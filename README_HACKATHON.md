@@ -608,7 +608,7 @@ You have **2 tokens per team**. Use them strategically:
 T+0:00-T+0:05: Read this README (fast scan)
 T+0:05-T+0:10: Do npm install (background)
 T+0:10-T+0:15: Verify health endpoint works
-T+0:15-T+0:30: Brainstorm 3 problem ideas with team
+T+0:15-T+0:30: Brainstorm 3 problem ideas with team & use your advice tokens!
 ├─ Pick the REALEST one
 ├─ Sketch how x402 fits in
 └─ Commit to it!
