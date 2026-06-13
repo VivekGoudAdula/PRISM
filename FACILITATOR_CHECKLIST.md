@@ -29,9 +29,10 @@
 
 **Quick intro (3 min):**
 - [ ] What is x402? (payment protocol for APIs)
-- [ ] The goal: Build 1 monetized endpoint in 55 min
+- [ ] The goal: Build at least 2 monetized endpoints and get them verified
 - [ ] Examples: Weather, Analytics, AI, Creator content
-- [ ] Judge on: x402 usage, creativity, usability, presentation
+- [ ] Requirement: Get Green Card verification for each endpoint before presenting
+- [ ] Judged on: Business value, novelty, abstraction quality, implementation depth, presentation clarity, and code quality
 - [ ] Winners: [Prizes TBD]
 
 ## Team Quick Start (5-10 min)

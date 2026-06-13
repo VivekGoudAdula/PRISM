@@ -302,19 +302,21 @@ T=55: Prepare pitch
 
 ## 🎯 Judging Criteria
 
-Teams are judged on:
-- **x402 Usage** - Correctly implements payment flow
-- **Simplicity** - Code is clean, easy to understand
-- **Creativity** - Original idea, novel use case
-- **Usability** - Works smoothly, user-friendly
-- **Presentation** - Clear pitch, good demo
+Teams are evaluated on:
+- **Real Business Value** - Does the use case solve a genuine problem? Would a real user pay for this?
+- **Novelty of Application** - Is the use case original and creative? Does it go beyond obvious applications?
+- **Quality of Abstraction** - Does the front end feel like a product? Is the user experience clean?
+- **Depth of Implementation** - How many working endpoints does the team have? How well do they work together?
+- **Clarity of Presentation** - Is the problem and solution communicated clearly within the 3 minute pitch?
+- **Clear Code** - Is the codebase well-structured, readable, and maintainable?
 
-This starter kit helps with all 5:
-- ✅ x402 already integrated
-- ✅ Clean, modular code
-- ✅ Handlers as templates for creativity
-- ✅ Example flows show usability
-- ✅ Working demo ready to show
+This starter kit helps with all 6:
+- ✅ Helps identify real business problems
+- ✅ Handlers as templates for creative solutions
+- ✅ Example flows show clean user experience
+- ✅ Modular design supports multiple endpoints
+- ✅ Working demo ready to present clearly
+- ✅ Well-organized, documented code structure
 
 ## 🚨 Before You Start
 

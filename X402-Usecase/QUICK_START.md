@@ -32,12 +32,14 @@ npm run start
 
 ## 🎯 Your Mission
 
-Build **ONE new monetized endpoint** that:
-1. Accepts x402 payment (USDC on Algorand TestNet)
-2. Returns useful data/service
-3. Works end-to-end in browser
+**Build at least 2 working monetized endpoints** that:
+1. Accept x402 payment (USDC on Algorand TestNet)
+2. Return useful data/service
+3. Work end-to-end in browser
 
-**Example:** Weather API → Your idea 
+**Then:** Show them to the verifier to get Green Cards (required to present to judges)
+
+**Example:** Weather API → Your creative idea 
 
 ---
 
