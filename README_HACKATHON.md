@@ -1,22 +1,112 @@
-# 🏆 x402 Build & Arena - Starter Kit
+# 🏆 x402 Build Sprint - Starter Kit
 
-> **Professional x402 Starter Kit** - Production-ready, hackathon-optimized, beginner-friendly.
+> **x402 Build Sprint on Algobharat Dev Retreat**  
+> **Duration:** 4 Hours | **Teams:** 10 x 6 people | **Format:** Competitive Build + Presentation
 
-## 📋 What You Got
+---
 
-This is a **complete, working** x402 payment system ready for hackathon teams to extend:
+## 📋 Event Overview
 
-✅ **Backend Server** - Hono.js with payment middleware  
-✅ **Frontend App** - React with wallet integration  
-✅ **4 Example Handlers** - Copy/modify for your idea  
-✅ **Modular Design** - Add endpoints in 5 minutes  
-✅ **Full Documentation** - Quick start to deployment  
-✅ **Type-Safe** - TypeScript with no compilation errors  
-✅ **Production Ready** - CORS, error handling, logging  
+The x402 Build Sprint is a focused hackathon embedded within the Algobharat Dev Retreat. This is **NOT a traditional hackathon**. Teams are challenged to:
 
-## 🎯 For Hackathon Teams (55 minutes)
+✅ **Identify a real business problem** - Not just a demo  
+✅ **Build a product-quality interface** - Users don't see the complexity  
+✅ **Implement 2+ x402 endpoints** - Real agents, real payments  
+✅ **Get Green Cards verified** - Technical integrity matters  
+✅ **Pitch in 3 minutes** - Clear, compelling communication  
 
-### ⚡ 5-Minute Setup
+**The Prize:** Teams that build genuine value with clean abstraction win.
+
+---
+
+## 🎯 4-Hour Sprint Timeline
+
+| Time | Activity | Duration | Your Team |
+|------|----------|----------|-----------|
+| **T+0:00** | Teams announced & Tokens distributed | 15 min | 🔄 Form team, get Consulting Tokens (×2) |
+| **T+0:15** | Problem scoping & use case definition | 45 min | 🧠 Brainstorm real problems, sketch solution |
+| **T+1:00** | **BUILD PHASE STARTS** | 90 min | ⚙️ Setup, code endpoints, get Green Cards verified |
+| **T+2:30** | Final build & last Green Card checks
+
+---
+
+## 🎯 What Every Team Must Build
+
+**Requirement 1: Define a Real Business Problem**  
+Your use case must reflect genuine friction in a real domain. Example: *"Researchers waste hours finding relevant academic papers across multiple databases."*
+
+**Requirement 2: Build a Clean, Abstracted User Interface**  
+Users simply state what they want. They should **never see x402 complexity**. Behind the scenes:
+- Multiple x402 agents coordinate
+- Each calls a distinct endpoint
+- Results aggregate invisibly
+- One payment request at the right moment
+
+**Requirement 3: Implement 2+ Working x402 Endpoints**  
+Each endpoint performs a distinct function. Together they solve the business problem. Examples:
+- Endpoint A: Search SSRN for academic papers
+- Endpoint B: Query ProQuest database
+- Endpoint C: Save selected papers to Google Drive
+
+**Requirement 4: Surface a USDC Payment Request**  
+Present payment at the right moment — after value is demonstrated, before delivery. Users pay once to unlock everything.
+
+**Requirement 5: Obtain Green Cards for Verification**  
+Each working endpoint must be verified by a technical verifier. You get a Green Card per verified endpoint.
+- **Minimum to present:** 2 Green Cards (2 verified endpoints)
+- **Extra credit:** 3+ Green Cards (more working endpoints)
+
+---
+
+## 🎮 Game Mechanics
+
+### 🎟️ Consulting Tokens (×2 per team)
+Each team receives **2 Consulting Tokens** at the start.
+
+**What they do:** Redeem one token to get a **1-on-1 consulting session** with an Algorand team member.
+- ⏱️ Time-boxed (15-20 min)
+- 📋 Use for: Unblocking technical issues, validating use case, endpoint design guidance
+- 🎯 Strategic use: Tokens are finite — use wisely!
+- **Note:** Judges are NOT available for consulting
+
+### 🏆 Green Cards
+A **Green Card** is issued when a verifier confirms your endpoint works as described.
+
+**What they do:** Act as your technical passport
+- ✅ Minimum 2 Green Cards required to present to judges
+- 📊 Signal depth of implementation (more cards = more endpoints)
+- 🔐 Not about quality/novelty — only "does it work?"
+
+**How to get them:**
+1. Build endpoint in your server
+2. Test it completely
+3. Call over a verifier
+4. They test it once
+5. You get your Green Card
+
+---
+
+## 🧭 The x402 Philosophy
+
+**x402 enables autonomous agents to transact on behalf of users.** These agents:
+- Make requests independently
+- Receive results
+- Trigger payments when value is delivered
+- Work silently in the background
+
+**Key Principle: Abstraction**  
+Users experience a clean product. They never see:
+- x402 protocol details
+- Agent orchestration
+- Endpoint coordination
+- Payment infrastructure
+
+They only see: problem solved → cost displayed → payment made.
+
+---
+
+## ⚡ Quick Setup (5-Minute)
+
 ```bash
 # Backend setup
 cd x402-demo-server
@@ -31,28 +121,13 @@ npm install
 npm run dev
 ```
 
-### 🚀 40-Minute Build
-**Pick one idea:**
-- 🤖 AI API endpoint
-- 📊 Analytics dashboard
-- 🎨 Creator monetization
-- 🔍 Premium search
-- 📸 Image processing
-- etc. (see HACKATHON_STARTER_KIT.md for 10+ ideas)
+✅ Backend runs on: `http://localhost:4021`  
+✅ Frontend runs on: `http://localhost:5173`  
+✅ Test with: `curl http://localhost:4021/health`
 
-**Then build it:**
-1. Enable/add endpoint in `endpoints.config.ts`
-2. Create handler in `handlers/my-api.ts`
-3. Register in `index.ts`
-4. Test with `curl` then browser
+---
 
-### 💬 15-Minute Polish & Pitch
-- Fix any bugs
-- Add error handling
-- Prepare demo
-- Write 2-min pitch
-
-## 📁 Repository Structure
+## 🏗️ Repository Structure
 
 ```
 X402-Usecase/
@@ -89,55 +164,102 @@ X402-Usecase/
     └── package.json
 ```
 
-## 🎬 Getting Started
+## 👥 Role-Based Guides
 
-### **For Teams:**
+### **For Team Participants**
 
-1. **Read:** [HACKATHON_STARTER_KIT.md](./HACKATHON_STARTER_KIT.md) (5 min)
-2. **Setup:** Backend + Frontend (5 min)
-3. **Pick Idea:** From 10+ examples (2 min)
-4. **Build:** Create endpoint (40 min)
-5. **Demo:** Show payment flow (3 min)
+**Your mission in 4 hours:**
+1. ✅ **T+0-15:** Form team & understand constraints
+2. ✅ **T+15-60:** Identify real problem, scope solution
+3. ✅ **T+60-150:** Build endpoints, get Green Cards
+4. ✅ **T+150-180:** Polish, test, prepare pitch
+5. ✅ **T+180+:** Present & celebrate
 
-### **For Facilitators:**
+**Success looks like:**
+- 🧠 Clear, real business problem (not fake)
+- 🎯 Clean UI (users don't see x402 internals)
+- ⚙️ 2+ verified endpoints (Green Cards proven)
+- 💳 Working payment flow
+- 🎤 3-minute pitch judges understand
 
-- Copy repo to teams
-- Let them build their MVP
-- Judge on: x402 usage, creativity, usability, presentation
+**Start here:**
+1. Read [HACKATHON_STARTER_KIT.md](./HACKATHON_STARTER_KIT.md) (10 min)
+2. Run setup above (5 min)
+3. Check [x402-demo-server/HACKATHON_README.md](./x402-demo-server/HACKATHON_README.md) (5 min)
+4. Pick a problem & build!
+
+### **For Judges**
+
+You're evaluating teams on **5 dimensions**:
+
+| Criterion | Description | What to Listen For |
+|-----------|-------------|-------------------|
+| **Real Business Value** | Does use case solve genuine problem? Would real users pay? | Specific friction, clear pain point, viable market |
+| **Novelty** | Original & creative? Beyond obvious applications? | Unique angle, fresh perspective, not seen before |
+| **Quality of Abstraction** | Does UI feel like product? Clean experience? | User doesn't need to understand x402, natural workflow |
+| **Depth of Implementation** | How many working endpoints? How well integrated? | Green Cards held, endpoints work together smoothly |
+| **Clarity of Presentation** | Is problem/solution communicated clearly in 3 min? | Story flows, easy to understand, compelling demo |
+
+**Presentation Format:**
+- 3 minutes: Pitch
+- 2 minutes: Your Q&A
+- Green Cards shown at start as proof
+
+### **For Verifiers**
+
+Your job: Confirm endpoints work as described (NOT judge quality).
+
+**Process:**
+1. Team calls you when endpoint is ready
+2. Test the endpoint thoroughly
+3. If it works → Issue Green Card
+4. If it needs work → Give feedback, test again later
+
+**Green Card Checklist:**
+- [ ] Endpoint responds correctly
+- [ ] Returns expected data format
+- [ ] Handles errors gracefully
+- [ ] Integrates with payment flow
+- [ ] Works with frontend UI
+
+**Note:** You're technical validation, not judges. Be thorough but encouraging!
+
+### **For Organizers**
+
+**Key Responsibilities:**
+- 📋 Manage time rigorously (start/end on schedule)
+- 🎫 Distribute Consulting Tokens & Green Cards
+- 👥 Announce teams at T+0
+- 🗣️ Introduce rules & philosophy
+- 📊 Facilitate verifier rotation
+- ⏱️ Hard stops at T+3:00 for pitches
+
+---
 
 ## 📚 Documentation Tree
 
 ```
 Choose Your Path:
 
-Quick Learner?
-├─ HACKATHON_STARTER_KIT.md (15 min)
-└─ x402-demo-server/HACKATHON_README.md (10 min)
+🚀 Quick Start (20 min total)
+├─ THIS FILE ← Overview & timeline
+├─ HACKATHON_STARTER_KIT.md ← 10+ use case ideas
+└─ x402-demo-server/HACKATHON_README.md ← Backend details
 
-Want Full Details?
-├─ X402_IMPLEMENTATION_GUIDE.md (30 min)
-├─ ARCHITECTURE.md (20 min)
-└─ X402_CRITICAL_REFERENCE.md (10 min)
+📖 Deep Dive (1 hour)
+├─ X402_IMPLEMENTATION_GUIDE.md ← Protocol internals
+├─ ARCHITECTURE.md ← System design
+└─ X402_CRITICAL_REFERENCE.md ← Code lookup
 
-Finding Code?
-├─ X402_CRITICAL_REFERENCE.md → "Code Snippets by Use Case"
-├─ handlers/ → Copy/modify examples
-└─ endpoints.config.ts → Uncomment examples
-
-Deploying?
-├─ ARCHITECTURE.md → "Deployment Architecture"
-├─ x402-demo-server/HACKATHON_README.md → "Ready to Deploy"
-└─ Production setup instructions
-
-Debugging?
-├─ X402_CRITICAL_REFERENCE.md → "Troubleshooting"
-├─ HACKATHON_STARTER_KIT.md → "Troubleshooting"
-└─ Server logs (watch for "✓ PAYMENT VERIFIED")
+🔧 Need Help?
+├─ handlers/ ← Copy example patterns
+├─ endpoints.config.ts ← See structure
+└─ X402_CRITICAL_REFERENCE.md → Troubleshooting
 ```
 
-## 🌟 What Makes This Hackathon-Ready
+## 🌟 Starter Kit Includes
 
-### ✅ For Teams
+### ✅ For Fast Onboarding
 - **5-minute setup** - Not 2 hours
 - **Copy-paste handlers** - 4 examples ready
 - **Clear patterns** - All handlers follow same structure
@@ -145,32 +267,23 @@ Debugging?
 - **Working demo** - Start with weather, modify for your idea
 - **Quick testing** - `curl` or browser
 
-### ✅ For Production
+### ✅ For Quality Delivery
 - **Type-safe** - Full TypeScript with no errors
 - **Error handling** - Try/catch in all handlers
 - **Logging** - Debug-friendly console output
 - **CORS working** - Handles browser requests
 - **Scalable** - Easy to add 10+ endpoints
-- **Documented** - Deployment-ready
+- **Production ready** - Deployment-ready code
 
-### ✅ For Learning
+### ✅ For Rapid Learning
 - **Real x402 flow** - Not simplified
 - **Best practices** - Proper middleware stack
 - **Clean code** - Easy to understand
 - **Well-commented** - Every section explained
-- **Examples** - 4 different handler patterns
-- **Deep docs** - 3000+ lines of reference material
+- **Multiple patterns** - 4 different handler examples
+- **Deep docs** - Reference material included
 
-## 💡 10+ Example Ideas (Pick One!)
-
-| Idea | Price | Time | Complexity | Files |
-|------|-------|------|-----------|-------|
-| Weather Data | $0.005 | 10 min | ⭐ Easy | handlers/weather.ts ✓ |
-| Analytics | $0.01 | 20 min | ⭐⭐ Medium | handlers/analytics.ts ✓ |
-| AI Analysis | $0.001 | 30 min | ⭐⭐⭐ Hard | handlers/ai-analysis.ts ✓ |
-| Creator Content | $0.05 | 25 min | ⭐⭐ Medium | handlers/creator-content.ts ✓ |
-| Image Processing | $0.02 | 30 min | ⭐⭐⭐ Hard | Create new |
-| Code Analysis | $0.001 | 20 min | ⭐⭐ Medium | Create new |
+## 💡 Example Use Cases
 | Premium Search | $0.005 | 15 min | ⭐ Easy | Create new |
 | API Proxy | $0.005 | 15 min | ⭐ Easy | Create new |
 | Data Export | $0.05 | 20 min | ⭐⭐ Medium | Create new |
@@ -204,9 +317,9 @@ lsof -ti:4021 | xargs kill -9  # Free the port
 npx tsc --noEmit           # Type check
 ```
 
-## 🏗️ Adding Your Endpoint (Copy-Paste)
+## 🚀 Add Your First Endpoint (90 seconds)
 
-### 1️⃣ Define in `endpoints.config.ts`
+**Step 1: Define in `endpoints.config.ts`**
 ```typescript
 'GET /my-api': {
   accepts: [{
@@ -220,17 +333,14 @@ npx tsc --noEmit           # Type check
 },
 ```
 
-### 2️⃣ Create `handlers/my-api.ts`
+**Step 2: Create `handlers/my-api.ts`**
 ```typescript
 import type { Context } from 'hono';
 
 export function handleMyApi(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED');
-    
-    // Your logic here
-    const result = { /* your data */ };
-    
+    const result = { data: 'your value here' };
     return c.json(result);
   } catch (error) {
     console.error('Error:', error);
@@ -239,161 +349,283 @@ export function handleMyApi(c: Context) {
 }
 ```
 
-### 3️⃣ Register in `index.ts`
+**Step 3: Register in `index.ts`**
 ```typescript
 import { handleMyApi } from './handlers/my-api';
-
 app.get('/my-api', handleMyApi);
 ```
 
-### 4️⃣ Test
+**Step 4: Test**
 ```bash
 curl http://localhost:4021/my-api  # Should return 402 ✓
 ```
 
-**That's it! 55 seconds to add a paid endpoint.**
+---
 
-## 🔍 Key Files Summary
-
-| File | Purpose | Edit? | Notes |
-|------|---------|-------|-------|
-| **HACKATHON_STARTER_KIT.md** | Quick start guide | 📖 Read | **START HERE** |
-| **x402-demo-server/HACKATHON_README.md** | Backend guide | 📖 Read | Specific to server |
-| **endpoints.config.ts** | Define routes | ✏️ **YES** | Your MVP here |
-| **handlers/*.ts** | Business logic | ✏️ **YES** | Copy & modify |
-| **index.ts** | Main server | ⚠️ Careful | Register routes only |
-| **x402-demo-server/.env** | Configuration | ✏️ **YES** | Your wallet address |
-| **X402-Usecase/.env.local** | Frontend config | ✅ Pre-set | Already configured |
-
-## ✨ Team Workflow
+## 🏃 4-Hour Team Workflow
 
 ```
-T=0: Start hacking
-├─ Read: HACKATHON_STARTER_KIT.md (5 min)
-├─ Setup: npm install + .env (5 min)
-└─ Verify: npm start → http://localhost:4021/health ✓
+T+0:00 - T+0:15: FORMATION & SETUP
+├─ Teams announced (your name is on board!)
+├─ Receive 2 Consulting Tokens
+├─ Do quick setup: npm install, .env config
+├─ Verify: npm start + npm run dev
+└─ Verify: http://localhost:4021/health works ✓
 
-T=10: Choose idea
-├─ Pick from 10+ examples
-├─ Check handlers/ for similar pattern
-└─ Plan your MVP
+T+0:15 - T+1:00: PROBLEM SCOPING (45 min)
+├─ 🧠 Brainstorm: What real problem can you solve?
+├─ 📋 Define use case: Specific, genuine, valuable
+├─ 🎯 Sketch solution: How x402 fits in
+├─ ✍️ Note how many endpoints you'll need (2+)
+├─ 👥 Assign roles: Who builds what?
+└─ 💡 Consider: How many Green Cards do you aim for?
 
-T=15: Build endpoint
-├─ Add to endpoints.config.ts
-├─ Create handlers/my-api.ts
-├─ Register in index.ts
-└─ Test: curl http://localhost:4021/my-api
+T+1:00 - T+2:30: BUILD PHASE (90 min)
+├─ ⚙️ Build endpoint 1 in backend
+│  ├─ Add to endpoints.config.ts
+│  ├─ Create handler in handlers/
+│  ├─ Register in index.ts
+│  └─ Test locally: curl http://localhost:4021/my-endpoint
+├─ ✅ Call verifier for Green Card check
+├─ 📱 If needed: Update frontend component
+├─ ⚙️ Build endpoint 2 (repeat above)
+├─ ✅ Get 2nd Green Card verified
+├─ ✨ Optional: Build endpoint 3+ for extra credit
+└─ 🎟️ Consider: Use Consulting Token if stuck?
 
-T=45: Build frontend (optional)
-├─ Component already in place
-├─ Just works with your backend
-└─ Test payment flow
+T+2:30 - T+3:00: POLISH & PREP (30 min)
+├─ 🧪 Test full payment flow end-to-end
+├─ 🐛 Fix any bugs or errors
+├─ 📝 Prepare 3-minute pitch
+│  ├─ Problem statement (1 min)
+│  ├─ Solution demo (1.5 min)
+│  └─ Why it matters (0.5 min)
+├─ 🎬 Practice live demo
+├─ 📸 Get Green Cards ready to show
+└─ ✅ Check: Do you have minimum 2 Green Cards?
 
-T=50: Polish & test
-├─ Error handling
-├─ Console logging
-├─ Try real payment flow
+T+3:00 - T+3:50: PRESENTATIONS (50 min)
+├─ 🎤 Teams present in order (5 min each)
+├─ 🟢 Show Green Cards at start
+├─ ⏱️ Pitch (3 min) + Q&A (2 min)
+├─ 💳 Demo payment flow if possible
+└─ 🙌 Answer judge questions clearly
 
-T=55: Prepare pitch
-├─ 2 min presentation
-├─ 1 min live demo
-└─ Submit!
+T+3:50 - T+4:00: JUDGING & WINNERS
+├─ 👨‍⚖️ Judges deliberate
+└─ 🏆 Winners announced!
 ```
 
-## 🎯 Judging Criteria
+---
+
+## 🎯 Illustrative Example
+
+**The Problem:**  
+An academic researcher needs literature review for "Reverse Logistics" but papers are scattered across SSRN, ProQuest, and JSTOR. Manually searching each takes hours.
+
+**The x402 Solution:**
+1. **Frontend:** User types "Find me Reverse Logistics papers"
+2. **Intent Agent (Backend):** Breaks request into 3 parallel tasks
+3. **Endpoint 1:** Search SSRN → Returns list + price
+4. **Endpoint 2:** Query ProQuest → Returns list + price
+5. **Endpoint 3:** Check JSTOR → Returns list + price
+6. **Aggregation:** Combine results, show user clean interface
+7. **Payment:** Single USDC request for selected papers
+8. **Fulfillment:** Deliver all to user's Google Drive automatically
+
+**Why this works:**
+- ✅ Real problem (researchers actually do this)
+- ✅ Clean UX (users see results, not complexity)
+- ✅ Multiple x402 endpoints (3 sources)
+- ✅ One payment moment (user buys once)
+- ✅ Agentic workflow (agents coordinate behind scenes)
+
+---
+
+## 📋 Judging Criteria
 
 Teams are evaluated on:
-- **Real Business Value** - Does the use case solve a genuine problem? Would a real user pay for this?
-- **Novelty of Application** - Is the use case original and creative? Does it go beyond obvious applications?
-- **Quality of Abstraction** - Does the front end feel like a product? Is the user experience clean?
-- **Depth of Implementation** - How many working endpoints does the team have? How well do they work together?
-- **Clarity of Presentation** - Is the problem and solution communicated clearly within the 3 minute pitch?
-- **Clear Code** - Is the codebase well-structured, readable, and maintainable?
 
-This starter kit helps with all 6:
-- ✅ Helps identify real business problems
-- ✅ Handlers as templates for creative solutions
-- ✅ Example flows show clean user experience
-- ✅ Modular design supports multiple endpoints
-- ✅ Working demo ready to present clearly
-- ✅ Well-organized, documented code structure
+| Criterion | Weight | Questions Judges Ask |
+|-----------|--------|----------------------|
+| **Real Business Value** | ⭐⭐⭐⭐⭐ | Does this solve a real problem? Would real users pay? Is there a market? |
+| **Novelty** | ⭐⭐⭐⭐ | Is this original? Creative angle? Not seen before? Fresh take? |
+| **Quality of Abstraction** | ⭐⭐⭐⭐ | Does UI feel like a product? Clean UX? User forgets about x402? |
+| **Depth of Implementation** | ⭐⭐⭐⭐ | Green Cards prove working endpoints. How many? Do they work together? |
+| **Clarity of Presentation** | ⭐⭐⭐ | 3-min pitch easy to follow? Demo works? Questions answered clearly? |
 
-## 🚨 Before You Start
+---
 
-### Prerequisites
+## ✅ Prerequisites
+
 - [ ] Node.js 18+ installed
-- [ ] Algorand TestNet wallet (Pera or Defly)
+- [ ] Algorand TestNet wallet (Pera or Defly app)
 - [ ] 0.01+ USDC on TestNet
-  - Get USDC: https://dispenser.testnet.algorand.network/
+  - Get testnet USDC: https://dispenser.testnet.algorand.network/
 
-### After Setup
-- [ ] Backend runs on localhost:4021
-- [ ] Frontend runs on localhost:5173
-- [ ] `curl http://localhost:4021/health` returns `{"status":"ok"}`
-- [ ] Can see weather example in browser
+---
 
-## 🆘 If Something Breaks
+## 🆘 Troubleshooting
 
-**Common Issues:**
+**Port 4021 already in use:**
+```bash
+lsof -ti:4021 | xargs kill -9
+npm start
+```
 
-| Problem | Solution |
-|---------|----------|
-| Port 4021 in use | `lsof -ti:4021 \| xargs kill -9` |
-| npm install fails | Delete `node_modules`, try again |
-| CORS error | Restart backend: `npm start` |
-| 402 always returns | Check wallet connected, has USDC |
-| Type errors | Run `npx tsc --noEmit` to see issues |
-| Server won't start | Check .env has correct values |
+**npm install fails:**
+```bash
+rm -rf node_modules
+npm install
+```
 
-**See docs:** [HACKATHON_STARTER_KIT.md - Troubleshooting](./HACKATHON_STARTER_KIT.md#troubleshooting)
+**CORS errors in browser:**
+- Restart backend server
+- Check frontend .env.local has correct API URL
+- Check CORS headers in server logs
 
-## 📊 Performance Notes
+**Endpoint returns 402 but shouldn't:**
+- Check wallet is connected
+- Check wallet has USDC on TestNet
+- Check price in endpoints.config.ts is set
 
-- **Response time:** <100ms for endpoint
-- **Payment verification:** 2-5 seconds
-- **Blockchain confirmation:** 4-5 seconds
-- **Total flow:** ~5-10 seconds per payment
-- **Capacity:** ~1000 concurrent users on TestNet
+**Type errors:**
+```bash
+npx tsc --noEmit  # See all TypeScript errors
+```
 
-This is fine for a hackathon demo!
+**Server won't start:**
+- Check .env file has AVM_ADDRESS
+- Check FACILITATOR_URL is correct
+- Check port 4021 is free
 
-## 🌍 After Hackathon
+---
 
-**Want to keep building?**
+## 🏆 Winning Strategy
 
-1. Deploy frontend (Vercel, Netlify)
-2. Deploy backend (Heroku, Railway, AWS)
-3. Add more endpoints
-4. Go to MainNet (real USDC)
-5. Build business! 💰
+**Focus on solving a REAL problem, not a demo.**
 
-## 📞 Support
+1. **Pick a genuine problem** (T+0:15-T+0:45)
+   - Interview yourselves: "Would I actually pay for this?"
+   - Look for specific friction: time wasted, money lost, workflow blocked
+   - Real ≠ famous; it can be niche but needs to be real
 
-**During Event:**
-- Check docs (links below)
-- Ask mentors nearby
-- Look at handlers/ for patterns
+2. **Keep the interface clean** (T+1:00-T+2:30)
+   - Hide x402 complexity completely
+   - Users click, get results, see price, pay
+   - No technical jargon in UI
 
-**Documentation:**
-- 🚀 **[HACKATHON_STARTER_KIT.md](./HACKATHON_STARTER_KIT.md)** - Full guide with 10+ examples
-- ⚙️ **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design
-- 📖 **[X402_IMPLEMENTATION_GUIDE.md](./X402_IMPLEMENTATION_GUIDE.md)** - Protocol details
-- 🔗 **[X402_CRITICAL_REFERENCE.md](./X402_CRITICAL_REFERENCE.md)** - Code reference
+3. **Build 2 working endpoints first** (T+1:00-T+2:00)
+   - Use Consulting Tokens if stuck
+   - Get both Green Cards verified
+   - Get them working TOGETHER (not separately)
+
+4. **Optional: 3rd endpoint for differentiation** (T+2:00-T+2:30)
+   - Only if first two are solid
+   - Extra Green Card = signal of depth
+
+5. **Pitch with confidence** (T+3:00-T+3:05)
+   - Lead with the problem (judges care about this first)
+   - Show payment flow works (live if possible)
+   - Mention Green Cards held as proof
+
+**Judges' perspective:** Novelty is secondary to real value. They'll remember: "This team found a genuine problem and solved it cleanly with x402."
+
+---
+
+## 📚 File Reference
+
+| File | Purpose | Edit? |
+|------|---------|-------|
+| **THIS FILE** | 4-hour sprint overview | 📖 Read |
+| **HACKATHON_STARTER_KIT.md** | 10+ use case ideas | 📖 Read |
+| **x402-demo-server/HACKATHON_README.md** | Backend specifics | 📖 Read |
+| **endpoints.config.ts** | Define your routes | ✏️ **EDIT** |
+| **handlers/*.ts** | Your business logic | ✏️ **EDIT** |
+| **index.ts** | Register routes | ⚠️ Careful |
+| **X402_IMPLEMENTATION_GUIDE.md** | Deep protocol dive | 📖 Reference |
+| **ARCHITECTURE.md** | System design | 📖 Reference |
+
+---
+
+## 💡 Quick Reference: Consulting Tokens
+
+You have **2 tokens per team**. Use them strategically:
+
+**Good uses:**
+- ✅ "Our endpoint keeps crashing, please debug"
+- ✅ "We're unsure if our use case is valid, review?"
+- ✅ "How should we structure this payment?"
+
+**Bad uses:**
+- ❌ "Build our endpoint for us"
+- ❌ "Tell us what idea to pick" (brainstorm yourselves!)
+- ❌ "Same question we already asked" (take notes)
+
+**Pro tip:** Save at least 1 token for T+2:00-T+2:30 in case you hit a blocker.
+
+---
+
+## 🎯 Key Reminders
+
+| Item | Must Have | Why |
+|------|-----------|-----|
+| 2+ Green Cards | ✅ Required | Minimum to present |
+| Real problem | ✅ Required | Judges evaluate on this first |
+| Working payment | ✅ Required | Demonstrates x402 integration |
+| Clean UI | ✅ Required | "Quality of Abstraction" criterion |
+| 3-min pitch | ✅ Required | Hard time limit |
+| Live demo | ⚡ Nice-to-have | Impressive if it works |
+| 3+ endpoints | ⭐ Bonus | Signals depth |
+| Deployed version | ⭐ Bonus | Shows you can ship |
+
+---
+
+## 📞 Getting Help
+
+**During the sprint:**
+- 📖 **Read docs first** - Many answers are already here
+- 🎟️ **Use a Consulting Token** - For real blockers
+- 👥 **Ask nearby mentor** - Often faster for quick questions
+- 🔍 **Check handlers/** - See similar patterns
+
+**Quick links:**
+- 🚀 [HACKATHON_STARTER_KIT.md](./HACKATHON_STARTER_KIT.md) - Use cases & ideas
+- ⚙️ [x402-demo-server/HACKATHON_README.md](./x402-demo-server/HACKATHON_README.md) - Backend setup
+- 🔗 [X402_CRITICAL_REFERENCE.md](./X402_CRITICAL_REFERENCE.md) - Code reference
+- 📖 [X402_IMPLEMENTATION_GUIDE.md](./X402_IMPLEMENTATION_GUIDE.md) - Protocol deep dive
+- 🏗️ [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
+
+---
+
+## 🎬 Action Plan: Your First 30 Minutes
+
+```
+T+0:00-T+0:05: Read this README (fast scan)
+T+0:05-T+0:10: Do npm install (background)
+T+0:10-T+0:15: Verify health endpoint works
+T+0:15-T+0:30: Brainstorm 3 problem ideas with team
+├─ Pick the REALEST one
+├─ Sketch how x402 fits in
+└─ Commit to it!
+
+→ You're now ready to build.
+```
+
+---
 
 ## 🎉 Let's Go Build!
 
 ```
-55 minutes → $0 to launch → Monetized API
+4 hours of focused building → 1 working product → Real value
                               ↓
-                        Deploy to production
+                        Working x402 payment flow
                               ↓
-                        Passive income! 💰
+                        Maybe a great business! 🚀
 ```
 
-**Happy hacking! 🚀**
+**x402 Build Sprint** — Where agents earn, users save, and teams learn.
 
 ---
 
-**x402 Build & Arena**  
-Powered by Algorand & AlgoBharat  
-*Let's monetize the web, one x402 endpoint at a time.*
+**Questions? Check the docs. Blocked? Use a token. Let's build!** 🚀
