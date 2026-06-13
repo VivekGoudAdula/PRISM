@@ -1,7 +1,7 @@
 # 🏆 x402 Build Sprint - Starter Kit
 
 > **x402 Build Sprint on Algobharat Dev Retreat**  
-> **Duration:** 4 Hours | **Teams:** 10 x 6 people | **Format:** Competitive Build + Presentation
+> **Duration:** 4 Hours |
 
 ---
 
