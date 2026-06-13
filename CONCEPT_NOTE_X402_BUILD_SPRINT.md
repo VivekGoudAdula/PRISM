@@ -1,14 +1,14 @@
 # Concept Note: x402 Build Sprint on Algobharat Dev Retreat
 
 **Event Date:** Saturday, 13 June 2026  
-**Duration:** 3 to 4 Hours  
+**Duration:**  4 Hours  
 **Format:** Internal Team Sync
 
 ---
 
 ## 1. Overview
 
-The x402 Build Sprint is a focused and competitive hackathon session embedded within the Algobharat Dev Retreat. It brings together approximately 60 participants drawn from 30 project teams and reorganises them into 10 freshly composed teams of 6. The session is designed to be energetic and collaborative. It is grounded in real business problem solving. The central theme is x402 as the foundational protocol for agentic commerce on Algorand. This protocol is made accessible through goPlausible x402 endpoints on the Algorand blockchain.
+The x402 Build Sprint is a focused and competitive hackathon session embedded within the Algobharat Dev Retreat. It brings together approximately ~60 participants drawn from 30 project teams and reorganises them into 10 freshly composed teams of 6. The session is designed to be energetic and collaborative. It is grounded in real business problem solving. The central theme is x402 as the foundational protocol for agentic commerce on Algorand. This protocol is made accessible through goPlausible x402 endpoints on the Algorand blockchain.
 
 The event challenges teams to move beyond simple demos and prototypes. Each team is expected to identify a genuine business problem. They must design a solution that uses x402 powered agents working silently in the background. They must deliver a working and user facing product experience within a single afternoon.
 
@@ -30,7 +30,7 @@ The key design principle for this competition is abstraction. Users should exper
 |-----------|--------|
 | Total Participants | ~60 people |
 | Original Teams | 30 project teams (2 people each) |
-| Sprint Teams | 10 new teams of 6 people each |
+| Sprint Teams | 11 new teams of 5 people each |
 | Team Composition | Cross pollinated from original teams |
 
 Teams are newly formed for this sprint. We deliberately mix participants from different original project teams. This encourages fresh thinking and new collaborations. It prevents teams from simply extending their existing work.
@@ -137,7 +137,7 @@ Judging is conducted by a panel of designated judges. The technical verification
 | T+2:30 | Final builds and last Green Card verifications |
 | T+3:00 | Pitches begin with 5 minutes per team |
 | T+3:50 | Judges deliberate |
-| T+4:00 | Winners announced |
+| T+5:00 | Winners announced |
 
 ---
 
