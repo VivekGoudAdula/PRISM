@@ -324,7 +324,7 @@ This starter kit helps with all 6:
 - [ ] Node.js 18+ installed
 - [ ] Algorand TestNet wallet (Pera or Defly)
 - [ ] 0.01+ USDC on TestNet
-  - Get USDC: https://dispenser.testnet.algorand.network/
+  - Get USDC: https://faucet.circle.com/
 
 ### After Setup
 - [ ] Backend runs on localhost:4021
