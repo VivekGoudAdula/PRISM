@@ -461,7 +461,11 @@ Teams are evaluated on:
 - [ ] Node.js 18+ installed
 - [ ] Algorand TestNet wallet (Pera or Defly app)
 - [ ] 0.01+ USDC on TestNet
+<<<<<<< HEAD
   - Get testnet USDC: https://dispenser.testnet.algorand.network/
+=======
+  - Get USDC: https://faucet.circle.com/
+>>>>>>> b158335e02f7651d45579fc817c1740d3761b359
 
 ---
 
