@@ -107,9 +107,9 @@ const Weather: React.FC = () => {
         )}
 
         {weatherData && (
-          <div className="mockup-code bg-base-200 p-4">
-            <pre className="text-xs overflow-auto max-h-64">
-              <code>{formatWeatherData(weatherData)}</code>
+          <div className="mockup-code bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
+            <pre className="text-sm overflow-auto max-h-64 font-mono text-emerald-300 leading-relaxed">
+              <code className="whitespace-pre-wrap break-words">{formatWeatherData(weatherData)}</code>
             </pre>
           </div>
         )}

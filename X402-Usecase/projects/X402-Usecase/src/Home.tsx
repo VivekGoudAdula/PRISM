@@ -19,7 +19,7 @@ const Home: React.FC<HomeProps> = () => {
       <div className="hero-content w-full max-w-3xl flex flex-col gap-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-white mb-2">x402 Weather Demo</h1>
+          <h1 className="text-5xl font-bold text-white mb-2">x402 Demo</h1>
           <p className="text-lg text-teal-100">
             Pay-per-API on Algorand: Connect wallet, sign payment, get data
           </p>
