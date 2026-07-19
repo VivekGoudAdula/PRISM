@@ -1,5 +1,6 @@
 import { SupportedWallet, WalletId, WalletManager, WalletProvider } from '@txnlab/use-wallet-react'
 import { SnackbarProvider } from 'notistack'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './Home'
 import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
 
@@ -50,7 +51,17 @@ export default function App() {
   return (
     <SnackbarProvider maxSnack={3}>
       <WalletProvider manager={walletManager}>
-        <Home />
+        <Routes>
+          {/* Landing page */}
+          <Route path="/" element={<Home />} />
+          {/* Auth pages */}
+          <Route path="/login" element={<Home />} />
+          <Route path="/signup" element={<Home />} />
+          {/* Dashboard */}
+          <Route path="/app" element={<Home />} />
+          {/* Catch-all → landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </WalletProvider>
     </SnackbarProvider>
   )

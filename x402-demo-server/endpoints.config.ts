@@ -1,176 +1,179 @@
 /**
  * X402 Hackathon Starter Kit - Endpoints Configuration
  *
- * This file defines all payment-protected endpoints for your x402 service.
- * Modify this file to add new endpoints or change payment requirements.
+ * This file defines all payment-protected endpoints for the x402 service.
  *
- * QUICK START FOR TEAMS:
- * 1. Add a new entry below with your endpoint path and payment price
- * 2. Create a handler in handlers/ directory
- * 3. Import and register it in index.ts
- * 4. Test with curl: curl http://localhost:4021/your-endpoint
+ * Key architecture:
+ *  - Individual task endpoints (/resume-screen-*, /contract-analyze-*, etc.)
+ *    use STATIC prices per call.
+ *  - POST /execute-task uses a DYNAMIC price resolved from the plan stored
+ *    in MongoDB (quantity × unitPrice + platformFee). The DynamicPrice
+ *    function reads the planId from the query string, fetches the Task
+ *    document, and returns the computed totalCost.
  */
 
 import { ALGORAND_TESTNET_CAIP2, USDC_TESTNET_ASA_ID } from '@x402/avm';
+import type { DynamicPrice } from '@x402/core/server';
+import { Task } from './models/Task';
 
-// Type definition for endpoints
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface StaticPaymentOption {
+  scheme: 'exact';
+  price: string;
+  network: string;
+  payTo: string;
+  extra: { asset: number };
+}
+
+export interface DynamicPaymentOption {
+  scheme: 'exact';
+  price: DynamicPrice;
+  network: string;
+  payTo: string;
+  extra: { asset: number };
+}
+
 export interface EndpointConfig {
   [key: string]: {
-    accepts: Array<{
-      scheme: 'exact';
-      price: string;
-      network: string;
-      payTo: string;
-      extra: { asset: number };
-    }>;
+    accepts: Array<StaticPaymentOption | DynamicPaymentOption>;
     description: string;
   };
 }
 
+// ─── Config factory ──────────────────────────────────────────────────────────
+
 /**
- * ENDPOINT TEMPLATES - Copy and modify for your ideas!
+ * Creates the full payment config for all protected endpoints.
  *
- * Modify this based on your team's MVP idea:
+ * @param avmAddress - The Algorand wallet address that receives payments
  */
 export function createPaymentConfig(avmAddress: string): EndpointConfig {
-  return {
-    // ========== EXAMPLE ENDPOINTS - Modify these! ==========
 
-    /**
-     * EXAMPLE 1: Pay-Per-Use API
-     * Users pay for accessing premium data
-     * Idea: Real-time market data, weather, news, etc.
-     */
+  /**
+   * Dynamic price resolver for /execute-task.
+   *
+   * Reads the `planId` query parameter from the request context, fetches the
+   * corresponding Task document, and returns its pre-computed totalCost as the
+   * x402 payment price. This makes the blockchain payment amount exactly equal
+   * to (executionQuantity × unitPrice + platformFee).
+   */
+  const executionTaskDynamicPrice: DynamicPrice = async (context) => {
+    const planId = context.adapter.getQueryParam?.('planId') as string | undefined;
+
+    if (!planId) {
+      // Fallback minimum to trigger 402 — handler will reject missing planId
+      return '$0.01';
+    }
+
+    try {
+      const plan = await Task.findById(planId).lean();
+      if (!plan || !plan.totalCost || plan.status !== 'planned') {
+        // Fallback: plan not found or not ready — return a minimum to trigger 402
+        return '$0.01';
+      }
+      // Return the exact dynamic total e.g. "$12.00"
+      return `$${plan.totalCost.toFixed(2)}`;
+    } catch (err) {
+      console.error('executionTaskDynamicPrice: DB lookup failed:', err);
+      return '$0.01';
+    }
+  };
+
+  return {
+    // ── Individual AI Endpoints (static, per-call pricing) ──────────────────
+
     'GET /weather': {
-      accepts: [
-        {
-          scheme: 'exact',
-          price: '$0.005', // Change this price
-          network: ALGORAND_TESTNET_CAIP2,
-          payTo: avmAddress,
-          extra: { asset: Number(USDC_TESTNET_ASA_ID) },
-        },
-      ],
-      description: 'Weather data access - Pay $0.005 USDC',
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.005',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Weather data access — $0.005 USDC per call',
     },
 
-    /**
-     * EXAMPLE 2: Premium Analytics
-     * Users pay for detailed analytics or reports
-     * Idea: Portfolio analytics, trading stats, DeFi analytics
-     */
-    // 'GET /analytics': {
-    //   accepts: [
-    //     {
-    //       scheme: 'exact',
-    //       price: '$0.01', // Premium pricing
-    //       network: ALGORAND_TESTNET_CAIP2,
-    //       payTo: avmAddress,
-    //       extra: { asset: USDC_TESTNET_ASA_ID },
-    //     },
-    //   ],
-    //   description: 'Advanced analytics dashboard - Pay $0.01 USDC',
-    // },
+    'POST /resume-screen-fast': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.20',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Fast Resume Screening — $0.20 USDC per call',
+    },
 
-    /**
-     * EXAMPLE 3: Creator Monetization
-     * Creators get paid when users access their content
-     * Idea: Exclusive NFT content, digital art, music, tutorials
-     */
-    // 'GET /exclusive-content/:id': {
-    //   accepts: [
-    //     {
-    //       scheme: 'exact',
-    //       price: '$0.02', // Creator's price
-    //       network: ALGORAND_TESTNET_CAIP2,
-    //       payTo: avmAddress,
-    //       extra: { asset: USDC_TESTNET_ASA_ID },
-    //     },
-    //   ],
-    //   description: 'Exclusive creator content - Pay $0.02 USDC per access',
-    // },
+    'POST /resume-screen-accurate': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.45',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Accurate Resume Screening — $0.45 USDC per call',
+    },
 
-    /**
-     * EXAMPLE 4: Token-Gated Utility
-     * Users pay to access special tools or utilities
-     * Idea: Dev tools, code analysis, AI-powered features
-     */
-    // 'POST /ai-analysis': {
-    //   accepts: [
-    //     {
-    //       scheme: 'exact',
-    //       price: '$0.001', // Micropayment
-    //       network: ALGORAND_TESTNET_CAIP2,
-    //       payTo: avmAddress,
-    //       extra: { asset: USDC_TESTNET_ASA_ID },
-    //     },
-    //   ],
-    //   description: 'AI analysis tool - Pay $0.001 USDC per request',
-    // },
+    'POST /contract-analyze-fast': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.30',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Fast Contract Analysis — $0.30 USDC per call',
+    },
 
-    /**
-     * EXAMPLE 5: Subscription Alternative
-     * Users pay small amounts instead of monthly subscriptions
-     * Idea: Database access, API quota, file storage
-     */
-    // 'GET /premium-data': {
-    //   accepts: [
-    //     {
-    //       scheme: 'exact',
-    //       price: '$0.003', // Small payment
-    //       network: ALGORAND_TESTNET_CAIP2,
-    //       payTo: avmAddress,
-    //       extra: { asset: USDC_TESTNET_ASA_ID },
-    //     },
-    //   ],
-    //   description: 'Premium data access - Pay as you go',
-    // },
+    'POST /contract-analyze-accurate': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.60',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Accurate Contract Analysis — $0.60 USDC per call',
+    },
+
+    'POST /invoice-extract-fast': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.15',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Fast Invoice Extraction — $0.15 USDC per call',
+    },
+
+    'POST /invoice-extract-accurate': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.35',
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Accurate Invoice Extraction — $0.35 USDC per call',
+    },
+
+    // ── NEW: Dynamic-price orchestrated execution ────────────────────────────
+    // Price = plan.totalCost = (executionQuantity × unitPrice) + platformFee
+    // Resolved live from MongoDB by reading the planId query parameter.
+    'POST /execute-task': {
+      accepts: [{
+        scheme: 'exact',
+        price: executionTaskDynamicPrice,
+        network: ALGORAND_TESTNET_CAIP2,
+        payTo: avmAddress,
+        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+      }],
+      description: 'Dynamic-price task execution — quantity × unitPrice + $0.75 platform fee',
+    },
   };
 }
-
-/**
- * QUICK GUIDE: Adding a New Endpoint
- *
- * Step 1: Add config here
- * ───────────────────────
- * 'GET /my-endpoint': {
- *   accepts: [{
- *     scheme: 'exact',
- *     price: '$0.005',
- *     network: ALGORAND_TESTNET_CAIP2,
- *     payTo: avmAddress,
- *     extra: { asset: USDC_TESTNET_ASA_ID },
- *   }],
- *   description: 'Description of what users pay for',
- * },
- *
- * Step 2: Create handler in handlers/myEndpoint.ts
- * ─────────────────────────────────────────────────
- * import { Context } from 'hono';
- *
- * export function handleMyEndpoint(c: Context) {
- *   console.log('✓ Payment verified - returning data');
- *   return c.json({ data: 'your response here' });
- * }
- *
- * Step 3: Register in index.ts
- * ─────────────────────────────
- * import { handleMyEndpoint } from './handlers/myEndpoint';
- * app.get('/my-endpoint', handleMyEndpoint);
- *
- * That's it! Your endpoint is now payment-protected.
- */
-
-/**
- * PRICING EXAMPLES (Convert to USDC decimals):
- * - $0.001 = 1 microUSDC (micropayment)
- * - $0.005 = 5 microUSDC (low cost)
- * - $0.01  = 10 microUSDC (small fee)
- * - $0.05  = 50 microUSDC (premium)
- * - $0.10  = 100 microUSDC (high value)
- *
- * USDC on TestNet (ASA 10458941) has 6 decimals
- * So $0.01 USDC = 10,000 microunits
- */
 
 export default createPaymentConfig;

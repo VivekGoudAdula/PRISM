@@ -44,11 +44,15 @@
     "@x402-avm/core": "^2.6.1",
     "@x402-avm/fetch": "^2.6.1",
     "algosdk": "^3.0.0",
+    "axios": "^1.18.1",
     "daisyui": "^4.0.0",
     "lute-connect": "^1.7.0",
     "notistack": "^3.0.1",
+    "ogl": "^1.0.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-icons": "^5.7.0",
+    "react-router-dom": "^7.18.1",
     "tslib": "^2.6.2"
   },
   "scripts": {

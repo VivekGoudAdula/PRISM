@@ -1,6 +1,14 @@
 # 🚀 x402 Hackathon Starter Kit
 
-> **Build payment-protected APIs in 55 minutes** using the x402 HTTP payment protocol on Algorand.
+## Prism — Verified Bidding Router
+
+**Router (`/run-task`):** Prism exposes a main customer-facing endpoint `/run-task` that accepts a plain-language task description, routes it internally after payment settlement, and returns the verified execution results from the winning capability.
+
+**Capabilities (Underlying Endpoints):** There are 6 specialized payment-protected backend endpoints: fast and accurate variants for resume screening (`/resume-screen-fast` / `-accurate`), contract analysis (`/contract-analyze-fast` / `-accurate`), and invoice extraction (`/invoice-extract-fast` / `-accurate`).
+
+**Bidding, Verification, and Reputation:** For each task, Prism conducts a bidding process where candidates compete based on price, confidence, and reputation. After execution, Prism automatically validates the output schema and updates the persistent reputation store, dynamically adjusting future bids.
+
+---
 
 ## Table of Contents
 

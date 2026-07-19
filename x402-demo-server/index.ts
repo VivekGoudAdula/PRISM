@@ -19,6 +19,7 @@ import { paymentMiddleware } from '@x402/hono';
 import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactAvmScheme } from '@x402/avm/exact/server';
 import { ALGORAND_TESTNET_CAIP2 } from '@x402/avm';
+import mongoose from 'mongoose';
 
 // Import handler functions
 import { handleWeatherRequest } from './handlers/weather';
@@ -37,12 +38,77 @@ import {
 // Import endpoint configuration
 import createPaymentConfig, { EndpointConfig } from './endpoints.config';
 
+// Import Middlewares and Routers
+import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
+import { requireAuth } from './middleware/auth';
+import authRouter from './routes/auth';
+import chatRouter from './routes/chat';
+import { analyticsRouter, adminRouter } from './routes/analytics';
+
 // Load environment variables
 config();
+
+import bcrypt from 'bcryptjs';
+import { User } from './models/User';
+
+// Connect to MongoDB
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const mongoDbName = process.env.MONGO_DB_NAME || 'prism_app';
+
+let connectionString = mongoUri;
+if (mongoUri.includes('?')) {
+  const parts = mongoUri.split('?');
+  const base = parts[0].endsWith('/') ? parts[0].slice(0, -1) : parts[0];
+  const protocolSeparator = base.indexOf('//');
+  const pathPart = base.substring(protocolSeparator + 2);
+  const slashCount = (pathPart.match(/\//g) || []).length;
+  
+  if (slashCount > 0) {
+    const lastSlash = base.lastIndexOf('/');
+    connectionString = base.substring(0, lastSlash) + '/' + mongoDbName + '?' + parts[1];
+  } else {
+    connectionString = base + '/' + mongoDbName + '?' + parts[1];
+  }
+} else {
+  if (mongoUri.endsWith('/')) {
+    connectionString = mongoUri + mongoDbName;
+  } else {
+    connectionString = mongoUri + '/' + mongoDbName;
+  }
+}
+
+console.log(`Connecting to MongoDB at: ${connectionString.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`); // Hide credentials in log
+mongoose.connect(connectionString)
+  .then(async () => {
+    console.log('✅ MongoDB connected successfully');
+    
+    // Seed Admin User
+    try {
+      const adminEmail = 'admin@prism.com';
+      const existingAdmin = await User.findOne({ email: adminEmail });
+      if (!existingAdmin) {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash('Admin@123!', salt);
+        await User.create({
+          fullName: 'System Admin',
+          email: adminEmail,
+          passwordHash,
+          role: 'admin',
+          subscriptionPlan: 'enterprise',
+          credits: 999999,
+        });
+        console.log('✅ Default Admin user seeded successfully');
+      }
+    } catch (err) {
+      console.error('Error seeding admin user:', err);
+    }
+  })
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // ════════════════════════════════════════════════════════════════════
 // CONFIGURATION & SETUP
 // ════════════════════════════════════════════════════════════════════
+
 
 const avmAddress = process.env.AVM_ADDRESS;
 const facilitatorUrl = process.env.FACILITATOR_URL;
@@ -110,23 +176,16 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-/**
- * Logging Middleware
- *
- * Logs all requests for debugging and monitoring
- */
-app.use('*', async (c, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`\n[${timestamp}] ${c.req.method.toUpperCase()} ${c.req.path}`);
+// Load standard middlewares
+app.use('*', requestLogger);
+app.use('*', rateLimiter);
+app.onError(errorMiddleware);
 
-  // Log headers (useful for debugging)
-  if (c.req.header('payment-signature')) {
-    console.log('  ✓ Payment-Signature header detected');
-  }
-
-  await next();
-  console.log(`  Response: ${c.res.status}`);
-});
+// Mount API routes
+app.route('/api/auth', authRouter);
+app.route('/api/chat', chatRouter);
+app.route('/api/analytics', analyticsRouter);
+app.route('/api/admin', adminRouter);
 
 /**
  * X402 Payment Middleware
@@ -144,6 +203,7 @@ console.log();
 
 app.use(paymentMiddleware(paymentConfig as any, x402Server));
 
+
 // ════════════════════════════════════════════════════════════════════
 // ROUTE HANDLERS - Payment-Protected Endpoints
 // ════════════════════════════════════════════════════════════════════
@@ -155,6 +215,50 @@ app.use(paymentMiddleware(paymentConfig as any, x402Server));
 
 // Example 1: Weather Data - Pay $0.005
 app.get('/weather', handleWeatherRequest);
+
+// 6 new payment-protected endpoints
+app.post('/resume-screen-fast', async (c) => {
+  const { handleResumeScreenFastRequest } = await import('./handlers/resume-screen-fast');
+  return handleResumeScreenFastRequest(c);
+});
+app.post('/resume-screen-accurate', async (c) => {
+  const { handleResumeScreenAccurateRequest } = await import('./handlers/resume-screen-accurate');
+  return handleResumeScreenAccurateRequest(c);
+});
+app.post('/contract-analyze-fast', async (c) => {
+  const { handleContractAnalyzeFastRequest } = await import('./handlers/contract-analyze-fast');
+  return handleContractAnalyzeFastRequest(c);
+});
+app.post('/contract-analyze-accurate', async (c) => {
+  const { handleContractAnalyzeAccurateRequest } = await import('./handlers/contract-analyze-accurate');
+  return handleContractAnalyzeAccurateRequest(c);
+});
+app.post('/invoice-extract-fast', async (c) => {
+  const { handleInvoiceExtractFastRequest } = await import('./handlers/invoice-extract-fast');
+  return handleInvoiceExtractFastRequest(c);
+});
+app.post('/invoice-extract-accurate', async (c) => {
+  const { handleInvoiceExtractAccurateRequest } = await import('./handlers/invoice-extract-accurate');
+  return handleInvoiceExtractAccurateRequest(c);
+});
+
+app.post('/run-task', requireAuth, async (c) => {
+  const { handleRunTaskRequest } = await import('./handlers/run-task');
+  return handleRunTaskRequest(c);
+});
+
+/**
+ * POST /execute-task?planId=<id> — DYNAMIC PAYMENT PROTECTED
+ *
+ * Phase 2 of the new pipeline. The x402 paymentMiddleware enforces a
+ * dynamic price resolved from the plan's totalCost (quantity × unitPrice
+ * + platformFee). Called only after the user confirms the Execution Summary
+ * and the blockchain payment is verified.
+ */
+app.post('/execute-task', requireAuth, async (c) => {
+  const { handleExecuteTaskRequest } = await import('./handlers/execute-task');
+  return handleExecuteTaskRequest(c);
+});
 
 // Example 2: Analytics - Uncomment to enable
 // app.get('/analytics', handleAnalyticsRequest);
@@ -184,6 +288,28 @@ app.get('/health', (c) => {
     service: 'x402-hackathon-starter',
     uptime: process.uptime(),
   });
+});
+
+app.post('/classify-task', async (c) => {
+  const { handleClassifyTaskRequest } = await import('./handlers/classify-task');
+  return handleClassifyTaskRequest(c);
+});
+
+app.post('/select-endpoint', async (c) => {
+  const { handleSelectEndpointRequest } = await import('./handlers/select-endpoint');
+  return handleSelectEndpointRequest(c);
+});
+
+/**
+ * POST /plan-task — PUBLIC (no payment required)
+ *
+ * Phase 1 of the new pipeline. Classifies the task, discovers providers,
+ * computes dynamic pricing (quantity × unitPrice + platform fee), and
+ * returns a planId + full ExecutionPlan to the client.
+ */
+app.post('/plan-task', requireAuth, async (c) => {
+  const { handlePlanTaskRequest } = await import('./handlers/plan-task');
+  return handlePlanTaskRequest(c);
 });
 
 /**

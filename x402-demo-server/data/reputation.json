@@ -1,0 +1,32 @@
+{
+  "/resume-screen-fast": {
+    "score": 0.5,
+    "total_runs": 0,
+    "verified_passes": 0
+  },
+  "/resume-screen-accurate": {
+    "score": 1,
+    "total_runs": 13,
+    "verified_passes": 13
+  },
+  "/contract-analyze-fast": {
+    "score": 0.5,
+    "total_runs": 0,
+    "verified_passes": 0
+  },
+  "/contract-analyze-accurate": {
+    "score": 0.5,
+    "total_runs": 0,
+    "verified_passes": 0
+  },
+  "/invoice-extract-fast": {
+    "score": 0.5,
+    "total_runs": 0,
+    "verified_passes": 0
+  },
+  "/invoice-extract-accurate": {
+    "score": 1,
+    "total_runs": 1,
+    "verified_passes": 1
+  }
+}
