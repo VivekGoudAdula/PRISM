@@ -160,19 +160,6 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       description: 'Accurate Invoice Extraction — $0.35 USDC per call',
     },
 
-    // ── NEW: Dynamic-price orchestrated execution ────────────────────────────
-    // Price = plan.totalCost = (executionQuantity × unitPrice) + platformFee
-    // Resolved live from MongoDB by reading the planId query parameter.
-    'POST /execute-task': {
-      accepts: [{
-        scheme: 'exact',
-        price: executionTaskDynamicPrice,
-        network: ALGORAND_TESTNET_CAIP2,
-        payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
-      }],
-      description: 'Dynamic-price task execution — quantity × unitPrice + $0.75 platform fee',
-    },
   };
 }
 

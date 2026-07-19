@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { extractText } from './lib/extract-document';
 
 /**
  * POST /invoice-extract-fast
@@ -29,7 +30,15 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
     let totalLlmLatency = 0;
 
     for (const file of files) {
-      const extracted_text = file.text || '';
+      let extracted_text = file.text || '';
+      if (!extracted_text && file.content_base64) {
+        try {
+          const extResult = await extractText(file.filename, file.content_base64);
+          extracted_text = extResult.text;
+        } catch (err) {
+          console.error(`Failed to extract text for ${file.filename}:`, err);
+        }
+      }
       
       let fileItems = [];
       let success = false;

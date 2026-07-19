@@ -305,15 +305,15 @@ export async function planTask(
  */
 export async function executeTaskWithPayment(
   baseUrl: string,
-  planId: string,
+  plan: ExecutionPlan,
   taskDescription: string,
   files: AttachedFile[],
   walletSigner: any,
+  onProgress?: (current: number, phase: 'payment' | 'executing' | 'verifying' | 'completed') => void
 ): Promise<ExecuteTaskResponse> {
-  const url = `${baseUrl}/execute-task?planId=${encodeURIComponent(planId)}`
   console.log('\n=== executeTaskWithPayment START ===')
-  console.log('URL:', url)
-  console.log('Plan ID:', planId)
+  console.log('Plan ID:', plan.planId)
+  console.log('Endpoint:', plan.endpointPath)
   console.log('Files:', files.length)
 
   const fetchFn = await createX402Fetch(walletSigner)
@@ -326,25 +326,94 @@ export async function executeTaskWithPayment(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetchFn(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      task_description: taskDescription,
-      files,
-    }),
-  })
+  const executionCount = files.length > 0 ? files.length : 1
+  const handlerResults: any[] = []
+  const transactionIds: string[] = []
 
-  console.log('Response status:', response.status)
+  try {
+    for (let i = 0; i < executionCount; i++) {
+      const singleFile = files[i]
+      if (onProgress) {
+        onProgress(i + 1, 'payment')
+      }
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}))
-    throw new Error((errData as any).error || `Execute Task failed: HTTP ${response.status}`)
+      const payload = {
+        task_description: taskDescription,
+        files: singleFile ? [singleFile] : [],
+      }
+
+      console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount}`)
+
+      if (onProgress) {
+        onProgress(i + 1, 'executing')
+      }
+
+      const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${response.status}`)
+      }
+
+      const paymentHeader = response.headers.get('x-payment') || response.headers.get('payment-signature')
+      if (paymentHeader) {
+        transactionIds.push(paymentHeader)
+      }
+
+      const result = await response.json()
+      handlerResults.push(result)
+    }
+
+    if (onProgress) {
+      onProgress(executionCount, 'verifying')
+    }
+
+    // Report back to the server to record execution
+    const executeUrl = `${baseUrl}/execute-task?planId=${encodeURIComponent(plan.planId)}`
+    const saveResponse = await fetch(executeUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        results: handlerResults,
+        transactionIds,
+      }),
+    })
+
+    if (!saveResponse.ok) {
+      const errData = await saveResponse.json().catch(() => ({}))
+      throw new Error(errData.error || `Save task execution failed: HTTP ${saveResponse.status}`)
+    }
+
+    const data: ExecuteTaskResponse = await saveResponse.json()
+    console.log('SUCCESS — Execution result:', data)
+
+    if (onProgress) {
+      onProgress(executionCount, 'completed')
+    }
+
+    return data
+  } catch (err: any) {
+    console.error('Error during execution orchestration:', err)
+    
+    // Report failure to the server
+    const executeUrl = `${baseUrl}/execute-task?planId=${encodeURIComponent(plan.planId)}`
+    await fetch(executeUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        status: 'failed',
+        error: err.message || 'Execution failed',
+      }),
+    }).catch((saveErr) => {
+      console.error('Failed to report task failure to server:', saveErr)
+    })
+    
+    throw err
   }
-
-  const data: ExecuteTaskResponse = await response.json()
-  console.log('SUCCESS — Execution result:', data)
-  return data
 }
 
 // ─── Legacy helpers (kept for backward compatibility) ─────────────────────────

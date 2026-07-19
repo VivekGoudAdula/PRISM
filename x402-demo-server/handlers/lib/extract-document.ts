@@ -2,7 +2,6 @@ import { config } from 'dotenv';
 import { PDFParse } from 'pdf-parse';
 import pdfExtractModule from 'pdf.js-extract';
 import Tesseract from 'tesseract.js';
-import mammoth from 'mammoth';
 
 config();
 
@@ -44,28 +43,17 @@ async function extractImagesFromPdf(buffer: Buffer): Promise<string[]> {
 }
 
 /**
- * Centrally extracts text from base64 file content based on type (txt, pdf, scanned pdf OCR fallback, docx).
+ * Centrally extracts text from base64 file content based on type (txt, pdf, scanned pdf OCR fallback).
  */
 export async function extractText(
   filename: string,
   content_base64: string
-): Promise<{ text: string; method: 'pdf-text' | 'ocr' | 'plain' | 'docx-text' }> {
+): Promise<{ text: string; method: 'pdf-text' | 'ocr' | 'plain' }> {
   const normalizedFilename = filename.toLowerCase();
 
   if (normalizedFilename.endsWith('.txt')) {
     const text = Buffer.from(content_base64, 'base64').toString('utf-8');
     return { text, method: 'plain' };
-  }
-
-  if (normalizedFilename.endsWith('.docx')) {
-    const buffer = Buffer.from(content_base64, 'base64');
-    try {
-      const result = await mammoth.extractRawText({ buffer });
-      return { text: result.value.trim(), method: 'docx-text' };
-    } catch (err: any) {
-      console.error(`Failed to parse DOCX using mammoth for ${filename}:`, err);
-      throw new Error(`Failed to extract text from DOCX: ${err.message}`);
-    }
   }
 
   if (normalizedFilename.endsWith('.pdf')) {
@@ -126,6 +114,18 @@ export async function extractText(
     }
 
     return { text, method: 'pdf-text' };
+  }
+
+  if (normalizedFilename.endsWith('.docx')) {
+    const buffer = Buffer.from(content_base64, 'base64');
+    try {
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+      return { text: result.value, method: 'plain' };
+    } catch (err: any) {
+      console.error(`Mammoth docx extraction failed for ${filename}:`, err);
+      throw new Error(`Failed to extract text from DOCX: ${err.message}`);
+    }
   }
 
   throw new Error(`Unsupported file type: ${filename}. Only .txt, .pdf, and .docx are supported.`);

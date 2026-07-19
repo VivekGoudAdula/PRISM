@@ -143,13 +143,14 @@ async function invokeProviderHandler(endpoint: string, bodyData: Record<string, 
  *  6. Persist full billing breakdown, groupTransactionId, and progress log
  *  7. Return combined result with execution metadata
  */
+
 export async function handleExecuteTaskRequest(c: Context) {
   const startTime = Date.now();
   let taskRecord: any = null;
   let user: any = null;
 
   try {
-    console.log('✓ PAYMENT VERIFIED (DYNAMIC) — POST /execute-task executing');
+    console.log('✓ POST /execute-task executing (recording completed task)');
 
     // ── Step 1: Resolve plan ─────────────────────────────────────────────────
     const planId = c.req.query('planId');
@@ -161,9 +162,9 @@ export async function handleExecuteTaskRequest(c: Context) {
     if (!taskRecord) {
       return c.json({ error: `Plan not found: ${planId}` }, 404);
     }
-    if (taskRecord.status !== 'planned') {
+    if (taskRecord.status !== 'planned' && taskRecord.status !== 'in_progress') {
       return c.json({
-        error: `Plan is not in 'planned' state (current: ${taskRecord.status}). Each plan can only be executed once.`,
+        error: `Plan is not in 'planned' state (current: ${taskRecord.status}).`,
       }, 409);
     }
 
@@ -187,140 +188,43 @@ export async function handleExecuteTaskRequest(c: Context) {
       }
     }
 
-    // ── Step 3: Extract the consolidated group transaction ID ────────────────
-    // The x402 payment header carries a single transaction signature that covers
-    // (executionQuantity × unitPrice + platformFee) — this is our "group" payment ID.
-    const paymentHeader = c.req.header('x-payment') || c.req.header('payment-signature');
-    const groupTransactionId = paymentHeader
-      ? paymentHeader.substring(0, 500)
-      : `consolidated-${new mongoose.Types.ObjectId()}`;
-
-    // Mark as in-progress immediately to prevent duplicate executions
-    taskRecord.status = 'in_progress';
-    taskRecord.groupTransactionId = groupTransactionId;
-    taskRecord.paymentMode = 'consolidated';
-    await taskRecord.save();
-
-    await AuditLog.create({
-      userId: user._id,
-      action: 'Task Execution Started',
-      details: {
-        taskId: taskRecord._id,
-        planId,
-        executionQuantity: taskRecord.executionQuantity,
-        totalCost: taskRecord.totalCost,
-        provider: taskRecord.providerName,
-        groupTransactionId,
-        paymentMode: 'consolidated',
-      },
-      ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
-    });
-
-    // ── Step 4: Extract text from all uploaded files ─────────────────────────
+    // ── Step 3: Extract results and transaction IDs ──────────────────────────
     const body = await c.req.json().catch(() => ({}));
-    const { task_description = taskRecord.prompt, files = [] } = body;
+    const { results = [], transactionIds = [], status, error } = body;
 
-    const extractedFiles: { filename: string; text: string; method: string }[] = [];
-    for (const file of files) {
-      if (file.filename && file.content_base64) {
-        try {
-          const extResult = await extractText(file.filename, file.content_base64);
-          extractedFiles.push({
-            filename: file.filename,
-            text: extResult.text,
-            method: extResult.method,
-          });
-        } catch (err: any) {
-          console.error(`File extraction failed for ${file.filename}:`, err);
-          taskRecord.status = 'failed';
-          await taskRecord.save();
-          return c.json({ error: `File extraction failed for ${file.filename}: ${err.message}` }, 400);
-        }
-      }
+    if (status === 'failed' || error) {
+      taskRecord.status = 'failed';
+      await taskRecord.save();
+
+      await AuditLog.create({
+        userId: user._id,
+        action: 'Task Failed',
+        details: { planId, error: error || 'Execution failed' },
+        ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
+      }).catch(() => {});
+
+      return c.json({ error: error || 'Execution failed' }, 400);
     }
 
-    // ── Step 5: Execute provider N times — one per file ──────────────────────
+    const actualQuantity = results.length > 0 ? results.length : 1;
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
-    const actualQuantity = extractedFiles.length > 0 ? extractedFiles.length : 1;
 
-    const handlerResults: any[] = [];
-    const progressLog: ProgressEntry[] = [];
-
-    if (extractedFiles.length > 0) {
-      for (let i = 0; i < extractedFiles.length; i++) {
-        const singleFile = extractedFiles[i];
-        const stepNum = i + 1;
-
-        // Record "executing" step
-        progressLog.push({
-          step: stepNum,
-          filename: singleFile.filename,
-          status: 'executing',
-          timestamp: new Date(),
-        });
-
-        console.log(`Executing ${winnerEndpoint} for file ${stepNum}/${extractedFiles.length}: ${singleFile.filename}`);
-
-        try {
-          const result = await invokeProviderHandler(winnerEndpoint, {
-            task_description,
-            files: [singleFile],
-          });
-
-          handlerResults.push(result);
-
-          // Record "completed" step
-          progressLog.push({
-            step: stepNum,
-            filename: singleFile.filename,
-            status: 'completed',
-            timestamp: new Date(),
-          });
-        } catch (err: any) {
-          progressLog.push({
-            step: stepNum,
-            filename: singleFile.filename,
-            status: 'failed',
-            timestamp: new Date(),
-          });
-          throw err;
-        }
-      }
-    } else {
-      // No files — single text-only execution
-      progressLog.push({ step: 1, filename: undefined, status: 'executing', timestamp: new Date() });
-      console.log(`Executing ${winnerEndpoint} for text-only task`);
-
-      try {
-        const result = await invokeProviderHandler(winnerEndpoint, {
-          task_description,
-          files: [],
-        });
-        handlerResults.push(result);
-        progressLog.push({ step: 1, filename: undefined, status: 'completed', timestamp: new Date() });
-      } catch (err: any) {
-        progressLog.push({ step: 1, filename: undefined, status: 'failed', timestamp: new Date() });
-        throw err;
-      }
-    }
-
-    // ── Step 6: Aggregate all results ────────────────────────────────────────
-    const combinedResult = aggregateResults(category, handlerResults);
+    // ── Step 4: Aggregate results ────────────────────────────────────────────
+    const combinedResult = aggregateResults(category, results);
     const executionTime = Date.now() - startTime;
 
-    // ── Step 7: Output verification ──────────────────────────────────────────
+    // ── Step 5: Output verification ──────────────────────────────────────────
     const verification = verifyOutput(category, combinedResult);
     updateReputation(winnerEndpoint, verification.passed);
-    /** Convert boolean verification.passed to a numeric quality score (0 or 1). */
     const verificationScore = verification.passed ? 1 : 0;
 
-    // ── Step 8: Compute final pricing (use plan values, cross-check) ─────────
+    // ── Step 6: Compute final pricing (strictly for DB logging, no payment check)
     const unitPrice: number = taskRecord.unitPrice ?? 0;
     const finalExecutionCost: number = parseFloat((unitPrice * actualQuantity).toFixed(2));
-    const finalTotalCost: number = parseFloat((finalExecutionCost + PLATFORM_FEE).toFixed(2));
+    const finalTotalCost: number = finalExecutionCost; // No platform fee on independent calls
 
-    // ── Step 9: Update Task record with all grouped-payment metadata ──────────
+    // ── Step 7: Update Task record ───────────────────────────────────────────
     taskRecord.status = 'completed';
     taskRecord.output = combinedResult;
     taskRecord.executionTime = executionTime;
@@ -330,31 +234,38 @@ export async function handleExecuteTaskRequest(c: Context) {
     taskRecord.totalCost = finalTotalCost;
     taskRecord.verificationScore = verificationScore;
     taskRecord.verificationStatus = verification.passed ? 'passed' : 'failed';
+    taskRecord.paymentMode = 'grouped';
+    taskRecord.groupTransactionId = transactionIds[0] || `grouped-${new mongoose.Types.ObjectId()}`;
+
+    // Create progress log
+    const progressLog: ProgressEntry[] = results.map((r, i) => ({
+      step: i + 1,
+      filename: r.candidates?.[0]?.name || `Execution #${i + 1}`,
+      status: 'completed',
+      timestamp: new Date(),
+    }));
     taskRecord.executionProgressLog = progressLog;
-    // groupTransactionId and paymentMode already set in Step 3
-    // individualTransactionIds: not set — requires future x402 protocol extension
     await taskRecord.save();
 
-    // ── Step 10: Create Payment record with grouped-payment tracking ──────────
+    // ── Step 8: Create Payment record ────────────────────────────────────────
     await Payments.create({
       taskId: taskRecord._id,
       userId: user._id,
-      x402TransactionId: groupTransactionId,
+      x402TransactionId: transactionIds[0] || `grouped-independent-${new mongoose.Types.ObjectId()}`,
       amount: finalTotalCost,
       unitPrice,
       executionQuantity: actualQuantity,
       executionCost: finalExecutionCost,
-      platformFee: PLATFORM_FEE,
+      platformFee: 0,
       totalAmount: finalTotalCost,
       blockchain: 'Algorand',
       currency: 'USDC',
       status: 'completed',
-      groupTransactionId,
-      paymentMode: 'consolidated',
-      // transactionIds: not set — requires future x402 protocol extension
+      groupTransactionId: transactionIds[0] || `grouped-independent-${new mongoose.Types.ObjectId()}`,
+      paymentMode: 'grouped',
     });
 
-    // ── Step 11: Record endpoint usage ───────────────────────────────────────
+    // ── Step 9: Record endpoint usage ────────────────────────────────────────
     await EndpointUsage.create({
       endpointName: winnerEndpoint,
       endpointId: winnerEndpoint,
@@ -366,7 +277,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       taskId: taskRecord._id,
     });
 
-    // ── Step 12: Update user aggregate stats ─────────────────────────────────
+    // ── Step 10: Update user aggregate stats ─────────────────────────────────
     user.totalTasks = (user.totalTasks ?? 0) + 1;
     user.totalSpent = (user.totalSpent ?? 0) + finalTotalCost;
     user.totalSaved = (user.totalSaved ?? 0) + Math.max(0, (actualQuantity * 1.50) - finalTotalCost);
@@ -383,10 +294,10 @@ export async function handleExecuteTaskRequest(c: Context) {
         executionCount: actualQuantity,
         unitPrice,
         executionCost: finalExecutionCost,
-        platformFee: PLATFORM_FEE,
+        platformFee: 0,
         totalCost: finalTotalCost,
-        groupTransactionId,
-        paymentMode: 'consolidated',
+        groupTransactionId: transactionIds[0],
+        paymentMode: 'grouped',
         verificationPassed: verification.passed,
         verificationReason: verification.reason,
       },
@@ -401,17 +312,14 @@ export async function handleExecuteTaskRequest(c: Context) {
       unitPrice,
       executionQuantity: actualQuantity,
       executionCost: finalExecutionCost,
-      platformFee: PLATFORM_FEE,
+      platformFee: 0,
       totalCost: finalTotalCost,
       executionCount: actualQuantity,
       executionTime,
       verification,
-      // Grouped payment metadata
-      groupTransactionId,
-      paymentMode: 'consolidated',
-      // individualTransactionIds omitted — requires future x402 protocol extension
+      groupTransactionId: transactionIds[0] || 'grouped-independent',
+      paymentMode: 'grouped',
       executionProgressLog: progressLog,
-      extracted_files: extractedFiles.map((f) => ({ filename: f.filename, method: f.method })),
       result: combinedResult,
     });
   } catch (error: any) {

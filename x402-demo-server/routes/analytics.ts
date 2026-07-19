@@ -28,8 +28,8 @@ analyticsRouter.get('/dashboard', async (c) => {
       return c.json({ error: 'User not found' }, 404);
     }
 
-    // Get all tasks for this user
-    const tasks = await Task.find({ userId });
+    // Get all tasks for this user (exclude planned ones which are just quotes)
+    const tasks = await Task.find({ userId, status: { $ne: 'planned' } });
     const totalTasks = tasks.length;
     const totalSpent = dbUser.totalSpent;
     const totalSaved = dbUser.totalSaved;
@@ -68,6 +68,7 @@ analyticsRouter.get('/dashboard', async (c) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentTasks = await Task.find({
       userId,
+      status: { $ne: 'planned' },
       createdAt: { $gte: thirtyDaysAgo }
     });
 
@@ -117,7 +118,10 @@ analyticsRouter.get('/dashboard', async (c) => {
 analyticsRouter.get('/tasks', async (c) => {
   try {
     const userPayload = c.get('user');
-    const tasks = await Task.find({ userId: userPayload.userId }).sort({ createdAt: -1 }).limit(20);
+    const tasks = await Task.find({ 
+      userId: userPayload.userId,
+      status: { $ne: 'planned' }
+    }).sort({ createdAt: -1 }).limit(20);
     return c.json(tasks);
   } catch (error) {
     console.error('Get user tasks error:', error);
@@ -133,8 +137,23 @@ adminRouter.use('*', requireAuth, requireAdmin);
  */
 adminRouter.get('/users', async (c) => {
   try {
-    const users = await User.find({ role: { $ne: 'admin' } }).select('-passwordHash').sort({ createdAt: -1 });
-    return c.json(users);
+    const users = await User.find({ role: { $ne: 'admin' } }).select('-passwordHash').sort({ createdAt: -1 }).lean();
+    
+    // Dynamically calculate the actual non-planned (executed) tasks run per user
+    const usersWithDynamicStats = await Promise.all(
+      users.map(async (user: any) => {
+        const actualTasksRun = await Task.countDocuments({
+          userId: user._id,
+          status: { $ne: 'planned' }
+        });
+        return {
+          ...user,
+          totalTasks: actualTasksRun
+        };
+      })
+    );
+    
+    return c.json(usersWithDynamicStats);
   } catch (error) {
     return c.json({ error: 'Failed to retrieve users' }, 500);
   }
@@ -145,7 +164,9 @@ adminRouter.get('/users', async (c) => {
  */
 adminRouter.get('/tasks', async (c) => {
   try {
-    const tasks = await Task.find({}).populate('userId', 'fullName email').sort({ createdAt: -1 }).limit(100);
+    const tasks = await Task.find({
+      status: { $ne: 'planned' }
+    }).populate('userId', 'fullName email').sort({ createdAt: -1 }).limit(100);
     return c.json(tasks);
   } catch (error) {
     return c.json({ error: 'Failed to retrieve tasks' }, 500);
@@ -208,8 +229,8 @@ adminRouter.get('/stats', async (c) => {
     const completedPayments = await Payments.find({ status: 'completed' });
     const revenue = completedPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // Most Used Categories
-    const tasks = await Task.find({});
+    // Most Used Categories (exclude planned tasks)
+    const tasks = await Task.find({ status: { $ne: 'planned' } });
     const categoryCounts = tasks.reduce((acc, t) => {
       acc[t.category] = (acc[t.category] || 0) + 1;
       return acc;
@@ -234,7 +255,7 @@ adminRouter.get('/stats', async (c) => {
       recentActivity,
       totals: {
         users: await User.countDocuments({ role: { $ne: 'admin' } }),
-        tasks: await Task.countDocuments({}),
+        tasks: await Task.countDocuments({ status: { $ne: 'planned' } }),
         payments: completedPayments.length,
       }
     });

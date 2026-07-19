@@ -29,19 +29,15 @@ export interface IPayment {
   groupTransactionId?: string;
   /**
    * Which payment mode was used.
-   * 'consolidated' = legacy single tx for total.
-   * 'grouped'      = true Algorand atomic transaction group.
+   * 'consolidated' = single tx for total (current).
+   * 'grouped'      = true Algorand atomic group (future).
    */
   paymentMode?: 'consolidated' | 'grouped';
   /**
-   * Individual per-execution and platform-fee transaction IDs
-   * from the confirmed Algorand atomic group.
+   * Reserved for future true grouped-txn support.
+   * Will store individual per-execution transaction IDs.
    */
   transactionIds?: string[];
-  /** Algorand block round in which the atomic group confirmed */
-  confirmationRound?: number;
-  /** Total number of transactions in the atomic group (N executions + 1 platform fee) */
-  atomicGroupSize?: number;
 
   currency: string;
   blockchain: string;
@@ -67,10 +63,8 @@ const PaymentsSchema = new Schema<IPayment>({
 
   // Grouped payment tracking
   groupTransactionId: { type: String, index: true },
-  paymentMode: { type: String, enum: ['consolidated', 'grouped'], default: 'grouped' },
+  paymentMode: { type: String, enum: ['consolidated', 'grouped'], default: 'consolidated' },
   transactionIds: { type: [String], default: undefined },
-  confirmationRound: { type: Number },
-  atomicGroupSize: { type: Number },
 
   currency: { type: String, default: 'USDC' },
   blockchain: { type: String, default: 'Algorand' },

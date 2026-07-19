@@ -29,14 +29,7 @@ export interface ITask {
   groupTransactionId?: string;
   individualTransactionIds?: string[];
   executionProgressLog?: any[];
-  /**
-   * Payment mode: 'consolidated' (legacy single tx) or 'grouped' (Algorand atomic group).
-   */
-  paymentMode?: 'consolidated' | 'grouped';
-  /** Algorand block round in which the atomic transaction group was confirmed */
-  confirmationRound?: number;
-  /** Total number of transactions in the atomic group (N executions + 1 platform fee) */
-  atomicGroupSize?: number;
+  paymentMode?: string;
 
   // --- Legacy / compatibility field ---
   endpointCost?: number;
@@ -72,9 +65,7 @@ const TaskSchema = new Schema<ITask>({
   groupTransactionId: { type: String },
   individualTransactionIds: [{ type: String }],
   executionProgressLog: [{ type: Schema.Types.Mixed }],
-  paymentMode: { type: String, enum: ['consolidated', 'grouped'] },
-  confirmationRound: { type: Number },
-  atomicGroupSize: { type: Number },
+  paymentMode: { type: String },
 
   // Legacy
   endpointCost: { type: Number, default: 0 },

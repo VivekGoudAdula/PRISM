@@ -782,7 +782,7 @@ const Home: React.FC<HomeProps> = () => {
 
         {/* CHAT/WEATHER DASHBOARD VIEW */}
         {viewState === 'app' && (
-          <div className="w-full max-w-4xl px-4 md:px-8 flex-1 flex flex-col justify-center items-center pb-24 gap-6">
+          <div className={`w-full ${userRole === 'admin' ? 'max-w-7xl px-6 md:px-12 justify-start items-stretch pt-6' : 'max-w-4xl px-4 md:px-8 justify-center items-center'} flex-1 flex flex-col pb-24 gap-6`}>
             {userRole === 'admin' ? (
               <AdminDashboard />
             ) : (

@@ -6,8 +6,8 @@
   },
   "/resume-screen-accurate": {
     "score": 1,
-    "total_runs": 13,
-    "verified_passes": 13
+    "total_runs": 18,
+    "verified_passes": 18
   },
   "/contract-analyze-fast": {
     "score": 0.5,

@@ -322,6 +322,7 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isProcessingRef = useRef(false);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4021';
 
@@ -429,6 +430,8 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
       setError('Please enter a task description.');
       return;
     }
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
 
     setIsPlanning(true);
     setError('');
@@ -444,6 +447,7 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
       console.error('Plan task error:', err);
     } finally {
       setIsPlanning(false);
+      isProcessingRef.current = false;
     }
   };
 
@@ -460,6 +464,8 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
    */
   const handleConfirmAndPay = async () => {
     if (!executionPlan || !activeAddress || !signTransactions) return;
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
 
     setShowSummaryModal(false);
     setLoading(true);
@@ -469,44 +475,39 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
     const category = executionPlan.category;
 
     // Show payment-approval phase immediately
-    setExecProgress({ current: 0, total, category, phase: 'payment' });
-    setPaymentStatus(`Requesting $${executionPlan.totalCost.toFixed(2)} USDC approval…`);
+    setExecProgress({ current: 1, total, category, phase: 'payment' });
+    setPaymentStatus(`Requesting USDC payment approval…`);
 
     try {
       const signer = { address: activeAddress, signTransactions };
 
-      // Kick off per-file progress simulation while waiting for the server.
-      // Each file gets ~equal time share. We advance through 'executing' phase steps.
-      let progressCount = 0;
-      const stepMs = Math.max(600, (executionPlan.estimatedTimeSeconds * 1000) / (total + 2));
-
-      const progressInterval = setInterval(() => {
-        progressCount += 1;
-        if (progressCount <= total) {
-          setExecProgress({
-            current: progressCount,
-            total,
-            category,
-            phase: 'executing',
-            currentFilename: executionPlan.paymentPreview?.find(
-              (p) => p.type === 'execution' && p.index === progressCount
-            )?.filename,
-          });
-        } else {
-          setExecProgress({ current: total, total, category, phase: 'verifying' });
-          clearInterval(progressInterval);
-        }
-      }, stepMs);
-
       const data = await executeTaskWithPayment(
         apiBaseUrl,
-        executionPlan.planId,
+        executionPlan,
         taskDescription,
         attachedFiles,
         signer,
+        (current, phase) => {
+          setExecProgress({
+            current,
+            total,
+            category,
+            phase,
+            currentFilename: executionPlan.paymentPreview?.find(
+              (p) => p.type === 'execution' && p.index === current
+            )?.filename,
+          });
+          if (phase === 'payment') {
+            setPaymentStatus(`Requesting payment for execution #${current}…`);
+          } else if (phase === 'executing') {
+            setPaymentStatus(`Executing work for execution #${current}…`);
+          } else if (phase === 'verifying') {
+            setPaymentStatus(`Verifying and aggregating all results…`);
+          } else if (phase === 'completed') {
+            setPaymentStatus(`Completed successfully.`);
+          }
+        }
       );
-
-      clearInterval(progressInterval);
 
       // Show verifying phase briefly before showing completed
       setExecProgress({ current: total, total, category, phase: 'verifying' });
@@ -529,6 +530,7 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
       console.error('Execute task error:', err);
     } finally {
       setLoading(false);
+      isProcessingRef.current = false;
     }
   };
 
