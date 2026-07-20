@@ -129,8 +129,8 @@ app.use(paymentMiddleware(weatherConfig, x402Server))
 HTTP/1.1 402 Payment Required
 Payment-Required: true
 Payment-Response: {
-  "sender": "RK6K3SMBBNVUH3CZIQNHB4EEDOQSLZHYBLJPSDSBYIQN75RU5VUVWQXGVA",
-  "receiver": "KJ47QTT3MKRHDCLH35GH3ZS27PTQNFSPVZW7AA5R77YQTWRCATPUSDLIXQ",
+  "sender": "RK...GVA",
+  "receiver": "KJ4....LIXQ",
   "amount": "5000",
   "assetId": "10458941",
   "network": "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=",
@@ -623,8 +623,8 @@ GoPlausible: https://facilitator.goplausible.xyz
 ```json
 {
   "type": "axfer",
-  "sender": "RK6K3SMBBNVUH3CZIQNHB4EEDOQSLZHYBLJPSDSBYIQN75RU5VUVWQXGVA",
-  "receiver": "KJ47QTT3MKRHDCLH35GH3ZS27PTQNFSPVZW7AA5R77YQTWRCATPUSDLIXQ",
+  "sender": "RK6K3S...VWQXGVA",
+  "receiver": "KJ47QTT...PUSDLIXQ",
   "assetIndex": 10458941,
   "amount": 5000,
   "groupIndex": 1,
