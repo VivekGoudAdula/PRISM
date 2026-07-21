@@ -2,12 +2,14 @@
 import { useWallet } from '@txnlab/use-wallet-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut } from 'react-icons/fi'
+import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi'
 import ConnectWallet from './components/ConnectWallet'
 import Weather from './components/Weather'
 import Prism from './components/Prism'
 import AdminDashboard from './components/AdminDashboard'
+import WaitlistModal from './components/WaitlistModal'
 import { api, setAccessToken } from './utils/api'
+import { fetchWaitlistCount } from './utils/waitlistApi'
 
 interface HomeProps { }
 
@@ -17,18 +19,44 @@ const Home: React.FC<HomeProps> = () => {
   const [openWalletModal, setOpenWalletModal] = useState<boolean>(false)
   const { activeAddress } = useWallet()
 
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('user')
+
+  const openWaitlist = () => {
+    setMobileNavOpen(false)
+    setShowWaitlistModal(true)
+  }
+
+  const scrollToSection = (id: string) => {
+    setMobileNavOpen(false)
+    if (pathname !== '/') {
+      navigate('/')
+      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 100)
+    } else {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const handleWaitlistSuccess = () => {
+    fetchWaitlistCount()
+      .then(setWaitlistCount)
+      .catch(() => {})
+  }
+
   // Derive view from URL
-  const viewState = pathname === '/login' || pathname === '/signup'
-    ? 'auth'
-    : pathname === '/app'
-      ? 'app'
-      : 'landing'
+  const viewState =
+    pathname === '/login' || pathname === '/signup' || (pathname === '/demo' && !currentUser)
+      ? 'auth'
+      : pathname === '/app' || (pathname === '/demo' && currentUser)
+        ? 'app'
+        : 'landing'
 
   // Whether the auth form is in sign-up mode (driven by path)
   const isSignUp = pathname === '/signup'
 
-  const [currentUser, setCurrentUser] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<string>('user')
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false)
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false)
   const [tasks, setTasks] = useState<any[]>([])
@@ -204,7 +232,7 @@ const Home: React.FC<HomeProps> = () => {
       // Check session validity with me endpoint
       api.get('/api/auth/me')
         .then(() => {
-          if (pathname !== '/app') navigate('/app', { replace: true })
+          if (pathname !== '/app' && pathname !== '/demo') navigate('/app', { replace: true })
         })
         .catch(() => {
           // Token expired or invalid
@@ -214,6 +242,15 @@ const Home: React.FC<HomeProps> = () => {
       navigate('/', { replace: true })
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch waitlist count on landing
+  useEffect(() => {
+    if (viewState === 'landing') {
+      fetchWaitlistCount()
+        .then(setWaitlistCount)
+        .catch(() => setWaitlistCount(null))
+    }
+  }, [viewState])
 
   // Load user dashboard stats when in app
   useEffect(() => {
@@ -274,7 +311,7 @@ const Home: React.FC<HomeProps> = () => {
         credits: data.user.credits || 0,
         plan: data.user.subscriptionPlan || 'free'
       });
-      navigate('/app');
+      navigate(pathname === '/demo' ? '/demo' : '/app');
 
       // Reset inputs
       setName('')
@@ -317,7 +354,7 @@ const Home: React.FC<HomeProps> = () => {
         credits: data.user.credits || 0,
         plan: data.user.subscriptionPlan || 'free'
       });
-      navigate('/app');
+      navigate(pathname === '/demo' ? '/demo' : '/app');
 
       // Reset inputs
       setEmail('')
@@ -463,28 +500,59 @@ const Home: React.FC<HomeProps> = () => {
         {/* LANDING PAGE VIEW */}
         {viewState === 'landing' && (
           <div className="lp-hero-wrap w-full animate-fade-in relative">
-            
-            {/* Floating Top-Left Logo */}
-            <div
-              className="absolute top-10 left-6 md:left-8 cursor-pointer z-50 transition-transform hover:scale-105"
-              onClick={() => navigate('/')}
-            >
-              <img src="/logo.png" alt="Prism Logo" className="h-14 w-auto object-contain" />
-            </div>
 
-            {/* Floating Top-Right Sign In */}
-            <div className="absolute top-10 right-6 md:right-8 z-50">
-              <button
-                className="btn btn-outline btn-sm rounded-full px-6 text-xs font-semibold hover:bg-white/10 hover:scale-105 transition-all"
-                onClick={() => navigate('/login')}
+            {/* Landing Navbar */}
+            <nav className="lp-navbar">
+              <div
+                className="lp-navbar-logo cursor-pointer"
+                onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
               >
-                Sign In
-              </button>
-            </div>
+                <img src="/logo.png" alt="Prism Logo" className="h-12 w-auto object-contain" />
+              </div>
+
+              <div className="lp-navbar-links hidden md:flex">
+                <button className="lp-nav-link" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Home</button>
+                <button className="lp-nav-link" onClick={() => scrollToSection('features')}>Features</button>
+                <button className="lp-nav-link" onClick={() => scrollToSection('pricing')}>Pricing</button>
+                <button className="lp-nav-link" onClick={openWaitlist}>Waitlist</button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  className="btn btn-primary btn-sm rounded-full px-5 text-xs font-bold hidden md:inline-flex"
+                  onClick={openWaitlist}
+                >
+                  Join Waitlist
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm md:hidden text-slate-300"
+                  onClick={() => setMobileNavOpen(!mobileNavOpen)}
+                  aria-label="Toggle menu"
+                >
+                  {mobileNavOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
+                </button>
+              </div>
+            </nav>
+
+            {/* Mobile nav drawer */}
+            {mobileNavOpen && (
+              <div className="lp-mobile-nav md:hidden">
+                <button className="lp-nav-link" onClick={() => { setMobileNavOpen(false); navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Home</button>
+                <button className="lp-nav-link" onClick={() => scrollToSection('features')}>Features</button>
+                <button className="lp-nav-link" onClick={() => scrollToSection('pricing')}>Pricing</button>
+                <button className="lp-nav-link" onClick={openWaitlist}>Waitlist</button>
+                <button className="btn btn-primary btn-sm rounded-full font-bold mt-2" onClick={openWaitlist}>
+                  Join Waitlist
+                </button>
+              </div>
+            )}
 
             {/* ── Hero ── */}
-            <div className="lp-hero-content pt-16">
+            <div className="lp-hero-content pt-8 md:pt-16">
 
+              <span className="lp-hero-eyebrow">
+                🚀 Launching Soon on Algorand MainNet
+              </span>
 
               <h1 className="lp-hero-heading">
                 Decentralized AI Routing<br />
@@ -494,23 +562,24 @@ const Home: React.FC<HomeProps> = () => {
               </h1>
 
               <p className="lp-hero-sub">
-                Prism intelligently routes AI tasks to optimal endpoints — verified on-chain via Algorand, paid per task via x402. No subscriptions. No black boxes.
+                Prism intelligently routes AI tasks to optimal endpoints - verified on-chain via Algorand, paid per task via x402. No subscriptions. No black boxes.
               </p>
 
               <div className="lp-hero-actions">
                 <button
                   className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/signup') }}
+                  onClick={openWaitlist}
                 >
-                  Get Started Free
-                </button>
-                <button
-                  className="btn btn-outline btn-lg rounded-full px-10 font-bold hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/login') }}
-                >
-                  Sign In
+                  Join Waitlist
                 </button>
               </div>
+
+              {waitlistCount !== null && (
+                <p className="lp-waitlist-counter">
+                  <span className="lp-waitlist-counter-num">{waitlistCount.toLocaleString()}</span>
+                  {' '}Early Users Joined
+                </p>
+              )}
 
               {/* ── Trust Strip ── */}
               <div className="trust-strip">
@@ -531,7 +600,7 @@ const Home: React.FC<HomeProps> = () => {
 
         {/* ── Capability Cards — full-width section ── */}
         {viewState === 'landing' && (
-          <section className="lp-section w-full">
+          <section id="features" className="lp-section w-full">
             <div className="lp-section-inner">
               <p className="lp-eyebrow">Capabilities</p>
               <h2 className="lp-section-heading">Built for real AI workloads</h2>
@@ -626,12 +695,31 @@ const Home: React.FC<HomeProps> = () => {
                   </ul>
                   <button
                     className="btn btn-primary w-full mt-6 rounded-xl font-bold text-sm"
-                    onClick={() => { navigate('/signup') }}
+                    onClick={openWaitlist}
                   >
-                    Get Started Free
+                    Join Waitlist
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── Waitlist Section ── */}
+        {viewState === 'landing' && (
+          <section id="waitlist" className="lp-section w-full">
+            <div className="lp-section-inner text-center">
+              <p className="lp-eyebrow">Early Access</p>
+              <h2 className="lp-section-heading">Join the Prism Waitlist</h2>
+              <p className="lp-section-sub mx-auto">
+                Be among the first to route AI tasks on Algorand MainNet. Get priority access when we launch.
+              </p>
+              <button
+                className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform mt-4"
+                onClick={openWaitlist}
+              >
+                Join Waitlist
+              </button>
             </div>
           </section>
         )}
@@ -640,23 +728,17 @@ const Home: React.FC<HomeProps> = () => {
         {viewState === 'landing' && (
           <section className="lp-cta-section w-full">
             <div className="lp-cta-inner">
-              <p className="lp-eyebrow lp-eyebrow--light">Get started today</p>
-              <h2 className="lp-cta-heading">Ready to route your first task?</h2>
+              <p className="lp-eyebrow lp-eyebrow--light">Launching soon</p>
+              <h2 className="lp-cta-heading">Ready to transform your AI workflows?</h2>
               <p className="lp-cta-sub">
-                Sign up in seconds. No credit card required. Your first result is on us.
+                Join the waitlist today and get early access when Prism launches on Algorand MainNet.
               </p>
               <div className="flex gap-4 flex-wrap justify-center mt-8">
                 <button
                   className="btn btn-primary btn-lg rounded-full px-10 text-sm font-bold shadow-2xl shadow-indigo-500/30 hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/signup') }}
+                  onClick={openWaitlist}
                 >
-                  Get Started — It's Free
-                </button>
-                <button
-                  className="btn btn-outline btn-lg rounded-full px-10 text-sm font-bold hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/login') }}
-                >
-                  Sign In
+                  Join Waitlist
                 </button>
               </div>
               <p className="lp-cta-footnote">Powered by Algorand · x402 payments · GoPlausible verification</p>
@@ -682,6 +764,12 @@ const Home: React.FC<HomeProps> = () => {
 
             {/* Centered card */}
             <div className="w-full max-w-md liquid-glass p-8 animate-scale-up">
+
+            {pathname === '/demo' && (
+              <p className="text-xs font-bold uppercase tracking-widest text-indigo-400 text-center mb-4">
+                Demo Access
+              </p>
+            )}
 
             {/* Form Toggle Tabs */}
             <div className="flex border-b border-slate-800 mb-6">
@@ -815,8 +903,8 @@ const Home: React.FC<HomeProps> = () => {
               <p className="lp-footer-col-title">Product</p>
               <ul className="lp-footer-links">
                 <li><a href="#pricing" className="lp-footer-link">Pricing</a></li>
-                <li><button className="lp-footer-link" onClick={() => { navigate('/signup') }}>Get Started</button></li>
-                <li><button className="lp-footer-link" onClick={() => { navigate('/login') }}>Sign In</button></li>
+                <li><button className="lp-footer-link" onClick={() => scrollToSection('features')}>Features</button></li>
+                <li><button className="lp-footer-link" onClick={openWaitlist}>Join Waitlist</button></li>
               </ul>
             </div>
 
@@ -1005,6 +1093,12 @@ const Home: React.FC<HomeProps> = () => {
           </div>
         </div>
       )}
+
+      <WaitlistModal
+        open={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
+        onSuccess={handleWaitlistSuccess}
+      />
 
       <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
     </div>

@@ -54,9 +54,11 @@ export default function App() {
         <Routes>
           {/* Landing page */}
           <Route path="/" element={<Home />} />
-          {/* Auth pages */}
+          {/* Auth pages — not linked from landing, accessible via direct URL or /demo */}
           <Route path="/login" element={<Home />} />
           <Route path="/signup" element={<Home />} />
+          {/* Hidden demo access to the full application */}
+          <Route path="/demo" element={<Home />} />
           {/* Dashboard */}
           <Route path="/app" element={<Home />} />
           {/* Catch-all → landing */}

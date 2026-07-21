@@ -43,6 +43,7 @@ import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common
 import { requireAuth } from './middleware/auth';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
+import waitlistRouter from './routes/waitlist';
 import { analyticsRouter, adminRouter } from './routes/analytics';
 
 // Load environment variables
@@ -184,6 +185,7 @@ app.onError(errorMiddleware);
 // Mount API routes
 app.route('/api/auth', authRouter);
 app.route('/api/chat', chatRouter);
+app.route('/api/waitlist', waitlistRouter);
 app.route('/api/analytics', analyticsRouter);
 app.route('/api/admin', adminRouter);
 

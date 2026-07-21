@@ -208,6 +208,7 @@ pre code {
   align-items: center;
   justify-content: center;
   padding: 6rem 1.5rem 5rem;
+  padding-top: 5.5rem;
 }
 .lp-hero-content {
   max-width: 800px;
@@ -259,7 +260,78 @@ pre code {
   gap: 1rem;
   flex-wrap: wrap;
   justify-content: center;
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Landing Navbar ────────────────────────────────────────────────────── */
+.lp-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.lp-navbar-logo {
+  flex-shrink: 0;
+}
+.lp-navbar-links {
+  align-items: center;
+  gap: 0.25rem;
+}
+.lp-nav-link {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.lp-nav-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.lp-mobile-nav {
+  position: fixed;
+  top: 4.5rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 49;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+.lp-mobile-nav .lp-nav-link {
+  text-align: left;
+  width: 100%;
+}
+
+/* ─── Waitlist Counter ──────────────────────────────────────────────────── */
+.lp-waitlist-counter {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 2rem;
+}
+.lp-waitlist-counter-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #818cf8;
 }
 
 /* ─── Trust Strip ───────────────────────────────────────────────────────── */
