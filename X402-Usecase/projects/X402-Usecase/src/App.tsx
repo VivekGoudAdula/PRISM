@@ -41,13 +41,20 @@ export default function App() {
 
   const walletManager = new WalletManager({
     wallets: supportedWallets,
-    defaultNetwork: algodConfig.network,
+    defaultNetwork: 'mainnet',
     networks: {
-      [algodConfig.network]: {
+      mainnet: {
         algod: {
-          baseServer: algodConfig.server,
-          port: algodConfig.port,
-          token: String(algodConfig.token),
+          baseServer: 'https://mainnet-api.algonode.cloud',
+          port: '',
+          token: '',
+        },
+      },
+      testnet: {
+        algod: {
+          baseServer: 'https://testnet-api.algonode.cloud',
+          port: '',
+          token: '',
         },
       },
     },
