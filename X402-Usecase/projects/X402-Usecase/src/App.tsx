@@ -20,11 +20,14 @@ if (import.meta.env.VITE_ALGOD_NETWORK === 'localnet') {
 } else {
   supportedWallets = [
     { id: WalletId.DEFLY },
-    { id: WalletId.PERA },
+    {
+      id: WalletId.PERA,
+      options: {
+        compactMode: false,
+      },
+    },
     { id: WalletId.EXODUS },
-    { id: WalletId.LUTE}
-    // If you are interested in WalletConnect v2 provider
-    // refer to https://github.com/TxnLab/use-wallet for detailed integration instructions
+    { id: WalletId.LUTE },
   ]
 }
 
@@ -32,23 +35,8 @@ export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
   console.log(`[WalletManager] Initializing wallet manager with defaultNetwork: ${algodConfig.network}, server: ${algodConfig.server}`)
 
-  // Explicitly configure supported wallets with active network options
-  const activeWallets = supportedWallets.map((wallet) => {
-    if (wallet.id === WalletId.PERA) {
-      return {
-        ...wallet,
-        options: {
-          ...wallet.options,
-          compactMode: false,
-          network: algodConfig.network,
-        },
-      }
-    }
-    return wallet
-  })
-
   const walletManager = new WalletManager({
-    wallets: activeWallets,
+    wallets: supportedWallets,
     defaultNetwork: algodConfig.network,
     networks: {
       [algodConfig.network]: {
