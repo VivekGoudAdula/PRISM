@@ -228,8 +228,14 @@ export async function createX402Fetch(walletSigner: any) {
         }
 
         return walletResult
-      } catch (error) {
+      } catch (error: any) {
         console.error('signTransactions error:', error)
+        const errMsg = error?.message || String(error)
+        if (errMsg.includes('Network mismatch') || errMsg.includes('Confirmation Failed(4100)') || errMsg.includes('4100')) {
+          const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
+          const expectedNetwork = isMainnet ? 'Mainnet' : 'Testnet'
+          throw new Error(`Your Pera Wallet is set to a different network than this app. Open Pera, reconnect, and make sure you select ${expectedNetwork} before approving.`)
+        }
         throw error
       }
     },
