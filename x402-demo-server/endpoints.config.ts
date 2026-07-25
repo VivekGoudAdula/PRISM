@@ -12,9 +12,26 @@
  *    document, and returns the computed totalCost.
  */
 
-import { ALGORAND_TESTNET_CAIP2, USDC_TESTNET_ASA_ID } from '@x402/avm';
+import { ALGORAND_TESTNET_CAIP2, ALGORAND_MAINNET_CAIP2, USDC_TESTNET_ASA_ID, USDC_MAINNET_ASA_ID } from '@x402/avm';
 import type { DynamicPrice } from '@x402/core/server';
 import { Task } from './models/Task';
+
+// ─── Network Mode Configuration ─────────────────────────────────────────────
+
+const rawNetworkMode = (process.env.NETWORK_MODE || 'testnet').toLowerCase().trim();
+export const NETWORK_MODE = rawNetworkMode === 'mainnet' ? 'mainnet' : 'testnet';
+
+export const NETWORK_CONFIG = NETWORK_MODE === 'mainnet' 
+  ? {
+      caip2: ALGORAND_MAINNET_CAIP2,
+      usdcAssetId: Number(USDC_MAINNET_ASA_ID), // 31566704
+      name: 'MAINNET',
+    }
+  : {
+      caip2: ALGORAND_TESTNET_CAIP2,
+      usdcAssetId: Number(USDC_TESTNET_ASA_ID), // 10458941
+      name: 'TESTNET',
+    };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +40,7 @@ export interface StaticPaymentOption {
   price: string;
   network: string;
   payTo: string;
-  extra: { asset: number };
+  extra: { asset: number; tag: string };
 }
 
 export interface DynamicPaymentOption {
@@ -31,7 +48,7 @@ export interface DynamicPaymentOption {
   price: DynamicPrice;
   network: string;
   payTo: string;
-  extra: { asset: number };
+  extra: { asset: number; tag: string };
 }
 
 export interface EndpointConfig {
@@ -87,80 +104,103 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       accepts: [{
         scheme: 'exact',
         price: '$0.005',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Weather data access — $0.005 USDC per call',
+      description: 'Fetches real-time weather data and forecast metrics per location query.',
     },
 
     'POST /resume-screen-fast': {
       accepts: [{
         scheme: 'exact',
         price: '$0.20',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Fast Resume Screening — $0.20 USDC per call',
+      description: 'Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking.',
     },
 
     'POST /resume-screen-accurate': {
       accepts: [{
         scheme: 'exact',
         price: '$0.45',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Accurate Resume Screening — $0.45 USDC per call',
+      description: 'Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning.',
     },
 
     'POST /contract-analyze-fast': {
       accepts: [{
         scheme: 'exact',
         price: '$0.30',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Fast Contract Analysis — $0.30 USDC per call',
+      description: 'Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds.',
     },
 
     'POST /contract-analyze-accurate': {
       accepts: [{
         scheme: 'exact',
         price: '$0.60',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Accurate Contract Analysis — $0.60 USDC per call',
+      description: 'Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning.',
     },
 
     'POST /invoice-extract-fast': {
       accepts: [{
         scheme: 'exact',
         price: '$0.15',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Fast Invoice Extraction — $0.15 USDC per call',
+      description: 'Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents.',
     },
 
     'POST /invoice-extract-accurate': {
       accepts: [{
         scheme: 'exact',
         price: '$0.35',
-        network: ALGORAND_TESTNET_CAIP2,
+        network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
-        extra: { asset: Number(USDC_TESTNET_ASA_ID) },
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
       }],
-      description: 'Accurate Invoice Extraction — $0.35 USDC per call',
+      description: 'Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices.',
+    },
+
+    'POST /run-task': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.75',
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.',
+    },
+
+    'POST /execute-task': {
+      accepts: [{
+        scheme: 'exact',
+        price: executionTaskDynamicPrice,
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Executes planned batch multi-document AI processing workflows under a pre-calculated dynamic cost plan.',
     },
 
   };
 }
 
 export default createPaymentConfig;
+

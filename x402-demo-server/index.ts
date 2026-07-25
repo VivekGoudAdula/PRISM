@@ -35,8 +35,8 @@ import {
   handleCreatorEarningsRequest,
 } from './handlers/creator-content';
 
-// Import endpoint configuration
-import createPaymentConfig, { EndpointConfig } from './endpoints.config';
+import { bazaarResourceServerExtension } from '@x402/extensions/bazaar';
+import createPaymentConfig, { EndpointConfig, NETWORK_CONFIG, NETWORK_MODE } from './endpoints.config';
 
 // Import Middlewares and Routers
 import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
@@ -129,18 +129,27 @@ console.log('\n' + '═'.repeat(60));
 console.log('x402 HACKATHON STARTER KIT');
 console.log('═'.repeat(60));
 console.log('Configuration:');
-console.log(`  Receiver Address: ${avmAddress}`);
+console.log(`  NETWORK MODE: ${NETWORK_CONFIG.name}`);
+console.log(`  CAIP-2 Network: ${NETWORK_CONFIG.caip2}`);
+console.log(`  USDC Asset ID: ${NETWORK_CONFIG.usdcAssetId}`);
+console.log(`  PayTo Address: ${avmAddress}`);
 console.log(`  Facilitator: ${facilitatorUrl}`);
 console.log(`  Port: ${port}`);
-console.log('═'.repeat(60) + '\n');
+console.log('═'.repeat(60));
+console.log('\n' + '█'.repeat(60));
+console.log(`███  NETWORK MODE: ${NETWORK_CONFIG.name}  ███`);
+console.log(`███  PayTo: ${avmAddress}  ███`);
+console.log(`███  Asset ID: ${NETWORK_CONFIG.usdcAssetId}  ███`);
+console.log('█'.repeat(60) + '\n');
 
-// Initialize x402 Resource Server
+// Initialize x402 Resource Server & Register Bazaar Discovery Extension
 const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const x402Server = new x402ResourceServer(facilitatorClient);
+x402Server.registerExtension(bazaarResourceServerExtension);
 
-// Register payment scheme for TestNet
+// Register payment scheme for configured network (TestNet / MainNet)
 const avmServerScheme = new ExactAvmScheme();
-x402Server.register(ALGORAND_TESTNET_CAIP2, avmServerScheme);
+x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
 
 // Create Hono app
 const app = new Hono();
@@ -204,6 +213,7 @@ Object.entries(paymentConfig).forEach(([route, config]) => {
 console.log();
 
 app.use(paymentMiddleware(paymentConfig as any, x402Server));
+
 
 
 // ════════════════════════════════════════════════════════════════════
