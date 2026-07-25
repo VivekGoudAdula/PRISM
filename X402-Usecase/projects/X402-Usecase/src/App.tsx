@@ -30,9 +30,25 @@ if (import.meta.env.VITE_ALGOD_NETWORK === 'localnet') {
 
 export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
+  console.log(`[WalletManager] Initializing wallet manager with defaultNetwork: ${algodConfig.network}, server: ${algodConfig.server}`)
+
+  // Explicitly configure supported wallets with active network options
+  const activeWallets = supportedWallets.map((wallet) => {
+    if (wallet.id === WalletId.PERA) {
+      return {
+        ...wallet,
+        options: {
+          ...wallet.options,
+          compactMode: false,
+          network: algodConfig.network,
+        },
+      }
+    }
+    return wallet
+  })
 
   const walletManager = new WalletManager({
-    wallets: supportedWallets,
+    wallets: activeWallets,
     defaultNetwork: algodConfig.network,
     networks: {
       [algodConfig.network]: {

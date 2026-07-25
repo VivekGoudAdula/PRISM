@@ -5,11 +5,12 @@ export function getAlgodConfigFromViteEnvironment(): AlgoViteClientConfig {
     throw new Error('Attempt to get default algod configuration without specifying VITE_ALGOD_SERVER in the environment variables')
   }
 
+  const network = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase()
   return {
     server: import.meta.env.VITE_ALGOD_SERVER,
     port: import.meta.env.VITE_ALGOD_PORT,
     token: import.meta.env.VITE_ALGOD_TOKEN,
-    network: import.meta.env.VITE_ALGOD_NETWORK,
+    network,
   }
 }
 
