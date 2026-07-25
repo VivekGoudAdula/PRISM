@@ -255,8 +255,9 @@ export async function createX402Fetch(walletSigner: any) {
 
   const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
   const caip2Network = isMainnet ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2
-  client.register(caip2Network, new ExactAvmScheme(x402Signer))
-  console.log(`x402 client registered for ${isMainnet ? 'Mainnet' : 'TestNet'} (${caip2Network})`)
+  const algodUrl = isMainnet ? 'https://mainnet-api.algonode.cloud' : 'https://testnet-api.algonode.cloud'
+  client.register(caip2Network, new ExactAvmScheme(x402Signer, { algodUrl }))
+  console.log(`x402 client registered for ${isMainnet ? 'Mainnet' : 'TestNet'} (${caip2Network}) with algodUrl: ${algodUrl}`)
 
   return wrapFetchWithPayment(fetch, client)
 }
