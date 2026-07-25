@@ -72,17 +72,32 @@ export function verifyOutput(category: string, result: any): { passed: boolean; 
         return { passed: false, reason: 'Missing or empty candidates array' };
       }
 
-      // Check if every candidate has a missing name or match_score of 0
+      // Log server warning for any candidates with empty key_skills
+      candidates.forEach((c: any) => {
+        const skills = Array.isArray(c.key_skills) ? c.key_skills : [];
+        if (skills.length === 0) {
+          console.warn(`⚠️ [verifyOutput Warning] Candidate '${c.name || 'Unknown'}' returned with an empty key_skills array.`);
+        }
+      });
+
+      // Check for valid candidates: non-empty name, non-zero match score, and fail if key_skills is empty AND match_score < 0.3
       const validCandidates = candidates.filter((c: any) => {
         const name = (c.name || '').trim();
         const score = typeof c.match_score === 'number' ? c.match_score : 0;
+        const skills = Array.isArray(c.key_skills) ? c.key_skills : [];
+
+        // Fail if candidate has empty key_skills AND match_score < 0.3 (indicates failed extraction)
+        if (skills.length === 0 && score < 0.3) {
+          return false;
+        }
+
         return name.length > 0 && name.toLowerCase() !== 'unknown' && score > 0;
       });
 
       if (validCandidates.length === 0) {
         return {
           passed: false,
-          reason: 'Every candidate is missing a valid name or has a match_score of 0'
+          reason: 'Every candidate is missing a valid name, has a match_score of 0, or returned empty key_skills with a low match score (< 0.3)'
         };
       }
 

@@ -54,6 +54,7 @@ export async function handleResumeScreenFastRequest(c: Context) {
         key_skills: [],
         primary_domain: 'Unknown',
         alternative_roles: [] as string[],
+        reason: '',
       };
 
       let success = false;
@@ -73,7 +74,7 @@ export async function handleResumeScreenFastRequest(c: Context) {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Fast screen: Rate match score (0-1), extract name (use candidate name from semantic map), role, top key skills, primary_domain, and alternative_roles based on structured resume semantic map. Return ONLY JSON: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[] }',
+                    content: 'Fast screen: Rate match score (0-1), extract name (use candidate name from semantic map), role, top key skills, primary_domain, alternative_roles, and reason (concise score rationale) based on structured resume semantic map. Return ONLY JSON: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }',
                   },
                   {
                     role: 'user',
@@ -101,6 +102,7 @@ export async function handleResumeScreenFastRequest(c: Context) {
                   key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
                   primary_domain: parsed.primary_domain || 'Unknown',
                   alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
+                  reason: parsed.reason || (parsed.match_score < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
                 };
                 success = true;
                 break;

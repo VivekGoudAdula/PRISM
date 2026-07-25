@@ -54,6 +54,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
         key_skills: [],
         primary_domain: 'Unknown',
         alternative_roles: [] as string[],
+        reason: '',
       };
 
       let success = false;
@@ -73,7 +74,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[] }. For "name", use the candidate name provided in the semantic map. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.',
+                    content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score, especially when match_score is low or skills detail is missing. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
                   },
                   {
                     role: 'user',
@@ -102,6 +103,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
                   key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
                   primary_domain: parsed.primary_domain || 'Unknown',
                   alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
+                  reason: parsed.reason || (parsed.match_score < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
                 };
                 success = true;
                 break;
