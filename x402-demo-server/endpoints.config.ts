@@ -61,35 +61,7 @@ export interface EndpointConfig {
  */
 export function createPaymentConfig(avmAddress: string): EndpointConfig {
 
-  /**
-   * Dynamic price resolver for /execute-task.
-   *
-   * Reads the `planId` query parameter from the request context, fetches the
-   * corresponding Task document, and returns its pre-computed totalCost as the
-   * x402 payment price. This makes the blockchain payment amount exactly equal
-   * to (executionQuantity × unitPrice + platformFee).
-   */
-  const executionTaskDynamicPrice: DynamicPrice = async (context) => {
-    const planId = context.adapter.getQueryParam?.('planId') as string | undefined;
 
-    if (!planId) {
-      // Fallback minimum to trigger 402 — handler will reject missing planId
-      return '$0.01';
-    }
-
-    try {
-      const plan = await Task.findById(planId).lean();
-      if (!plan || !plan.totalCost || plan.status !== 'planned') {
-        // Fallback: plan not found or not ready — return a minimum to trigger 402
-        return '$0.01';
-      }
-      // Return the exact dynamic total e.g. "$12.00"
-      return `$${plan.totalCost.toFixed(2)}`;
-    } catch (err) {
-      console.error('executionTaskDynamicPrice: DB lookup failed:', err);
-      return '$0.01';
-    }
-  };
 
   return {
     // ── Individual AI Endpoints (static, per-call pricing) ──────────────────
@@ -182,16 +154,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       description: 'Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.',
     },
 
-    'POST /execute-task': {
-      accepts: [{
-        scheme: 'exact',
-        price: executionTaskDynamicPrice,
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
-      }],
-      description: 'Executes planned batch multi-document AI processing workflows under a pre-calculated dynamic cost plan.',
-    },
+
 
   };
 }
