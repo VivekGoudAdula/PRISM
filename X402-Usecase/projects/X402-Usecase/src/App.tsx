@@ -4,36 +4,40 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './Home'
 import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
 
-let supportedWallets: SupportedWallet[]
-if (import.meta.env.VITE_ALGOD_NETWORK === 'localnet') {
-  const kmdConfig = getKmdConfigFromViteEnvironment()
-  supportedWallets = [
-    {
-      id: WalletId.KMD,
-      options: {
-        baseServer: kmdConfig.server,
-        token: String(kmdConfig.token),
-        port: String(kmdConfig.port),
-      },
-    },
-  ]
-} else {
-  supportedWallets = [
-    { id: WalletId.DEFLY },
-    {
-      id: WalletId.PERA,
-      options: {
-        compactMode: false,
-      },
-    },
-    { id: WalletId.EXODUS },
-    { id: WalletId.LUTE },
-  ]
-}
-
 export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
-  console.log(`[WalletManager] Initializing wallet manager with defaultNetwork: ${algodConfig.network}, server: ${algodConfig.server}`)
+  const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
+  // Algorand CAIP Chain IDs for Pera Wallet Connect: MainNet = 416001 (or 4160), TestNet = 416002
+  const peraChainId: 416001 | 416002 = isMainnet ? 416001 : 416002
+  console.log(`[PeraWallet Diagnostic] VITE_ALGOD_NETWORK: '${import.meta.env.VITE_ALGOD_NETWORK}', isMainnet: ${isMainnet}, passing Pera chainId: ${peraChainId}`)
+
+  let supportedWallets: SupportedWallet[]
+  if (import.meta.env.VITE_ALGOD_NETWORK === 'localnet') {
+    const kmdConfig = getKmdConfigFromViteEnvironment()
+    supportedWallets = [
+      {
+        id: WalletId.KMD,
+        options: {
+          baseServer: kmdConfig.server,
+          token: String(kmdConfig.token),
+          port: String(kmdConfig.port),
+        },
+      },
+    ]
+  } else {
+    supportedWallets = [
+      { id: WalletId.DEFLY },
+      {
+        id: WalletId.PERA,
+        options: {
+          compactMode: false,
+          chainId: peraChainId,
+        },
+      },
+      { id: WalletId.EXODUS },
+      { id: WalletId.LUTE },
+    ]
+  }
 
   const walletManager = new WalletManager({
     wallets: supportedWallets,

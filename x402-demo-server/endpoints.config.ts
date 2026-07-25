@@ -12,26 +12,20 @@
  *    document, and returns the computed totalCost.
  */
 
-import { ALGORAND_TESTNET_CAIP2, ALGORAND_MAINNET_CAIP2, USDC_TESTNET_ASA_ID, USDC_MAINNET_ASA_ID } from '@x402/avm';
+import { ALGORAND_MAINNET_CAIP2, USDC_MAINNET_ASA_ID } from '@x402/avm';
 import type { DynamicPrice } from '@x402/core/server';
 import { Task } from './models/Task';
 
 // ─── Network Mode Configuration ─────────────────────────────────────────────
 
-const rawNetworkMode = (process.env.NETWORK_MODE || 'testnet').toLowerCase().trim();
-export const NETWORK_MODE = rawNetworkMode === 'mainnet' ? 'mainnet' : 'testnet';
+export const NETWORK_MODE = 'mainnet';
 
-export const NETWORK_CONFIG = NETWORK_MODE === 'mainnet' 
-  ? {
-      caip2: ALGORAND_MAINNET_CAIP2,
-      usdcAssetId: Number(USDC_MAINNET_ASA_ID), // 31566704
-      name: 'MAINNET',
-    }
-  : {
-      caip2: ALGORAND_TESTNET_CAIP2,
-      usdcAssetId: Number(USDC_TESTNET_ASA_ID), // 10458941
-      name: 'TESTNET',
-    };
+export const NETWORK_CONFIG = {
+  caip2: ALGORAND_MAINNET_CAIP2,
+  usdcAssetId: Number(USDC_MAINNET_ASA_ID), // 31566704
+  name: 'MAINNET',
+  algodServer: 'https://mainnet-api.algonode.cloud',
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -3,9 +3,6 @@ import { Refund } from '../../models/AnalyticsData';
 import mongoose from 'mongoose';
 import { NETWORK_CONFIG } from '../../endpoints.config';
 
-/** USDC Asset ID on Algorand TestNet */
-const USDC_ASSET_ID = 10458941;
-
 /**
  * Interface for refund log entries
  */
