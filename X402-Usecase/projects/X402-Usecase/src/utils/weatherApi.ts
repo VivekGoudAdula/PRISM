@@ -1,5 +1,5 @@
 import { x402Client, wrapFetchWithPayment } from '@x402-avm/fetch'
-import { ALGORAND_TESTNET_CAIP2 } from '@x402-avm/avm'
+import { ALGORAND_TESTNET_CAIP2, ALGORAND_MAINNET_CAIP2 } from '@x402-avm/avm'
 import type { ClientAvmSigner } from '@x402-avm/avm'
 import { ExactAvmScheme } from '@x402-avm/avm/exact/client'
 
@@ -235,8 +235,10 @@ export async function createX402Fetch(walletSigner: any) {
     },
   }
 
-  client.register(ALGORAND_TESTNET_CAIP2, new ExactAvmScheme(x402Signer))
-  console.log('x402 client registered for TestNet')
+  const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'testnet').toLowerCase() === 'mainnet'
+  const caip2Network = isMainnet ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2
+  client.register(caip2Network, new ExactAvmScheme(x402Signer))
+  console.log(`x402 client registered for ${isMainnet ? 'Mainnet' : 'TestNet'} (${caip2Network})`)
 
   return wrapFetchWithPayment(fetch, client)
 }
