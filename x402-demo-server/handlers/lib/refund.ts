@@ -1,6 +1,7 @@
 import algosdk from 'algosdk';
 import { Refund } from '../../models/AnalyticsData';
 import mongoose from 'mongoose';
+import { NETWORK_CONFIG } from '../../endpoints.config';
 
 /** USDC Asset ID on Algorand TestNet */
 const USDC_ASSET_ID = 10458941;
@@ -61,7 +62,7 @@ export async function issueRefund(
       console.log(`[Refund] Attempting on-chain USDC refund of ${amountUsdc} to ${recipientAddress}...`);
       const account = algosdk.mnemonicToSecretKey(mnemonic);
       const algodToken = '';
-      const algodServer = 'https://testnet-api.algonode.cloud';
+      const algodServer = NETWORK_CONFIG.algodServer;
       const algodPort = 443;
       const algodClient = new algosdk.Algodv2(algodToken, algodServer, algodPort);
 
@@ -73,7 +74,7 @@ export async function issueRefund(
         from: account.addr,
         to: recipientAddress,
         amount: microUsdc,
-        assetIndex: USDC_ASSET_ID,
+        assetIndex: Number(NETWORK_CONFIG.usdcAssetId),
         suggestedParams: params,
       });
 

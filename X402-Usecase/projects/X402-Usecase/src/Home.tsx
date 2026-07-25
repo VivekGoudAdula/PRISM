@@ -528,11 +528,11 @@ baseWidth={5.5}
             {viewState === 'app' && (
               <div className="flex items-center gap-2">
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                  (import.meta.env.VITE_ALGOD_NETWORK || 'testnet').toLowerCase() === 'mainnet'
+                  (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
                     ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
                     : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
                 }`}>
-                  {(import.meta.env.VITE_ALGOD_NETWORK || 'testnet').toLowerCase() === 'mainnet' ? 'Mainnet' : 'TestNet'}
+                  {(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet' ? 'Mainnet' : 'TestNet'}
                 </span>
                 <button
                   className="btn btn-outline btn-primary h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold hover:scale-105 transition-transform"
