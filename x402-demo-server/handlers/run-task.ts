@@ -110,20 +110,34 @@ export async function handleRunTaskRequest(c: Context) {
       await taskRecord.save();
       await AuditLog.create({
         userId: user._id,
-        action: 'Task Failed',
-        details: { taskId: taskRecord._id, error: 'Task classification failed or unsupported' },
+        action: 'Task Classification Failed',
+        details: { taskId: taskRecord._id, category: 'unsupported' },
         ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
       });
       return c.json({
-        error: 'Task classification failed or unsupported task type',
-        details: classifyResult
-      }, 400);
+        category: 'unsupported',
+        message: "This document doesn't match a supported task type yet (resume screening, contract analysis, or invoice extraction)."
+      }, 200);
     }
 
     const category = classifyResult.category;
     taskRecord.category = category;
     taskRecord.plannerOutput = classifyResult;
     await taskRecord.save();
+
+    // 2b. Build semantic-map once per extracted document after category is known
+    const { buildSemanticMap } = await import('./lib/semantic-map');
+    const processedFiles: { filename: string; text: string; semantic_map?: object; method: 'pdf-text' | 'ocr' | 'plain' }[] = [];
+
+    for (const file of extractedFiles) {
+      const mapResult = await buildSemanticMap(category, file.text, file.filename);
+      processedFiles.push({
+        filename: file.filename,
+        text: file.text,
+        semantic_map: mapResult.map,
+        method: file.method,
+      });
+    }
 
     // 3. Endpoint selected -> Update Task
     const mockContextSelect = {
@@ -188,7 +202,7 @@ export async function handleRunTaskRequest(c: Context) {
     // 5. Execution complete -> Update Task
     const mockContextHandler = {
       req: {
-        json: async () => ({ task_description, files: extractedFiles }),
+        json: async () => ({ task_description, files: processedFiles }),
       },
       json: (data: any) => data,
     } as unknown as Context;
@@ -238,18 +252,30 @@ export async function handleRunTaskRequest(c: Context) {
     const verification = verifyOutput(category, handlerResult);
     updateReputation(winner_endpoint, verification.passed);
 
-    taskRecord.verificationScore = verification.score;
+    taskRecord.verificationScore = verification.passed ? 1 : 0;
     taskRecord.verificationStatus = verification.passed ? 'passed' : 'failed';
-    await taskRecord.save();
+
+    let refund: { issued: boolean; amount: number; tx_id: string } | undefined = undefined;
 
     if (!verification.passed) {
+      const { issueRefund } = await import('./lib/refund');
+      const refundRecipient = user.walletAddress || c.req.header('x-payer-address') || c.req.header('payment-sender') || '';
+      const chargedAmount = 0.75;
+      refund = await issueRefund(refundRecipient, chargedAmount, taskRecord._id.toString(), verification.reason);
+      
+      taskRecord.status = 'failed';
+      taskRecord.refundIssued = true;
+      taskRecord.refundTxId = refund.tx_id;
+      taskRecord.refundAmount = refund.amount;
+      
       await AuditLog.create({
         userId: user._id,
-        action: 'Verification Failed',
-        details: { taskId: taskRecord._id, score: verification.score },
+        action: 'Verification Failed & Refunded',
+        details: { taskId: taskRecord._id, reason: verification.reason, refundTxId: refund.tx_id, amount: refund.amount },
         ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
       });
     }
+    await taskRecord.save();
 
     // 7. Store endpoint usage
     await EndpointUsage.create({
@@ -274,12 +300,40 @@ export async function handleRunTaskRequest(c: Context) {
     user.totalEndpointsUsed = userEndpoints.length;
     await user.save();
 
+    // Compute savings_this_request from processedFiles
+    let reqRawTokens = 0;
+    let reqMapTokens = 0;
+    const { encode } = await import('gpt-tokenizer');
+
+    for (const f of processedFiles) {
+      reqRawTokens += encode(f.text || '').length;
+      reqMapTokens += encode(JSON.stringify(f.semantic_map || {})).length;
+    }
+    const reqTokensSaved = reqRawTokens - reqMapTokens;
+    const reqPercent = reqRawTokens > 0 ? parseFloat(((reqTokensSaved / reqRawTokens) * 100).toFixed(2)) : 0;
+
+    const estimated_raw_cost_usd = parseFloat(((reqRawTokens / 1000) * 0.005 + 1.50).toFixed(2));
+    const actual_paid = price_paid_to_endpoint > 0 ? price_paid_to_endpoint : 0.75;
+    const savings_multiplier = parseFloat((estimated_raw_cost_usd / actual_paid).toFixed(1));
+
+    const savings_this_request = {
+      raw_tokens: reqRawTokens,
+      map_tokens: reqMapTokens,
+      tokens_saved: reqTokensSaved,
+      reduction_percent: reqPercent,
+      estimated_usd_saved: parseFloat(((reqTokensSaved / 1000) * 0.0015).toFixed(4)),
+      estimated_raw_cost_usd,
+      savings_multiplier
+    };
+
     return c.json({
       category,
       winner_endpoint,
       price_paid_to_endpoint,
       verification,
+      refund,
       extracted_files: extractedFiles.map((f) => ({ filename: f.filename, method: f.method })),
+      savings_this_request,
       result: handlerResult,
     });
   } catch (error: any) {

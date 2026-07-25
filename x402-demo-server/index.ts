@@ -249,6 +249,16 @@ app.post('/run-task', requireAuth, async (c) => {
   return handleRunTaskRequest(c);
 });
 
+app.get('/savings-summary', async (c) => {
+  const { handleSavingsSummaryRequest } = await import('./handlers/savings-summary');
+  return handleSavingsSummaryRequest(c);
+});
+
+app.post('/chat-reply', async (c) => {
+  const { handleChatReplyRequest } = await import('./handlers/chat-reply');
+  return handleChatReplyRequest(c);
+});
+
 /**
  * POST /execute-task?planId=<id> — DYNAMIC PAYMENT PROTECTED
  *

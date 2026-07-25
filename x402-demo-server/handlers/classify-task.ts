@@ -4,16 +4,66 @@ config();
 
 /**
  * POST /classify-task
- * Classifies a user's task description into a specific category
+ * Classifies a user's task description into a specific category.
+ *
+ * Accepts optional context fields to short-circuit classification:
+ *   - has_files:             true if the user attached files to this message
+ *   - has_prior_task_result: true if a completed task exists in the current conversation
+ *
+ * Hard pre-check rules (evaluated BEFORE any LLM call):
+ *   1. No files + prior result  => conversational (follow-up question about existing output)
+ *   2. No files + no prior result => unsupported (nothing to screen yet)
+ *   3. Files present            => route to LLM for task-type classification as normal
  */
 export async function handleClassifyTaskRequest(c: Context) {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { task_description } = body;
+    const {
+      task_description,
+      has_files = false,
+      has_prior_task_result = false,
+    } = body;
 
     if (!task_description || typeof task_description !== 'string') {
       return c.json({ error: 'task_description is required' }, 400);
     }
+
+    // ── Hard Pre-Check: Bypass LLM for clear-cut cases ────────────────────────
+
+    // Case 1: No files attached AND a prior task result exists in conversation
+    // → Must be a conversational follow-up about already-returned results.
+    if (!has_files && has_prior_task_result) {
+      console.log('[classify-task] Pre-check: no files + prior result → conversational');
+      return c.json({ category: 'conversational', raw_input: task_description });
+    }
+
+    // Case 2: No files attached AND no prior result
+    // → No document to process; cannot perform any task-type action.
+    if (!has_files && !has_prior_task_result) {
+      const lowerDesc = task_description.toLowerCase().trim();
+      const isConversationalIntent =
+        lowerDesc === 'hi' ||
+        lowerDesc === 'hello' ||
+        lowerDesc === 'hey' ||
+        lowerDesc.startsWith('what can you') ||
+        lowerDesc.startsWith('how does') ||
+        lowerDesc.startsWith('who are you') ||
+        lowerDesc.includes('pricing') ||
+        lowerDesc.includes('how much') ||
+        lowerDesc.includes('what is prism') ||
+        lowerDesc.includes('help');
+
+      if (isConversationalIntent) {
+        console.log('[classify-task] Pre-check: conversational greeting/question → conversational');
+        return c.json({ category: 'conversational', raw_input: task_description });
+      }
+
+      // Any task-type keyword without files is unsupported (nothing to process).
+      console.log('[classify-task] Pre-check: no files, no prior result, task-type request → unsupported');
+      return c.json({ category: 'unsupported', raw_input: task_description });
+    }
+
+    // ── LLM Classification (only reached when files ARE attached) ─────────────
 
     const getGroqKeys = () => {
       const keys = [];
@@ -46,7 +96,29 @@ export async function handleClassifyTaskRequest(c: Context) {
               messages: [
                 {
                   role: 'system',
-                  content: 'Classify this task into exactly one of: resume_screening, contract_analysis, invoice_extraction, unsupported. Respond with only the category name.',
+                  content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, conversational, or unsupported.
+
+Rules & Few-Shot Examples:
+- Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
+  Input: "hi" -> conversational
+  Input: "hello" -> conversational
+  Input: "what can you do?" -> conversational
+  Input: "how does pricing work?" -> conversational
+  Input: "who are you?" -> conversational
+
+- Bare category mentions or document screening/analysis tasks (when files are attached):
+  Input: "resume" -> resume_screening
+  Input: "invoice" -> invoice_extraction
+  Input: "contract" -> contract_analysis
+  Input: "screen candidates for frontend developer" -> resume_screening
+  Input: "review NDA termination clause" -> contract_analysis
+  Input: "extract line items from vendor bill" -> invoice_extraction
+
+- Random gibberish or uninterpretable noise MUST be classified as unsupported:
+  Input: "asdkfjasdf" -> unsupported
+  Input: "123987!@#" -> unsupported
+
+Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, conversational, or unsupported.`,
                 },
                 {
                   role: 'user',
@@ -62,7 +134,9 @@ export async function handleClassifyTaskRequest(c: Context) {
             const data = await response.json();
             const content = data.choices?.[0]?.message?.content?.trim() || '';
             const normalized = content.toLowerCase();
-            if (normalized.includes('resume_screening')) {
+            if (normalized.includes('conversational')) {
+              category = 'conversational';
+            } else if (normalized.includes('resume_screening')) {
               category = 'resume_screening';
             } else if (normalized.includes('contract_analysis')) {
               category = 'contract_analysis';
@@ -99,11 +173,20 @@ export async function handleClassifyTaskRequest(c: Context) {
 }
 
 /**
- * Fallback classification method if LLM API is not available
+ * Fallback classification method if LLM API is not available.
+ * Only reached when files are attached (after pre-check).
  */
 function localClassify(description: string): string {
-  const desc = description.toLowerCase();
-  if (desc.includes('resume') || desc.includes('cv') || desc.includes('candidate') || desc.includes('hiring')) {
+  const desc = description.toLowerCase().trim();
+  if (
+    desc === 'hi' || desc === 'hello' || desc === 'hey' ||
+    desc.includes('what can you do') ||
+    desc.includes('how does pricing work') ||
+    desc.includes('who are you')
+  ) {
+    return 'conversational';
+  }
+  if (desc.includes('resume') || desc.includes('resum') || desc.includes('cv') || desc.includes('candidate') || desc.includes('hiring')) {
     return 'resume_screening';
   }
   if (desc.includes('contract') || desc.includes('agreement') || desc.includes('nda') || desc.includes('clause') || desc.includes('legal')) {

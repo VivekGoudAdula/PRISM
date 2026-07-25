@@ -1,40 +1,112 @@
 /**
- * Verifies the output schema and quality based on the category.
+ * Verifies the output schema and quality based on the task category.
+ * Prevents low-quality, empty, or placeholder-filled results from passing verification.
  */
 export function verifyOutput(category: string, result: any): { passed: boolean; reason: string } {
   if (!result) {
     return { passed: false, reason: 'Result is empty or null' };
   }
 
-  // Handle case where result might be wrapped in Hono response or returned directly as JSON object
-  // Since we called the handler directly in-process returning c.json(data), the returned value is a Hono Response object!
-  // Wait, let's look at how we called the handler in run-task.ts:
-  // `handlerResult = await handleResumeScreenFastRequest(mockContextHandler);`
-  // But wait, our mock Context is:
-  // `json: (data: any) => data`
-  // Ah! Since our mock Context's `json` method returns the raw JSON object directly,
-  // handlerResult is indeed the raw JSON object! Let's verify this behavior.
-  // Yes, `json: (data: any) => data` returns the object itself, not a Hono Response object.
-  // So `result` is the raw JSON object.
-  
   switch (category) {
-    case 'resume_screening':
-      if (result.candidates && Array.isArray(result.candidates) && result.candidates.length > 0) {
-        return { passed: true, reason: 'Valid candidates array received' };
-      }
-      return { passed: false, reason: 'Missing or empty candidates array' };
+    case 'invoice_extraction': {
+      // Extract vendor name & total amount from direct result or documents list
+      const vendorName = (
+        result.vendor_name ||
+        result.documents?.find((d: any) => d.vendor_name && d.vendor_name !== 'Unknown' && d.vendor_name !== 'N/A')?.vendor_name ||
+        'Unknown'
+      ).trim();
 
-    case 'invoice_extraction':
-      if (result.line_items && Array.isArray(result.line_items) && result.line_items.length > 0) {
-        return { passed: true, reason: 'Valid line_items array received' };
-      }
-      return { passed: false, reason: 'Missing or empty line_items array' };
+      const totalAmount = typeof result.total_amount === 'number' && result.total_amount > 0
+        ? result.total_amount
+        : (result.documents?.reduce((sum: number, d: any) => sum + (d.total_amount ?? 0), 0) || 0);
 
-    case 'contract_analysis':
-      if (result.clauses || result.flags) {
-        return { passed: true, reason: 'Valid clauses or flags field received' };
+      const lineItems = result.line_items ?? result.documents?.flatMap((d: any) => d.line_items ?? []) ?? [];
+
+      const invalidVendors = ['unknown', 'n/a', 'none', '', 'null', 'undefined'];
+      const isVendorValid = vendorName && !invalidVendors.includes(vendorName.toLowerCase());
+
+      if (!isVendorValid) {
+        return {
+          passed: false,
+          reason: 'No valid vendor name found — vendor is missing, Unknown, or N/A'
+        };
       }
-      return { passed: false, reason: 'Missing clauses and flags fields' };
+
+      if (!totalAmount || totalAmount <= 0) {
+        // Check if there are non-zero line items
+        const hasNonZeroLineItems = lineItems.some((item: any) => {
+          const amt = Number(item.amount ?? item.total ?? 0);
+          return amt > 0;
+        });
+
+        if (!hasNonZeroLineItems) {
+          return {
+            passed: false,
+            reason: 'no valid vendor or total amount found — this may not be an invoice'
+          };
+        }
+      }
+
+      // Check if line items exist but every line item is $0.00
+      if (lineItems.length > 0) {
+        const allZero = lineItems.every((item: any) => {
+          const amt = Number(item.amount ?? item.total ?? 0);
+          return amt === 0;
+        });
+
+        if (allZero && totalAmount <= 0) {
+          return {
+            passed: false,
+            reason: 'Every line item has a $0.00 amount and total amount is 0'
+          };
+        }
+      }
+
+      return { passed: true, reason: 'Valid invoice data extracted with vendor name and non-zero amount' };
+    }
+
+    case 'resume_screening': {
+      const candidates = result.candidates ?? result.documents?.flatMap((d: any) => d.candidates ?? []) ?? [];
+
+      if (!Array.isArray(candidates) || candidates.length === 0) {
+        return { passed: false, reason: 'Missing or empty candidates array' };
+      }
+
+      // Check if every candidate has a missing name or match_score of 0
+      const validCandidates = candidates.filter((c: any) => {
+        const name = (c.name || '').trim();
+        const score = typeof c.match_score === 'number' ? c.match_score : 0;
+        return name.length > 0 && name.toLowerCase() !== 'unknown' && score > 0;
+      });
+
+      if (validCandidates.length === 0) {
+        return {
+          passed: false,
+          reason: 'Every candidate is missing a valid name or has a match_score of 0'
+        };
+      }
+
+      return { passed: true, reason: 'Valid candidates array with non-zero match scores' };
+    }
+
+    case 'contract_analysis': {
+      const clauses = result.clauses_flagged ?? result.clauses ?? result.flags ?? result.documents?.flatMap((d: any) => d.clauses ?? []) ?? [];
+      const overallRiskScore = typeof result.overall_risk_score === 'number' ? result.overall_risk_score : 0;
+
+      const validClauses = clauses.filter((c: any) => {
+        const text = (c.clause_summary || c.clause_text || c.description || '').trim();
+        return text.length > 0 && !text.includes('Could not perform real LLM analysis');
+      });
+
+      if (validClauses.length === 0 && (!overallRiskScore || overallRiskScore === 0)) {
+        return {
+          passed: false,
+          reason: 'No risk clauses flagged and overall_risk_score is 0 or missing'
+        };
+      }
+
+      return { passed: true, reason: 'Valid risk clauses or non-zero overall risk score received' };
+    }
 
     default:
       return { passed: false, reason: `Unknown task category: ${category}` };

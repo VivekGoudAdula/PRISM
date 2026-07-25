@@ -27,17 +27,27 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
 
     const keys = getGroqKeys();
     let line_items: any[] = [];
+    let vendor_name = 'Unknown';
+    let invoice_number = 'Unknown';
+    let date = 'Unknown';
+    let total_amount = 0;
     let totalLlmLatency = 0;
 
     for (const file of files) {
-      let extracted_text = file.text || '';
-      if (!extracted_text && file.content_base64) {
-        try {
-          const extResult = await extractText(file.filename, file.content_base64);
-          extracted_text = extResult.text;
-        } catch (err) {
-          console.error(`Failed to extract text for ${file.filename}:`, err);
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || '';
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err) {
+            console.error(`Failed to extract text for ${file.filename}:`, err);
+          }
         }
+        const { buildSemanticMap } = await import('./lib/semantic-map');
+        const mapRes = await buildSemanticMap('invoice_extraction', extracted_text, file.filename);
+        semantic_map = mapRes.map;
       }
       
       let fileItems = [];
@@ -58,11 +68,11 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Analyze the invoice text. Extract the line items and return ONLY a valid JSON object matching this schema: { "line_items": [ { "description": string, "amount": number } ] }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.',
+                    content: 'Fast invoice extraction: Extract structured data based on invoice semantic map. Return ONLY JSON: { "vendor_name": string, "invoice_number": string, "date": string, "line_items": [ { "description": string, "quantity": number, "unit_price": number, "total": number } ], "total_amount": number }',
                   },
                   {
                     role: 'user',
-                    content: `Instructions: ${task_description}\n\nInvoice text:\n${extracted_text.substring(0, 8000)}`,
+                    content: `Instructions: ${task_description}\n\nInvoice Semantic Map JSON:\n${JSON.stringify(semantic_map)}`,
                   },
                 ],
                 temperature: 0.1,
@@ -79,7 +89,29 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
                 const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) throw new Error('No JSON object found in response');
                 const parsed = JSON.parse(jsonMatch[0]);
-                fileItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+                const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+                fileItems = rawItems.map((item: any) => {
+                  const unit_price = typeof item.unit_price === 'number' ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, '')) || 0;
+                  const quantity = typeof item.quantity === 'number' ? item.quantity : parseFloat(String(item.quantity || 1).replace(/[^0-9.]/g, '')) || 1;
+                  const rawTotal = item.total !== undefined ? item.total : item.amount;
+                  const total = typeof rawTotal === 'number' ? rawTotal : parseFloat(String(rawTotal || (unit_price * quantity)).replace(/[^0-9.]/g, '')) || (unit_price * quantity);
+                  return {
+                    description: item.description || 'Unknown Item',
+                    quantity,
+                    unit_price,
+                    total,
+                    amount: total
+                  };
+                });
+                if (parsed.vendor_name && vendor_name === 'Unknown') vendor_name = parsed.vendor_name;
+                if (parsed.invoice_number && invoice_number === 'Unknown') invoice_number = parsed.invoice_number;
+                if (parsed.date && date === 'Unknown') date = parsed.date;
+                if (typeof parsed.total_amount === 'number') {
+                  total_amount += parsed.total_amount;
+                } else if (typeof parsed.total_amount === 'string') {
+                  const parsedAmt = parseFloat(parsed.total_amount.replace(/[^0-9.]/g, ''));
+                  if (!isNaN(parsedAmt)) total_amount += parsedAmt;
+                }
                 success = true;
                 break;
               } catch (e) {
@@ -91,11 +123,28 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
           }
         }
       }
+
+      if (!success) {
+        console.warn(`Fallback active for fast invoice extraction of file: ${file.filename}`);
+        fileItems = [
+          {
+            description: 'Could not perform real LLM extraction on this document.',
+            quantity: 1,
+            unit_price: 0,
+            total: 0,
+            amount: 0,
+          },
+        ];
+      }
       line_items = line_items.concat(fileItems);
     }
 
     return c.json({
+      vendor_name,
+      invoice_number,
+      date,
       line_items,
+      total_amount,
       confidence: 0.75,
       latency_ms: totalLlmLatency,
       timestamp: new Date().toISOString()

@@ -77,12 +77,27 @@ function aggregateResults(category: string, results: any[]): any {
   if (category === 'invoice_extraction') {
     const allDocuments = results.map((r, i) => ({
       document: i + 1,
+      vendor_name: r.vendor_name,
+      invoice_number: r.invoice_number,
+      date: r.date,
       line_items: r.line_items ?? [],
+      total_amount: r.total_amount,
       confidence: r.confidence ?? 0,
     }));
     const totalLineItems = allDocuments.reduce((sum, d) => sum + d.line_items.length, 0);
     const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
+    const line_items = results.flatMap((r) => r.line_items ?? []);
+    const vendor_name = results.find((r) => r.vendor_name && r.vendor_name !== 'Unknown')?.vendor_name || results[0]?.vendor_name || 'Unknown';
+    const invoice_number = results.find((r) => r.invoice_number && r.invoice_number !== 'Unknown')?.invoice_number || results[0]?.invoice_number || 'Unknown';
+    const date = results.find((r) => r.date && r.date !== 'Unknown')?.date || results[0]?.date || 'Unknown';
+    const total_amount = results.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
+
     return {
+      vendor_name,
+      invoice_number,
+      date,
+      line_items,
+      total_amount,
       documents: allDocuments,
       totalLineItems,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
@@ -193,6 +208,12 @@ export async function handleExecuteTaskRequest(c: Context) {
     const { results = [], transactionIds = [], status, error } = body;
 
     if (status === 'failed' || error) {
+      console.log('🔍 [DIAGNOSTIC /execute-task 400]', {
+        planId,
+        status,
+        error,
+        body
+      });
       taskRecord.status = 'failed';
       await taskRecord.save();
 
@@ -218,6 +239,18 @@ export async function handleExecuteTaskRequest(c: Context) {
     const verification = verifyOutput(category, combinedResult);
     updateReputation(winnerEndpoint, verification.passed);
     const verificationScore = verification.passed ? 1 : 0;
+
+    let refund: { issued: boolean; amount: number; tx_id: string } | undefined = undefined;
+
+    if (!verification.passed) {
+      const { issueRefund } = await import('./lib/refund');
+      const refundRecipient = user.walletAddress || c.req.header('x-payer-address') || c.req.header('payment-sender') || '';
+      refund = await issueRefund(refundRecipient, finalTotalCost, taskRecord._id.toString(), verification.reason);
+      
+      taskRecord.refundIssued = true;
+      taskRecord.refundTxId = refund.tx_id;
+      taskRecord.refundAmount = refund.amount;
+    }
 
     // ── Step 6: Compute final pricing (strictly for DB logging, no payment check)
     const unitPrice: number = taskRecord.unitPrice ?? 0;
@@ -317,6 +350,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       executionCount: actualQuantity,
       executionTime,
       verification,
+      refund,
       groupTransactionId: transactionIds[0] || 'grouped-independent',
       paymentMode: 'grouped',
       executionProgressLog: progressLog,

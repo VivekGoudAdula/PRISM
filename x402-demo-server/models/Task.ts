@@ -36,6 +36,9 @@ export interface ITask {
 
   verificationScore?: number;
   verificationStatus?: 'passed' | 'failed' | 'unverified';
+  refundIssued?: boolean;
+  refundTxId?: string;
+  refundAmount?: number;
   executionTime?: number;
   status: 'planned' | 'pending' | 'in_progress' | 'completed' | 'failed';
   output?: any;
@@ -72,6 +75,9 @@ const TaskSchema = new Schema<ITask>({
 
   verificationScore: { type: Number, default: 0 },
   verificationStatus: { type: String, enum: ['passed', 'failed', 'unverified'], default: 'unverified' },
+  refundIssued: { type: Boolean, default: false },
+  refundTxId: { type: String },
+  refundAmount: { type: Number, default: 0 },
   executionTime: { type: Number, default: 0 },
   status: {
     type: String,

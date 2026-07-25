@@ -353,7 +353,7 @@ pre code {
   gap: 0.45rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #f8fafc;
   white-space: nowrap;
 }
 .trust-icon {
@@ -405,7 +405,7 @@ pre code {
 }
 .lp-section-sub {
   font-size: 1.05rem;
-  color: #64748b;
+  color: #f1f5f9;
   max-width: 560px;
   margin: 0 auto 3.5rem;
   line-height: 1.7;
@@ -485,7 +485,7 @@ pre code {
 }
 .cap-body {
   font-size: 0.875rem;
-  color: #64748b;
+  color: #e2e8f0;
   line-height: 1.65;
   margin-bottom: 1.5rem;
   flex: 1;
@@ -506,7 +506,7 @@ pre code {
   gap: 0.5rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: #f8fafc;
 }
 .cap-feat-icon {
   flex-shrink: 0;
@@ -565,7 +565,7 @@ pre code {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #475569;
+  color: #cbd5e1;
   margin-bottom: 0.75rem;
 }
 .pricing-amount {
@@ -583,7 +583,7 @@ pre code {
 }
 .pricing-caption {
   font-size: 0.8rem;
-  color: #475569;
+  color: #cbd5e1;
   margin-bottom: 1.5rem;
   line-height: 1.5;
 }
@@ -606,7 +606,7 @@ pre code {
   font-weight: 600;
 }
 .pricing-feat--yes {
-  color: #94a3b8;
+  color: #f1f5f9;
 }
 .pricing-feat--yes svg {
   color: #6366f1;
@@ -614,7 +614,7 @@ pre code {
   font-size: 0.9rem;
 }
 .pricing-feat--no {
-  color: #334155;
+  color: #94a3b8;
 }
 .pricing-feat--no span {
   color: #ef4444;
@@ -643,7 +643,7 @@ pre code {
 }
 .lp-cta-sub {
   font-size: 1.05rem;
-  color: #64748b;
+  color: #f1f5f9;
   line-height: 1.7;
 }
 .lp-cta-footnote {
@@ -711,7 +711,7 @@ pre code {
 
 .lp-footer-tagline {
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   line-height: 1.6;
 }
 
@@ -770,7 +770,7 @@ pre code {
   padding: 0;
   margin: 0;
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: #e2e8f0;
   text-decoration: none;
   transition: all 0.2s ease;
   cursor: pointer;
@@ -831,7 +831,7 @@ pre code {
 
 .lp-footer-copy {
   font-size: 0.8rem;
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 /* ─── Premium Admin Console Styles ───────────────────────────────────────── */

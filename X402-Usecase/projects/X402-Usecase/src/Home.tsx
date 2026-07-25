@@ -2,14 +2,14 @@
 import { useWallet } from '@txnlab/use-wallet-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiMenu, FiX } from 'react-icons/fi'
+import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign } from 'react-icons/fi'
 import ConnectWallet from './components/ConnectWallet'
 import Weather from './components/Weather'
 import Prism from './components/Prism'
 import AdminDashboard from './components/AdminDashboard'
-import WaitlistModal from './components/WaitlistModal'
+// import WaitlistModal from './components/WaitlistModal'
 import { api, setAccessToken } from './utils/api'
-import { fetchWaitlistCount } from './utils/waitlistApi'
+// import { fetchWaitlistCount } from './utils/waitlistApi'
 
 interface HomeProps { }
 
@@ -19,11 +19,13 @@ const Home: React.FC<HomeProps> = () => {
   const [openWalletModal, setOpenWalletModal] = useState<boolean>(false)
   const { activeAddress } = useWallet()
 
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('user')
+
+  /* ── Waitlist mode (disabled locally — live on deployed branch) ──
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [currentUser, setCurrentUser] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<string>('user')
 
   const openWaitlist = () => {
     setMobileNavOpen(false)
@@ -45,14 +47,14 @@ const Home: React.FC<HomeProps> = () => {
       .then(setWaitlistCount)
       .catch(() => {})
   }
+  ── end waitlist ── */
 
   // Derive view from URL
-  const viewState =
-    pathname === '/login' || pathname === '/signup' || (pathname === '/demo' && !currentUser)
-      ? 'auth'
-      : pathname === '/app' || (pathname === '/demo' && currentUser)
-        ? 'app'
-        : 'landing'
+  const viewState = pathname === '/login' || pathname === '/signup'
+    ? 'auth'
+    : pathname === '/app'
+      ? 'app'
+      : 'landing'
 
   // Whether the auth form is in sign-up mode (driven by path)
   const isSignUp = pathname === '/signup'
@@ -60,9 +62,11 @@ const Home: React.FC<HomeProps> = () => {
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false)
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false)
   const [tasks, setTasks] = useState<any[]>([])
+  const [conversations, setConversations] = useState<any[]>([])
   const [profileData, setProfileData] = useState<{ email: string; credits: number; plan: string } | null>(null)
   const [stats, setStats] = useState<any>(null)
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
+  const [historyTab, setHistoryTab] = useState<'conversations' | 'tasks'>('conversations')
 
   const renderFormattedResult = (result: any, category: string) => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
@@ -76,6 +80,8 @@ const Home: React.FC<HomeProps> = () => {
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Candidate Name</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Target/Matched Role</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Match Score</th>
+                <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Primary Domain</th>
+                <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Alternative Fits</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-left py-2 px-3">Key Skills</th>
               </tr>
             </thead>
@@ -89,17 +95,37 @@ const Home: React.FC<HomeProps> = () => {
                   <tr key={index} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
                     <td className="font-semibold text-white py-2 px-3">{c.name}</td>
                     <td className="text-slate-300 py-2 px-3">{c.role || 'N/A'}</td>
-                    <td className="w-1/4 py-2 px-3">
+                    <td className="w-1/6 py-2 px-3">
                       <div className="flex items-center gap-2">
-                        <progress className={`progress ${progressClass} w-20 bg-slate-800`} value={scorePercent} max="100" />
+                        <progress className={`progress ${progressClass} w-16 bg-slate-800`} value={scorePercent} max="100" />
                         <span className="font-extrabold text-xs text-slate-200">{scorePercent}%</span>
                       </div>
                     </td>
-                    <td className="py-2 px-3">
-                      <div className="flex flex-wrap gap-1">
+                    <td className="py-3 px-3 align-top max-w-[150px]">
+                      <span className="inline-block px-2 py-1 rounded-md border border-emerald-500/20 text-emerald-300 bg-emerald-950/25 text-[11px] font-semibold leading-relaxed break-words">
+                        {c.primary_domain || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 align-top max-w-[200px]">
+                      <div className="flex flex-wrap gap-x-1.5 gap-y-2">
+                        {Array.isArray(c.alternative_roles) && c.alternative_roles.length > 0 ? (
+                          c.alternative_roles.map((alt: string, aIdx: number) => (
+                            <span key={aIdx} className="inline-flex items-center px-2 py-1 rounded-md border border-sky-500/20 text-sky-300 bg-sky-950/25 text-[10px] font-medium leading-normal break-words text-left">
+                              {alt}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 text-xs">None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 align-top max-w-[250px]">
+                      <div className="flex flex-wrap gap-x-1.5 gap-y-2">
                         {Array.isArray(c.key_skills) && c.key_skills.length > 0 ? (
                           c.key_skills.map((skill: string, sIdx: number) => (
-                            <span key={sIdx} className="badge badge-sm badge-outline border-indigo-500/30 text-indigo-300 bg-indigo-950/20 px-2 py-0.5 rounded">{skill}</span>
+                            <span key={sIdx} className="inline-flex items-center px-2 py-1 rounded-md border border-indigo-500/20 text-indigo-300 bg-indigo-950/25 text-[10px] font-medium leading-normal break-words text-left">
+                              {skill}
+                            </span>
                           ))
                         ) : (
                           <span className="text-slate-500 text-xs">None</span>
@@ -111,6 +137,10 @@ const Home: React.FC<HomeProps> = () => {
               })}
             </tbody>
           </table>
+          <div className="mt-3 text-[11px] text-slate-500 flex items-center gap-1.5 font-medium pl-3 pb-1 border-t border-slate-800/20 pt-2">
+            <span className="info-icon text-indigo-400 font-bold">ℹ</span>
+            <span>How is the Match Score calculated? The score represents semantic similarity and skill overlap computed by the LLM based on keyword presence, experience level, skill relevance weight, and target role criteria.</span>
+          </div>
         </div>
       );
     }
@@ -213,6 +243,7 @@ const Home: React.FC<HomeProps> = () => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [authError, setAuthError] = useState('')
+  const [authSubmitting, setAuthSubmitting] = useState(false)
 
   // Check login on load — redirect to /app if already signed in
   useEffect(() => {
@@ -232,7 +263,7 @@ const Home: React.FC<HomeProps> = () => {
       // Check session validity with me endpoint
       api.get('/api/auth/me')
         .then(() => {
-          if (pathname !== '/app' && pathname !== '/demo') navigate('/app', { replace: true })
+          if (pathname !== '/app') navigate('/app', { replace: true })
         })
         .catch(() => {
           // Token expired or invalid
@@ -242,15 +273,6 @@ const Home: React.FC<HomeProps> = () => {
       navigate('/', { replace: true })
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch waitlist count on landing
-  useEffect(() => {
-    if (viewState === 'landing') {
-      fetchWaitlistCount()
-        .then(setWaitlistCount)
-        .catch(() => setWaitlistCount(null))
-    }
-  }, [viewState])
 
   // Load user dashboard stats when in app
   useEffect(() => {
@@ -277,6 +299,7 @@ const Home: React.FC<HomeProps> = () => {
   // Handle Signup
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (authSubmitting) return;
     setAuthError('')
 
     if (!name || !email || !password || !confirmPassword) {
@@ -289,6 +312,7 @@ const Home: React.FC<HomeProps> = () => {
       return
     }
 
+    setAuthSubmitting(true);
     try {
       const { data } = await api.post('/api/auth/signup', {
         fullName: name,
@@ -311,7 +335,7 @@ const Home: React.FC<HomeProps> = () => {
         credits: data.user.credits || 0,
         plan: data.user.subscriptionPlan || 'free'
       });
-      navigate(pathname === '/demo' ? '/demo' : '/app');
+      navigate('/app');
 
       // Reset inputs
       setName('')
@@ -320,12 +344,15 @@ const Home: React.FC<HomeProps> = () => {
       setConfirmPassword('')
     } catch (err: any) {
       setAuthError(err.response?.data?.error || 'Signup failed.');
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (authSubmitting) return;
     setAuthError('')
 
     if (!email || !password) {
@@ -333,6 +360,7 @@ const Home: React.FC<HomeProps> = () => {
       return
     }
 
+    setAuthSubmitting(true);
     try {
       const { data } = await api.post('/api/auth/login', {
         email,
@@ -354,13 +382,15 @@ const Home: React.FC<HomeProps> = () => {
         credits: data.user.credits || 0,
         plan: data.user.subscriptionPlan || 'free'
       });
-      navigate(pathname === '/demo' ? '/demo' : '/app');
+      navigate('/app');
 
       // Reset inputs
       setEmail('')
       setPassword('')
     } catch (err: any) {
       setAuthError(err.response?.data?.error || 'Login failed.');
+    } finally {
+      setAuthSubmitting(false);
     }
   }
 
@@ -389,8 +419,72 @@ const Home: React.FC<HomeProps> = () => {
   }
 
 
+  const [savingsSummary, setSavingsSummary] = useState<{
+    total_raw_tokens?: number;
+    total_map_tokens?: number;
+    total_tokens_saved?: number;
+    average_reduction_percent?: number;
+    estimated_usd_saved?: number;
+    savings_multiplier?: number;
+    total_requests_processed?: number;
+    cache_hit_rate_percent?: number;
+    total_documents_processed?: number;
+  } | null>(null)
+
+  const [showSavingsModal, setShowSavingsModal] = useState<boolean>(false)
+  const [displayedSavings, setDisplayedSavings] = useState<number>(0)
+  const [isPulsing, setIsPulsing] = useState<boolean>(false)
+
+  const fetchSavingsSummary = async () => {
+    try {
+      const { data } = await api.get('/savings-summary')
+      if (data && typeof data.estimated_usd_saved === 'number') {
+        const newTarget = data.estimated_usd_saved
+        setSavingsSummary(data)
+
+        setDisplayedSavings((prev) => {
+          if (newTarget > prev && prev > 0) {
+            // Trigger pulse effect
+            setIsPulsing(true)
+            setTimeout(() => setIsPulsing(false), 1000)
+
+            // Smooth count-up animation over ~600ms
+            const startVal = prev
+            const duration = 600
+            const startTime = performance.now()
+
+            const animateCount = (currentTime: number) => {
+              const elapsed = currentTime - startTime
+              const progress = Math.min(elapsed / duration, 1)
+              const currentVal = startVal + (newTarget - startVal) * progress
+              setDisplayedSavings(currentVal)
+              if (progress < 1) {
+                requestAnimationFrame(animateCount)
+              }
+            }
+            requestAnimationFrame(animateCount)
+            return prev
+          } else {
+            return newTarget
+          }
+        })
+      } else {
+        setSavingsSummary(null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch savings summary:', err)
+      setSavingsSummary(null)
+    }
+  }
+
+  useEffect(() => {
+    if (viewState === 'app') {
+      fetchSavingsSummary()
+    }
+  }, [viewState])
+
   return (
-    <div className="min-h-screen flex flex-col text-slate-100 font-sans relative overflow-x-hidden">
+    <div className={`w-full text-slate-100 font-sans relative ${viewState === 'app' ? 'min-h-screen flex flex-col' : 'min-h-screen flex flex-col overflow-x-hidden'}`}>
       {/* Background backdrop and Prism */}
       <div className="fixed inset-0 bg-slate-950 -z-20" />
       <div className="fixed inset-0 -z-10 opacity-70 pointer-events-none">
@@ -398,7 +492,7 @@ const Home: React.FC<HomeProps> = () => {
           animationType="rotate"
           timeScale={0.8}
           height={3.5}
-          baseWidth={5.5}
+baseWidth={5.5}
           scale={3.5}
           hueShift={0}
           colorFrequency={1}
@@ -408,18 +502,32 @@ const Home: React.FC<HomeProps> = () => {
         />
       </div>
 
-      {/* Top Navbar — visible only on app dashboard */}
+      {/* Top Navbar — fixed overlay with top vignette shade on app dashboard */}
       {viewState === 'app' && (
-        <nav className="w-full flex items-center justify-between pt-6 pb-2 px-8 z-50 animate-fade-in">
-          <div className="flex items-center gap-3 select-none">
+        <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between pt-6 pb-10 px-8 animate-fade-in pointer-events-none bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent">
+          <div className="flex items-center gap-3 select-none pointer-events-auto">
             <img src="/logo.png" alt="Prism Logo" className="h-14 w-auto object-contain" />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pointer-events-auto">
+
+            {viewState === 'app' && savingsSummary && (
+              <button
+                className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 ${
+                  isPulsing
+                    ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/40 border-emerald-400'
+                    : 'bg-slate-900/80 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-400'
+                }`}
+                onClick={() => setShowSavingsModal(true)}
+              >
+                <FiDollarSign className="text-emerald-400 text-sm" />
+                <span>View Savings (${displayedSavings.toFixed(2)} saved)</span>
+              </button>
+            )}
 
             {viewState === 'app' && (
               <button
-                className="btn btn-outline btn-primary btn-sm rounded-full px-4 text-xs font-semibold hover:scale-105 transition-transform"
+                className="btn btn-outline btn-primary h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold hover:scale-105 transition-transform"
                 onClick={toggleWalletModal}
                 data-test-id="connect-wallet"
               >
@@ -429,9 +537,12 @@ const Home: React.FC<HomeProps> = () => {
 
             {viewState === 'app' && userRole !== 'admin' && (
               <button
-                className="btn btn-ghost btn-sm text-slate-300 hover:text-white rounded-xl border border-slate-800/60 px-4 text-xs font-bold"
-                onClick={() => {
-                  fetchTasks();
+                className="btn btn-ghost h-10 min-h-[40px] text-slate-300 hover:text-white rounded-full border border-slate-800/60 px-4 text-xs font-bold"
+                            onClick={() => {
+                  // Fetch both conversations and tasks for the history modal
+                  api.get('/api/chat/conversations').then(({ data }) => setConversations(data)).catch(() => {});
+                  api.get('/api/analytics/tasks').then(({ data }) => setTasks(data)).catch(() => {});
+                  setHistoryTab('conversations');
                   setSelectedTask(null);
                   setShowHistoryModal(true);
                 }}
@@ -443,7 +554,7 @@ const Home: React.FC<HomeProps> = () => {
             {viewState === 'app' && currentUser && (
               <div className="relative">
                 <button
-                  className="btn btn-circle btn-ghost text-slate-300 hover:text-white hover:bg-slate-800/50 flex items-center justify-center border border-slate-800/60"
+                  className="btn btn-circle h-10 w-10 min-h-[40px] min-w-[40px] btn-ghost text-slate-300 hover:text-white hover:bg-slate-800/50 flex items-center justify-center border border-slate-800/60"
                   onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                 >
                   <FiUser className="text-lg" />
@@ -482,7 +593,7 @@ const Home: React.FC<HomeProps> = () => {
 
             {viewState === 'app' && currentUser && (
               <button
-                className="btn btn-circle btn-ghost text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 flex items-center justify-center border border-rose-950/30"
+                className="btn btn-circle h-10 w-10 min-h-[40px] min-w-[40px] btn-ghost text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 flex items-center justify-center border border-rose-950/30"
                 onClick={handleLogout}
                 title="Log Out"
               >
@@ -495,94 +606,60 @@ const Home: React.FC<HomeProps> = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center z-10">
+      <main className="flex-1 flex flex-col items-center z-10 w-full">
 
         {/* LANDING PAGE VIEW */}
         {viewState === 'landing' && (
           <div className="lp-hero-wrap w-full animate-fade-in relative">
+            
+            {/* Floating Top-Left Logo */}
+            <div
+              className="absolute top-10 left-6 md:left-8 cursor-pointer z-50 transition-transform hover:scale-105"
+              onClick={() => navigate('/')}
+            >
+              <img src="/logo.png" alt="Prism Logo" className="h-14 w-auto object-contain" />
+            </div>
 
-            {/* Landing Navbar */}
-            <nav className="lp-navbar">
-              <div
-                className="lp-navbar-logo cursor-pointer"
-                onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+            {/* Floating Top-Right Sign In */}
+            <div className="absolute top-10 right-6 md:right-8 z-50">
+              <button
+                className="btn btn-outline btn-sm rounded-full px-6 text-xs font-semibold hover:bg-white/10 hover:scale-105 transition-all"
+                onClick={() => navigate('/login')}
               >
-                <img src="/logo.png" alt="Prism Logo" className="h-12 w-auto object-contain" />
-              </div>
-
-              <div className="lp-navbar-links hidden md:flex">
-                <button className="lp-nav-link" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Home</button>
-                <button className="lp-nav-link" onClick={() => scrollToSection('features')}>Features</button>
-                <button className="lp-nav-link" onClick={() => scrollToSection('pricing')}>Pricing</button>
-                <button className="lp-nav-link" onClick={openWaitlist}>Waitlist</button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  className="btn btn-primary btn-sm rounded-full px-5 text-xs font-bold hidden md:inline-flex"
-                  onClick={openWaitlist}
-                >
-                  Join Waitlist
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm md:hidden text-slate-300"
-                  onClick={() => setMobileNavOpen(!mobileNavOpen)}
-                  aria-label="Toggle menu"
-                >
-                  {mobileNavOpen ? <FiX className="text-xl" /> : <FiMenu className="text-xl" />}
-                </button>
-              </div>
-            </nav>
-
-            {/* Mobile nav drawer */}
-            {mobileNavOpen && (
-              <div className="lp-mobile-nav md:hidden">
-                <button className="lp-nav-link" onClick={() => { setMobileNavOpen(false); navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Home</button>
-                <button className="lp-nav-link" onClick={() => scrollToSection('features')}>Features</button>
-                <button className="lp-nav-link" onClick={() => scrollToSection('pricing')}>Pricing</button>
-                <button className="lp-nav-link" onClick={openWaitlist}>Waitlist</button>
-                <button className="btn btn-primary btn-sm rounded-full font-bold mt-2" onClick={openWaitlist}>
-                  Join Waitlist
-                </button>
-              </div>
-            )}
+                Sign In
+              </button>
+            </div>
 
             {/* ── Hero ── */}
-            <div className="lp-hero-content pt-8 md:pt-16">
+            <div className="lp-hero-content pt-16">
 
-              <span className="lp-hero-eyebrow">
-                🚀 Launching Soon on Algorand MainNet
-              </span>
-
-              <h1 className="lp-hero-heading">
-                Decentralized AI Routing<br />
-                <span className="lp-hero-gradient">
-                  for Agentic Workflows
+              <h1 className="lp-hero-heading mb-10">
+                <span className="whitespace-nowrap">Decentralized AI Routing</span><br />
+                for<br />
+                <span className="lp-hero-gradient whitespace-nowrap">
+                  Agentic Workflows
                 </span>
               </h1>
 
-              <p className="lp-hero-sub">
-                Prism intelligently routes AI tasks to optimal endpoints - verified on-chain via Algorand, paid per task via x402. No subscriptions. No black boxes.
-              </p>
 
-              <div className="lp-hero-actions">
+
+              <div className="lp-hero-actions mt-12 mb-8">
                 <button
                   className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform"
-                  onClick={openWaitlist}
+                  onClick={() => { navigate('/signup') }}
                 >
-                  Join Waitlist
+                  Get Started Free
+                </button>
+                <button
+                  className="btn btn-outline btn-lg rounded-full px-10 font-bold hover:scale-105 transition-transform"
+                  onClick={() => { navigate('/login') }}
+                >
+                  Sign In
                 </button>
               </div>
 
-              {waitlistCount !== null && (
-                <p className="lp-waitlist-counter">
-                  <span className="lp-waitlist-counter-num">{waitlistCount.toLocaleString()}</span>
-                  {' '}Early Users Joined
-                </p>
-              )}
-
               {/* ── Trust Strip ── */}
-              <div className="trust-strip">
+              <div className="trust-strip mt-12">
                 <span className="trust-badge">
                   <span className="trust-icon"><FiCheckCircle /></span>
                   No subscriptions — pay only when you use it
@@ -600,7 +677,7 @@ const Home: React.FC<HomeProps> = () => {
 
         {/* ── Capability Cards — full-width section ── */}
         {viewState === 'landing' && (
-          <section id="features" className="lp-section w-full">
+          <section className="lp-section w-full">
             <div className="lp-section-inner">
               <p className="lp-eyebrow">Capabilities</p>
               <h2 className="lp-section-heading">Built for real AI workloads</h2>
@@ -695,31 +772,12 @@ const Home: React.FC<HomeProps> = () => {
                   </ul>
                   <button
                     className="btn btn-primary w-full mt-6 rounded-xl font-bold text-sm"
-                    onClick={openWaitlist}
+                    onClick={() => { navigate('/signup') }}
                   >
-                    Join Waitlist
+                    Get Started Free
                   </button>
                 </div>
               </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── Waitlist Section ── */}
-        {viewState === 'landing' && (
-          <section id="waitlist" className="lp-section w-full">
-            <div className="lp-section-inner text-center">
-              <p className="lp-eyebrow">Early Access</p>
-              <h2 className="lp-section-heading">Join the Prism Waitlist</h2>
-              <p className="lp-section-sub mx-auto">
-                Be among the first to route AI tasks on Algorand MainNet. Get priority access when we launch.
-              </p>
-              <button
-                className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform mt-4"
-                onClick={openWaitlist}
-              >
-                Join Waitlist
-              </button>
             </div>
           </section>
         )}
@@ -728,23 +786,35 @@ const Home: React.FC<HomeProps> = () => {
         {viewState === 'landing' && (
           <section className="lp-cta-section w-full">
             <div className="lp-cta-inner">
-              <p className="lp-eyebrow lp-eyebrow--light">Launching soon</p>
-              <h2 className="lp-cta-heading">Ready to transform your AI workflows?</h2>
+              <p className="lp-eyebrow lp-eyebrow--light">Get started today</p>
+              <h2 className="lp-cta-heading">Ready to route your first task?</h2>
               <p className="lp-cta-sub">
-                Join the waitlist today and get early access when Prism launches on Algorand MainNet.
+                Sign up in seconds. No credit card required. Your first result is on us.
               </p>
               <div className="flex gap-4 flex-wrap justify-center mt-8">
                 <button
                   className="btn btn-primary btn-lg rounded-full px-10 text-sm font-bold shadow-2xl shadow-indigo-500/30 hover:scale-105 transition-transform"
-                  onClick={openWaitlist}
+                  onClick={() => { navigate('/signup') }}
                 >
-                  Join Waitlist
+                  Get Started — It's Free
+                </button>
+                <button
+                  className="btn btn-outline btn-lg rounded-full px-10 text-sm font-bold hover:scale-105 transition-transform"
+                  onClick={() => { navigate('/login') }}
+                >
+                  Sign In
                 </button>
               </div>
               <p className="lp-cta-footnote">Powered by Algorand · x402 payments · GoPlausible verification</p>
             </div>
           </section>
         )}
+
+        {/* ── Waitlist section (disabled locally — live on deployed branch) ──
+        {viewState === 'landing' && (
+          <section id="waitlist" className="lp-section w-full">...</section>
+        )}
+        ── end waitlist section ── */}
 
         {/* AUTH VIEW (LOGIN / SIGNUP) */}
         {viewState === 'auth' && (
@@ -764,12 +834,6 @@ const Home: React.FC<HomeProps> = () => {
 
             {/* Centered card */}
             <div className="w-full max-w-md liquid-glass p-8 animate-scale-up">
-
-            {pathname === '/demo' && (
-              <p className="text-xs font-bold uppercase tracking-widest text-indigo-400 text-center mb-4">
-                Demo Access
-              </p>
-            )}
 
             {/* Form Toggle Tabs */}
             <div className="flex border-b border-slate-800 mb-6">
@@ -859,9 +923,17 @@ const Home: React.FC<HomeProps> = () => {
 
               <button
                 type="submit"
-                className="btn btn-primary w-full rounded-lg font-bold text-sm mt-2 shadow-lg shadow-indigo-500/10"
+                disabled={authSubmitting}
+                className="btn btn-primary w-full rounded-lg font-bold text-sm mt-2 shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
               >
-                {isSignUp ? 'Create Account' : 'Sign In'}
+                {authSubmitting ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs text-white" />
+                    <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
+                  </>
+                ) : (
+                  <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                )}
               </button>
             </form>
             </div>
@@ -870,14 +942,18 @@ const Home: React.FC<HomeProps> = () => {
 
         {/* CHAT/WEATHER DASHBOARD VIEW */}
         {viewState === 'app' && (
-          <div className={`w-full ${userRole === 'admin' ? 'max-w-7xl px-6 md:px-12 justify-start items-stretch pt-6' : 'max-w-4xl px-4 md:px-8 justify-center items-center'} flex-1 flex flex-col pb-24 gap-6`}>
+          <div className={`w-full ${userRole === 'admin' ? 'max-w-7xl px-6 md:px-12 justify-start items-stretch pt-6' : 'max-w-6xl px-4 md:px-8 justify-center items-center'} flex-1 flex flex-col gap-6`}>
             {userRole === 'admin' ? (
               <AdminDashboard />
             ) : (
               <Weather 
                 activeTab="terminal" 
                 setActiveTab={() => {}}
-                onTaskComplete={fetchTasks} 
+                selectedHistoryTask={selectedTask}
+                onTaskComplete={() => {
+                  fetchTasks();
+                  fetchSavingsSummary();
+                }} 
               />
             )}
           </div>
@@ -903,8 +979,8 @@ const Home: React.FC<HomeProps> = () => {
               <p className="lp-footer-col-title">Product</p>
               <ul className="lp-footer-links">
                 <li><a href="#pricing" className="lp-footer-link">Pricing</a></li>
-                <li><button className="lp-footer-link" onClick={() => scrollToSection('features')}>Features</button></li>
-                <li><button className="lp-footer-link" onClick={openWaitlist}>Join Waitlist</button></li>
+                <li><button className="lp-footer-link" onClick={() => { navigate('/signup') }}>Get Started</button></li>
+                <li><button className="lp-footer-link" onClick={() => { navigate('/login') }}>Sign In</button></li>
               </ul>
             </div>
 
@@ -941,9 +1017,9 @@ const Home: React.FC<HomeProps> = () => {
       {/* History Modal Overlay */}
       {showHistoryModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl liquid-glass p-6 rounded-3xl shadow-2xl flex flex-col gap-4 animate-scale-up max-h-[85vh] overflow-y-auto relative border border-white/10">
+          <div className="w-full max-w-6xl liquid-glass p-8 rounded-3xl shadow-2xl flex flex-col gap-5 animate-scale-up max-h-[90vh] overflow-y-auto relative border border-white/10">
             <button
-              className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-bold p-2"
+              className="absolute top-5 right-5 text-slate-400 hover:text-white text-xl font-bold p-2"
               onClick={() => {
                 setShowHistoryModal(false);
                 setSelectedTask(null);
@@ -951,154 +1027,205 @@ const Home: React.FC<HomeProps> = () => {
             >
               ✕
             </button>
-            <h3 className="text-lg font-extrabold text-white uppercase tracking-wider mb-2">Historical Run Logs</h3>
-            
-            {tasks.length === 0 ? (
-              <p className="text-slate-500 text-sm">No tasks have been run yet.</p>
-            ) : (
-              <>
-                <div className="admin-table-wrap max-h-[30vh] overflow-y-auto">
-                  <table className="admin-table text-xs">
-                    <thead>
-                      <tr>
-                        <th>Prompt</th>
-                        <th>Category</th>
-                        <th>Winning Endpoint</th>
-                        <th>Latency</th>
-                        <th>Cost</th>
-                        <th>Verification</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tasks.map((task) => (
-                        <tr 
-                          key={task._id}
-                          className={`cursor-pointer hover:bg-slate-800/40 transition-colors ${selectedTask?._id === task._id ? 'bg-indigo-950/40 border-l-2 border-indigo-500' : ''}`}
-                          onClick={() => setSelectedTask(task)}
-                        >
-                          <td className="max-w-[250px] truncate" title={task.prompt}>{task.prompt}</td>
-                          <td><span className="admin-badge admin-badge--indigo">{task.category}</span></td>
-                          <td className="font-mono text-[10px]">{task.selectedEndpoint || 'N/A'}</td>
-                          <td>{task.executionTime ? `${task.executionTime}ms` : 'N/A'}</td>
-                          <td className="font-bold text-emerald-400">${(task.totalCost ?? task.endpointCost ?? 0).toFixed(3)} USDC</td>
-                          <td>
-                            <span className={`admin-badge ${task.verificationStatus === 'passed' ? 'admin-badge--green' : task.verificationStatus === 'failed' ? 'admin-badge--rose' : 'admin-badge--slate'}`}>
-                              {task.verificationStatus || 'unverified'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`admin-badge ${task.status === 'completed' ? 'admin-badge--green' : 'admin-badge--rose'}`}>
-                              {task.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <h3 className="text-xl font-extrabold text-white uppercase tracking-wider mb-1">History</h3>
 
-                {selectedTask && (
-                  <div className="mt-4 border-t border-slate-800 pt-4 animate-fade-in">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">
-                        Run Details
-                      </h4>
-                      <button 
-                        className="btn btn-ghost btn-xs text-slate-400 hover:text-white rounded px-2"
-                        onClick={() => setSelectedTask(null)}
-                      >
-                        Clear Details
-                      </button>
-                    </div>
+            {/* Tabs */}
+            <div className="flex gap-2 border-b border-slate-800/60 mb-2">
+              <button
+                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${
+                  historyTab === 'conversations'
+                    ? 'border-indigo-500 text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+                onClick={() => setHistoryTab('conversations')}
+              >
+                💬 Conversations ({conversations.length})
+              </button>
+              <button
+                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${
+                  historyTab === 'tasks'
+                    ? 'border-indigo-500 text-white'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+                onClick={() => setHistoryTab('tasks')}
+              >
+                📋 Task Logs ({tasks.length})
+              </button>
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Left: Result */}
-                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 max-h-[300px] overflow-y-auto">
-                        <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
-                          <h5 className="text-xs font-bold text-slate-350 uppercase tracking-wide">
-                            Execution Result Output
-                          </h5>
-                          <span className="text-[10px] text-slate-500 font-medium">Category: {selectedTask.category}</span>
+            {/* Conversations Tab */}
+            {historyTab === 'conversations' && (
+              conversations.length === 0 ? (
+                <p className="text-slate-500 text-sm">No saved conversations yet. Start a chat and your thread will be saved automatically.</p>
+              ) : (
+                <div className="flex flex-col gap-2 max-h-[55vh] overflow-y-auto pr-1">
+                  {conversations.map((convo) => (
+                    <button
+                      key={convo._id}
+                      className="w-full text-left px-4 py-3 bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/60 hover:border-indigo-500/40 rounded-xl transition-all group"
+                      onClick={() => {
+                        setShowHistoryModal(false);
+                        // Tag with _type so Weather.tsx knows this is a full conversation
+                        setSelectedTask({ ...convo, _type: 'conversation' });
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img src="/icon.png" alt="Prism" className="w-5 h-5 rounded-full object-contain shrink-0 opacity-70 group-hover:opacity-100" />
+                          <span className="text-sm font-semibold text-slate-100 truncate group-hover:text-white">{convo.title}</span>
                         </div>
-                        <div className="flex-1">
-                          {renderFormattedResult(selectedTask.output || selectedTask.result, selectedTask.category)}
-                        </div>
-                      </div>
-
-                      {/* Right: Transaction / Money Breakdown */}
-                      <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
-                        <div className="border-b border-slate-800/60 pb-2">
-                          <h5 className="text-xs font-bold text-slate-350 uppercase tracking-wide">
-                            Transaction & Money Breakdown
-                          </h5>
-                        </div>
-                        
-                        <div className="flex flex-col gap-2 text-xs text-slate-300">
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Winning Provider / Endpoint</span>
-                            <span className="font-mono text-white text-[10px]">{selectedTask.providerName || selectedTask.selectedEndpoint || 'N/A'}</span>
-                          </div>
-                          
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Quantity</span>
-                            <span className="font-semibold text-white">{selectedTask.executionQuantity ?? 1} unit(s)</span>
-                          </div>
-                          
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Unit Price</span>
-                            <span className="font-semibold text-white">${(selectedTask.unitPrice ?? 0).toFixed(3)} USDC</span>
-                          </div>
-                          
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Execution Cost</span>
-                            <span className="font-semibold text-white">${(selectedTask.executionCost ?? selectedTask.endpointCost ?? 0).toFixed(3)} USDC</span>
-                          </div>
-                          
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Platform Fee</span>
-                            <span className="font-semibold text-white">${(selectedTask.platformFee ?? 0.75).toFixed(3)} USDC</span>
-                          </div>
-
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Latency</span>
-                            <span className="font-semibold text-white">{selectedTask.executionTime ? `${selectedTask.executionTime}ms` : 'N/A'}</span>
-                          </div>
-
-                          <div className="flex justify-between border-b border-slate-900 pb-1.5">
-                            <span className="text-slate-500 font-medium">Verification Status</span>
-                            <span className="font-semibold capitalize text-indigo-300">{selectedTask.verificationStatus || 'unverified'}</span>
-                          </div>
-                          
-                          <div className="flex justify-between border-t border-slate-800 pt-2 pb-1">
-                            <span className="text-indigo-400 font-bold text-sm">Total Cost</span>
-                            <span className="font-extrabold text-emerald-400 text-sm">
-                              ${(selectedTask.totalCost ?? (selectedTask.executionCost ?? selectedTask.endpointCost ?? 0) + (selectedTask.platformFee ?? 0.75)).toFixed(3)} USDC
-                            </span>
-                          </div>
-                          
-                          {selectedTask.endpointChosenReason && (
-                            <div className="mt-2 bg-indigo-950/25 border border-indigo-900/35 p-2.5 rounded-xl">
-                              <span className="block text-[9px] font-extrabold text-indigo-400 uppercase mb-1">Routing Reason</span>
-                              <p className="text-[10px] leading-normal text-slate-400">{selectedTask.endpointChosenReason}</p>
-                            </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {convo.thread?.length > 0 && (
+                            <span className="text-[10px] text-slate-500 font-medium">{convo.thread.length} message{convo.thread.length !== 1 ? 's' : ''}</span>
                           )}
+                          <span className="text-[10px] text-slate-600">
+                            {new Date(convo.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
+
+            {/* Tasks Tab */}
+            {historyTab === 'tasks' && (
+              tasks.length === 0 ? (
+                <p className="text-slate-500 text-sm">No tasks have been run yet.</p>
+              ) : (
+                <>
+                  <div className="admin-table-wrap max-h-[55vh] overflow-y-auto">
+                    <table className="admin-table text-xs w-full">
+                      <thead>
+                        <tr>
+                          <th>Prompt</th>
+                          <th>Category</th>
+                          <th>Winning Endpoint</th>
+                          <th>Latency</th>
+                          <th>Cost</th>
+                          <th>Verification</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tasks.map((task) => (
+                          <tr 
+                            key={task._id}
+                            className="cursor-pointer hover:bg-slate-800/50 transition-colors border-b border-slate-800/40"
+                            onClick={() => {
+                              setShowHistoryModal(false);
+                              setSelectedTask(task);
+                            }}
+                          >
+                            <td className="max-w-[280px] truncate py-3 text-slate-100 font-medium" title={task.prompt}>{task.prompt}</td>
+                            <td><span className="admin-badge admin-badge--indigo">{task.category}</span></td>
+                            <td className="font-mono text-[11px] text-slate-300">{task.selectedEndpoint || 'N/A'}</td>
+                            <td className="text-slate-300">{task.executionTime ? `${task.executionTime}ms` : 'N/A'}</td>
+                            <td className="font-bold text-emerald-400 text-xs">${(task.totalCost ?? task.endpointCost ?? 0).toFixed(3)} USDC</td>
+                            <td>
+                              <span className={`admin-badge ${task.verificationStatus === 'passed' ? 'admin-badge--green' : task.verificationStatus === 'failed' ? 'admin-badge--rose' : 'admin-badge--slate'}`}>
+                                {task.verificationStatus || 'unverified'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`admin-badge ${task.refundIssued || task.verificationStatus === 'failed' ? 'admin-badge--rose' : task.status === 'completed' ? 'admin-badge--green' : 'admin-badge--slate'}`}>
+                                {task.refundIssued || task.verificationStatus === 'failed'
+                                  ? `Refunded ($${(task.refundAmount ?? task.totalCost ?? task.endpointCost ?? 0.75).toFixed(2)})`
+                                  : task.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </>
+                </>
+              )
             )}
           </div>
         </div>
       )}
 
+      {/* Waitlist modal (disabled locally — live on deployed branch)
       <WaitlistModal
         open={showWaitlistModal}
         onClose={() => setShowWaitlistModal(false)}
         onSuccess={handleWaitlistSuccess}
       />
+      */}
+
+      {/* Savings Breakdown Modal Overlay */}
+      {showSavingsModal && savingsSummary && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md liquid-glass p-6 rounded-3xl shadow-2xl flex flex-col gap-5 animate-scale-up relative border border-emerald-500/20">
+            <button
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-bold p-2"
+              onClick={() => setShowSavingsModal(false)}
+            >
+              ✕
+            </button>
+            
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <FiDollarSign className="text-xl" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white tracking-tight">Cumulative Cost Savings</h3>
+                <p className="text-xs text-slate-400">Prism LLM Optimization &amp; Caching Report</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Estimated USD Saved</span>
+                <span className="text-xl font-black text-emerald-400">${(savingsSummary.estimated_usd_saved ?? 0).toFixed(2)}</span>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Avg Efficiency Multiplier</span>
+                <span className="text-xl font-black text-indigo-400">{savingsSummary.savings_multiplier ?? 2.5}x</span>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Requests Processed</span>
+                <span className="text-sm font-extrabold text-white">{savingsSummary.total_requests_processed ?? savingsSummary.total_documents_processed ?? 0}</span>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Cache Hit / Token Reduction</span>
+                <span className="text-sm font-extrabold text-white">{Math.round(savingsSummary.average_reduction_percent ?? 0)}%</span>
+              </div>
+            </div>
+
+            <div className="bg-emerald-950/20 border border-emerald-900/40 p-3 rounded-2xl text-xs text-slate-300 flex flex-col gap-1.5">
+              <div className="flex justify-between border-b border-slate-800/60 pb-1">
+                <span className="text-slate-400">Total Raw Tokens:</span>
+                <span className="font-mono text-white font-semibold">{savingsSummary.total_raw_tokens ?? 0}</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800/60 pb-1">
+                <span className="text-slate-400">Total Structured Map Tokens:</span>
+                <span className="font-mono text-white font-semibold">{savingsSummary.total_map_tokens ?? 0}</span>
+              </div>
+              <div className="flex justify-between pt-0.5">
+                <span className="text-emerald-300 font-bold">Total Tokens Saved:</span>
+                <span className="font-mono text-emerald-400 font-extrabold">{savingsSummary.total_tokens_saved ?? 0}</span>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 leading-normal text-center">
+              On average, your workloads run <strong className="text-slate-300">{savingsSummary.savings_multiplier ?? 2.5}x more efficiently</strong> than unoptimized raw API calls by extracting reusable semantic document maps.
+            </p>
+
+            <button
+              className="btn btn-primary rounded-xl text-xs font-bold w-full"
+              onClick={() => setShowSavingsModal(false)}
+            >
+              Close Breakdown
+            </button>
+          </div>
+        </div>
+      )}
 
       <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
     </div>

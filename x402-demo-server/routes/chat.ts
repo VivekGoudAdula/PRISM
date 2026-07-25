@@ -8,7 +8,8 @@ const chatRouter = new Hono();
 chatRouter.use('*', requireAuth);
 
 /**
- * List conversations
+ * List conversations, sorted newest first.
+ * Includes the thread array so the frontend can restore full chat history.
  */
 chatRouter.get('/conversations', async (c) => {
   try {
@@ -22,12 +23,13 @@ chatRouter.get('/conversations', async (c) => {
 });
 
 /**
- * Create conversation
+ * Create a new conversation.
+ * Body: { title: string, thread?: any[] }
  */
 chatRouter.post('/conversations', async (c) => {
   try {
     const user = c.get('user');
-    const { title } = await c.req.json().catch(() => ({}));
+    const { title, thread = [] } = await c.req.json().catch(() => ({}));
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return c.json({ error: 'Title is required.' }, 400);
@@ -36,6 +38,7 @@ chatRouter.post('/conversations', async (c) => {
     const conversation = await Conversation.create({
       userId: new mongoose.Types.ObjectId(user.userId),
       title: title.trim(),
+      thread,
     });
 
     return c.json(conversation, 201);
@@ -46,7 +49,58 @@ chatRouter.post('/conversations', async (c) => {
 });
 
 /**
- * List messages in a conversation
+ * Save (overwrite) the full thread for an existing conversation.
+ * Body: { thread: any[] }
+ */
+chatRouter.put('/conversations/:id/thread', async (c) => {
+  try {
+    const user = c.get('user');
+    const { id } = c.req.param();
+    const { thread } = await c.req.json().catch(() => ({}));
+
+    if (!Array.isArray(thread)) {
+      return c.json({ error: 'thread must be an array.' }, 400);
+    }
+
+    const conversation = await Conversation.findOneAndUpdate(
+      { _id: id, userId: user.userId },
+      { thread, updatedAt: new Date() },
+      { new: true },
+    );
+
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found or unauthorized.' }, 404);
+    }
+
+    return c.json(conversation);
+  } catch (error: any) {
+    console.error('Save Thread Error:', error);
+    return c.json({ error: 'Failed to save thread.' }, 500);
+  }
+});
+
+/**
+ * Get the full thread of a conversation.
+ */
+chatRouter.get('/conversations/:id/thread', async (c) => {
+  try {
+    const user = c.get('user');
+    const { id } = c.req.param();
+
+    const conversation = await Conversation.findOne({ _id: id, userId: user.userId });
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found or unauthorized.' }, 404);
+    }
+
+    return c.json({ thread: conversation.thread || [] });
+  } catch (error: any) {
+    console.error('Get Thread Error:', error);
+    return c.json({ error: 'Failed to fetch thread.' }, 500);
+  }
+});
+
+/**
+ * List messages in a conversation (legacy text messages)
  */
 chatRouter.get('/messages', async (c) => {
   try {
@@ -55,7 +109,6 @@ chatRouter.get('/messages', async (c) => {
       return c.json({ error: 'conversationId is required.' }, 400);
     }
 
-    // Verify conversation ownership
     const user = c.get('user');
     const conversation = await Conversation.findOne({
       _id: conversationId,
@@ -75,7 +128,7 @@ chatRouter.get('/messages', async (c) => {
 });
 
 /**
- * Add message to a conversation
+ * Add a message to a conversation (legacy text messages)
  */
 chatRouter.post('/messages', async (c) => {
   try {
@@ -89,7 +142,6 @@ chatRouter.post('/messages', async (c) => {
       return c.json({ error: 'Invalid role. Must be user or assistant.' }, 400);
     }
 
-    // Verify ownership
     const user = c.get('user');
     const conversation = await Conversation.findOne({
       _id: conversationId,
@@ -106,7 +158,6 @@ chatRouter.post('/messages', async (c) => {
       content,
     });
 
-    // Update conversation updatedAt
     conversation.updatedAt = new Date();
     await conversation.save();
 

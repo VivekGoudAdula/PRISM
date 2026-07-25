@@ -58,6 +58,10 @@ export interface ExecutionPlan {
   /** Provider's reported confidence/accuracy (0-1) */
   estimatedAccuracy: number;
   candidates: ProviderCandidate[];
+  /** Conversational pre-classification flag and response */
+  isChat?: boolean;
+  reply?: string;
+  message?: string;
   /**
    * Per-file payment preview items, computed client-side from the plan.
    * Populated by buildPaymentPreview() before showing the confirmation modal.
@@ -78,18 +82,18 @@ export interface ExecutionProgressEntry {
 
 /** Full response returned by POST /execute-task */
 export interface ExecuteTaskResponse {
-  planId: string;
+  planId?: string;
   category: string;
-  winner_endpoint: string;
-  providerName: string;
-  unitPrice: number;
-  executionQuantity: number;
-  executionCost: number;
-  platformFee: number;
-  totalCost: number;
-  executionCount: number;
-  executionTime: number;
-  verification: { passed: boolean; score: number };
+  winner_endpoint?: string;
+  providerName?: string;
+  unitPrice?: number;
+  executionQuantity?: number;
+  executionCost?: number;
+  platformFee?: number;
+  totalCost?: number;
+  executionCount?: number;
+  executionTime?: number;
+  verification?: { passed: boolean; score: number };
   /**
    * The consolidated x402 transaction ID (single Algorand USDC transfer) that
    * covers the entire batch. Represents the "group payment" in our implementation.
@@ -98,15 +102,25 @@ export interface ExecuteTaskResponse {
    * x402 wire protocol (one x-payment header per HTTP request). This single tx covers
    * (executionQuantity × unitPrice + platformFee) in one wallet approval.
    */
-  groupTransactionId: string;
+  groupTransactionId?: string;
   /**
    * Payment mode used for this task. Always 'consolidated' until x402 protocol
    * supports grouped payment payloads.
    */
-  paymentMode: 'consolidated' | 'grouped';
+  paymentMode?: 'consolidated' | 'grouped';
   /** Per-file execution progress log, populated step-by-step by the server */
-  executionProgressLog: ExecutionProgressEntry[];
-  extracted_files: Array<{ filename: string; method: string }>;
+  executionProgressLog?: ExecutionProgressEntry[];
+  extracted_files?: Array<{ filename: string; method: string }>;
+  savings_this_request?: {
+    raw_tokens: number;
+    map_tokens?: number;
+    optimized_tokens?: number;
+    tokens_saved: number;
+    reduction_percent: number;
+    estimated_usd_saved: number;
+    estimated_raw_cost_usd?: number;
+    savings_multiplier?: number;
+  };
   result: any;
 }
 
@@ -233,21 +247,25 @@ export async function createX402Fetch(walletSigner: any) {
  * Calls POST /plan-task — a free endpoint that classifies the task,
  * discovers providers, and computes dynamic pricing.
  *
- * @param baseUrl - API base URL (e.g. http://localhost:4021)
- * @param taskDescription - Plain-language task description
- * @param files - Attached files (only metadata sent for planning; base64 not needed for cost calc)
+ * @param baseUrl              - API base URL (e.g. http://localhost:4021)
+ * @param taskDescription      - Plain-language task description
+ * @param files                - Attached files (only metadata sent for planning; base64 not needed for cost calc)
+ * @param hasPriorTaskResult   - Whether the current conversation already has a completed task result.
+ *                               Used server-side to pre-classify no-file follow-up messages as conversational.
  * @returns ExecutionPlan with planId, pricing breakdown, provider info, and payment preview
  */
 export async function planTask(
   baseUrl: string,
   taskDescription: string,
   files: AttachedFile[],
+  hasPriorTaskResult: boolean = false,
 ): Promise<ExecutionPlan> {
   const url = `${baseUrl}/plan-task`
   console.log('\n=== planTask START ===')
   console.log('URL:', url)
   console.log('Task:', taskDescription)
   console.log('Files:', files.length)
+  console.log('hasPriorTaskResult:', hasPriorTaskResult)
 
   const token = localStorage.getItem('prism_access_token')
   const headers: Record<string, string> = {
@@ -264,6 +282,8 @@ export async function planTask(
       task_description: taskDescription,
       // Send file metadata only (filename) for quantity calculation — not base64 content
       files: files.map((f) => ({ filename: f.filename })),
+      // Context flag: tells classifier whether prior task output already exists
+      has_prior_task_result: hasPriorTaskResult,
     }),
   })
 
@@ -346,6 +366,11 @@ export async function executeTaskWithPayment(
 
       if (onProgress) {
         onProgress(i + 1, 'executing')
+      }
+
+      if (i > 0) {
+        // Wait 1.5s between consecutive payment calls so wallet tx confirmation completes cleanly
+        await new Promise((r) => setTimeout(r, 1500))
       }
 
       const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {

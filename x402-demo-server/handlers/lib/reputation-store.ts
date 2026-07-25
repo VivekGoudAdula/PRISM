@@ -1,7 +1,4 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
-const reputationFilePath = path.join(__dirname, '..', '..', 'data', 'reputation.json');
+import { Reputation } from '../../models/AnalyticsData';
 
 export interface ReputationEntry {
   score: number;
@@ -11,52 +8,82 @@ export interface ReputationEntry {
 
 export type ReputationStore = Record<string, ReputationEntry>;
 
+const DEFAULT_ENDPOINTS = [
+  "/resume-screen-fast",
+  "/resume-screen-accurate",
+  "/contract-analyze-fast",
+  "/contract-analyze-accurate",
+  "/invoice-extract-fast",
+  "/invoice-extract-accurate"
+];
+
 /**
- * Reads the reputation database
+ * Reads the reputation database from MongoDB (async)
  */
-export function readReputation(): ReputationStore {
+export async function readReputationAsync(): Promise<ReputationStore> {
   try {
-    if (!fs.existsSync(reputationFilePath)) {
-      // Return default template if file does not exist
-      return {
-        "/resume-screen-fast": { "score": 0.5, "total_runs": 0, "verified_passes": 0 },
-        "/resume-screen-accurate": { "score": 0.5, "total_runs": 0, "verified_passes": 0 },
-        "/contract-analyze-fast": { "score": 0.5, "total_runs": 0, "verified_passes": 0 },
-        "/contract-analyze-accurate": { "score": 0.5, "total_runs": 0, "verified_passes": 0 },
-        "/invoice-extract-fast": { "score": 0.5, "total_runs": 0, "verified_passes": 0 },
-        "/invoice-extract-accurate": { "score": 0.5, "total_runs": 0, "verified_passes": 0 }
+    const docs = await Reputation.find({});
+    const store: ReputationStore = {};
+
+    for (const ep of DEFAULT_ENDPOINTS) {
+      store[ep] = { score: 0.5, total_runs: 0, verified_passes: 0 };
+    }
+
+    for (const doc of docs) {
+      store[doc.endpointPath] = {
+        score: doc.score,
+        total_runs: doc.totalRuns,
+        verified_passes: doc.verifiedPasses
       };
     }
-    const data = fs.readFileSync(reputationFilePath, 'utf-8');
-    return JSON.parse(data);
+
+    return store;
   } catch (error) {
-    console.error('Error reading reputation file:', error);
-    return {};
+    console.error('Error reading reputation from MongoDB:', error);
+    const fallback: ReputationStore = {};
+    for (const ep of DEFAULT_ENDPOINTS) {
+      fallback[ep] = { score: 0.5, total_runs: 0, verified_passes: 0 };
+    }
+    return fallback;
   }
 }
 
 /**
- * Updates the reputation score of a specific endpoint
+ * Synchronous backward-compatibility wrapper (returns default/cached structure)
  */
-export function updateReputation(endpoint_path: string, passed: boolean): void {
+export function readReputation(): ReputationStore {
+  const store: ReputationStore = {};
+  for (const ep of DEFAULT_ENDPOINTS) {
+    store[ep] = { score: 0.5, total_runs: 0, verified_passes: 0 };
+  }
+  return store;
+}
+
+/**
+ * Updates the reputation score of a specific endpoint in MongoDB
+ */
+export async function updateReputation(endpoint_path: string, passed: boolean): Promise<void> {
   try {
-    const store = readReputation();
-    if (!store[endpoint_path]) {
-      store[endpoint_path] = { score: 0.5, total_runs: 0, verified_passes: 0 };
+    let rep = await Reputation.findOne({ endpointPath: endpoint_path });
+    if (!rep) {
+      rep = new Reputation({
+        endpointPath: endpoint_path,
+        score: 0.5,
+        totalRuns: 0,
+        verifiedPasses: 0
+      });
     }
 
-    const entry = store[endpoint_path];
-    entry.total_runs += 1;
+    rep.totalRuns += 1;
     if (passed) {
-      entry.verified_passes += 1;
+      rep.verifiedPasses += 1;
     }
 
-    entry.score = entry.total_runs > 0 ? entry.verified_passes / entry.total_runs : 0.5;
+    rep.score = rep.totalRuns > 0 ? rep.verifiedPasses / rep.totalRuns : 0.5;
+    await rep.save();
 
-    // Write back synchronously to prevent race conditions in this MVP
-    fs.writeFileSync(reputationFilePath, JSON.stringify(store, null, 2), 'utf-8');
-    console.log(`Updated reputation for ${endpoint_path}: score=${entry.score}, total_runs=${entry.total_runs}`);
+    console.log(`Updated MongoDB reputation for ${endpoint_path}: score=${rep.score}, totalRuns=${rep.totalRuns}`);
   } catch (error) {
-    console.error('Error updating reputation file:', error);
+    console.error('Error updating reputation in MongoDB:', error);
   }
 }

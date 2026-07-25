@@ -31,21 +31,29 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
     let totalLlmLatency = 0;
 
     for (const file of files) {
-      let extracted_text = file.text || '';
-      if (!extracted_text && file.content_base64) {
-        try {
-          const extResult = await extractText(file.filename, file.content_base64);
-          extracted_text = extResult.text;
-        } catch (err) {
-          console.error(`Failed to extract text for ${file.filename}:`, err);
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || '';
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err) {
+            console.error(`Failed to extract text for ${file.filename}:`, err);
+          }
         }
+        const { buildSemanticMap } = await import('./lib/semantic-map');
+        const mapRes = await buildSemanticMap('resume_screening', extracted_text, file.filename);
+        semantic_map = mapRes.map;
       }
       
       let candidateInfo = {
-        name: file.filename,
+        name: semantic_map?.name || file.filename,
         match_score: 0.5,
         role: 'Unknown',
         key_skills: [],
+        primary_domain: 'Unknown',
+        alternative_roles: [] as string[],
       };
 
       let success = false;
@@ -65,11 +73,11 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Analyze the resume text against the target role. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[] }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.',
+                    content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[] }. For "name", use the candidate name provided in the semantic map. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.',
                   },
                   {
                     role: 'user',
-                    content: `Target role: ${task_description}\n\nResume text:\n${extracted_text.substring(0, 8000)}`,
+                    content: `Target role: ${task_description}\n\nCandidate Semantic Map JSON:\n${JSON.stringify(semantic_map, null, 2)}`,
                   },
                 ],
                 temperature: 0.1,
@@ -88,10 +96,12 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
                 if (!jsonMatch) throw new Error('No JSON object found in response');
                 const parsed = JSON.parse(jsonMatch[0]);
                 candidateInfo = {
-                  name: parsed.name || file.filename,
+                  name: parsed.name && parsed.name !== 'Candidate' && parsed.name !== 'Not Provided' ? parsed.name : (semantic_map?.name || file.filename),
                   match_score: typeof parsed.match_score === 'number' ? parsed.match_score : 0.5,
                   role: parsed.role || 'Unknown',
                   key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
+                  primary_domain: parsed.primary_domain || 'Unknown',
+                  alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
                 };
                 success = true;
                 break;

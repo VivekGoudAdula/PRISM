@@ -13,12 +13,12 @@ const PLATFORM_FEE = 0.75;
 
 /** Human-readable provider display names keyed by endpoint path */
 const PROVIDER_NAMES: Record<string, string> = {
-  '/resume-screen-fast': 'ResumeAI Fast (Groq Llama-3)',
-  '/resume-screen-accurate': 'ResumeAI Accurate (Groq 70B)',
-  '/contract-analyze-fast': 'ContractAI Fast (Groq Llama-3)',
-  '/contract-analyze-accurate': 'ContractAI Accurate (Groq 70B)',
-  '/invoice-extract-fast': 'InvoiceAI Fast (Groq Llama-3)',
-  '/invoice-extract-accurate': 'InvoiceAI Accurate (Groq 70B)',
+  '/resume-screen-fast': 'ResumeAI Fast',
+  '/resume-screen-accurate': 'ResumeAI Accurate',
+  '/contract-analyze-fast': 'ContractAI Fast',
+  '/contract-analyze-accurate': 'ContractAI Accurate',
+  '/invoice-extract-fast': 'InvoiceAI Fast',
+  '/invoice-extract-accurate': 'InvoiceAI Accurate',
 };
 
 /**
@@ -34,28 +34,57 @@ const PROVIDER_NAMES: Record<string, string> = {
 export async function handlePlanTaskRequest(c: Context) {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { task_description, files = [] } = body;
+    const { task_description, files = [], has_prior_task_result = false } = body;
 
     if (!task_description || typeof task_description !== 'string') {
       return c.json({ error: 'task_description is required' }, 400);
     }
 
+    // Derive has_files from the actual files array
+    const has_files: boolean = Array.isArray(files) && files.length > 0;
+
     // ── Step 1: Classify the task ────────────────────────────────────────────
+    // Pass file + history context so the classifier can short-circuit without calling LLM
     const mockCtxClassify = {
-      req: { json: async () => ({ task_description }) },
+      req: {
+        json: async () => ({
+          task_description,
+          has_files,
+          has_prior_task_result,
+        }),
+      },
       json: (data: any) => data,
     } as unknown as Context;
 
     const classifyResult: any = await handleClassifyTaskRequest(mockCtxClassify);
+    const category: string = classifyResult?.category || 'unsupported';
 
-    if (!classifyResult || classifyResult.error || classifyResult.category === 'unsupported') {
+    // ── Pre-Classification Branch 1: Conversational Chat ─────────────────────
+    if (category === 'conversational') {
+      const { generateChatReply } = await import('./chat-reply');
+      const reply = await generateChatReply(task_description);
       return c.json({
-        error: 'Task type is unsupported or classification failed',
+        category: 'conversational',
+        reply,
+        message: reply,
+        isChat: true,
+      });
+    }
+
+    // ── Pre-Classification Branch 2: Unsupported Task ────────────────────────
+    if (!classifyResult || classifyResult.error || category === 'unsupported') {
+      console.log('🔍 [DIAGNOSTIC /plan-task 400]', {
+        task_description,
+        classifyResult,
+        reason: 'Task type is unsupported or classification failed'
+      });
+      return c.json({
+        category: 'unsupported',
+        error: "I'm not sure what you'd like done — try something like 'screen this resume for a backend role' or 'extract data from this invoice.'",
+        message: "I'm not sure what you'd like done — try something like 'screen this resume for a backend role' or 'extract data from this invoice.'",
         details: classifyResult,
       }, 400);
     }
-
-    const category: string = classifyResult.category;
 
     // ── Step 2: Discover and rank providers ──────────────────────────────────
     const mockCtxSelect = {

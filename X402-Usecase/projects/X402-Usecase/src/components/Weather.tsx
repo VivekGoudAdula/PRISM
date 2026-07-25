@@ -17,6 +17,7 @@ interface WeatherProps {
   activeTab: 'terminal' | 'history' | 'chats';
   setActiveTab: (tab: 'terminal' | 'history' | 'chats') => void;
   onTaskComplete?: () => void;
+  selectedHistoryTask?: any;
 }
 
 // ─── Execution Summary Modal ──────────────────────────────────────────────────
@@ -24,7 +25,7 @@ interface WeatherProps {
 interface ExecutionSummaryModalProps {
   plan: ExecutionPlan;
   files: AttachedFile[];
-  onConfirm: () => void;
+  onConfirm: (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan) => void;
   onCancel: () => void;
 }
 
@@ -40,8 +41,43 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
     invoice_extraction: 'Invoice Extraction',
   };
 
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
+    new Set(files.map((_, i) => i))
+  );
+
+  const toggleSelectFile = (idx: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
+
+  const selectedCount = selectedIndices.size;
+  const executionCost = selectedCount * plan.unitPrice;
+  const totalCost = selectedCount > 0 ? executionCost + plan.platformFee : 0;
   const accuracyPct = Math.round((plan.estimatedAccuracy ?? 0) * 100);
   const preview: PaymentPreviewItem[] = plan.paymentPreview ?? [];
+
+  const handleConfirm = () => {
+    if (selectedCount === 0) return;
+    const filteredFiles = files.filter((_, idx) => selectedIndices.has(idx));
+    const updatedPlan: ExecutionPlan = {
+      ...plan,
+      executionQuantity: selectedCount,
+      executionCost: executionCost,
+      totalCost: totalCost,
+      paymentPreview: plan.paymentPreview ? plan.paymentPreview.filter(item => {
+        if (item.type === 'platform_fee') return true;
+        return item.index !== undefined && selectedIndices.has(item.index - 1);
+      }) : []
+    };
+    onConfirm(filteredFiles, updatedPlan);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -90,7 +126,7 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
             {
               icon: <FiZap className="text-amber-400" />,
               label: 'Executions',
-              value: `${plan.executionQuantity} file${plan.executionQuantity !== 1 ? 's' : ''}`,
+              value: `${selectedCount} file${selectedCount !== 1 ? 's' : ''}`,
             },
           ] as { icon: React.ReactNode; label: string; value: string }[]).map(({ icon, label, value }) => (
             <div key={label} className="flex items-center justify-between py-2 border-b border-white/4">
@@ -110,23 +146,39 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
                 <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Payment Breakdown</span>
               </div>
               <div className="flex flex-col divide-y divide-slate-800/40">
-                {preview.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      {item.type === 'platform_fee' ? (
-                        <span className="w-5 h-5 rounded bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-[9px] font-black text-violet-400">₱</span>
-                      ) : (
-                        <span className="w-5 h-5 rounded bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-[9px] font-black text-indigo-400">
-                          {item.index}
-                        </span>
-                      )}
-                      <span className="text-xs text-slate-300 font-medium truncate max-w-[220px]">{item.label}</span>
+                {preview.map((item, idx) => {
+                  const isChecked = item.type === 'execution' ? (item.index !== undefined ? selectedIndices.has(item.index - 1) : false) : true;
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between px-4 py-2 transition-opacity duration-200 ${
+                        item.type === 'execution' && !isChecked ? 'opacity-40' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {item.type === 'execution' ? (
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => item.index !== undefined && toggleSelectFile(item.index - 1)}
+                            className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950"
+                          />
+                        ) : (
+                          <span className="w-5 h-5 rounded bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-[9px] font-black text-violet-400">₱</span>
+                        )}
+                        {item.type === 'execution' && (
+                          <span className="w-5 h-5 rounded bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-[9px] font-black text-indigo-400">
+                            {item.index}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-300 font-medium truncate max-w-[200px]">{item.label}</span>
+                      </div>
+                      <span className={`text-xs font-bold ${item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-300'}`}>
+                        ${item.amount.toFixed(2)}
+                      </span>
                     </div>
-                    <span className={`text-xs font-bold ${item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-300'}`}>
-                      ${item.amount.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -154,7 +206,7 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
               <span className="text-[10px] text-slate-500 font-medium">One wallet approval — consolidated Algorand tx</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-2xl font-black text-white">${plan.totalCost.toFixed(2)}</span>
+              <span className="text-2xl font-black text-white">${totalCost.toFixed(2)}</span>
               <span className="text-[10px] text-indigo-400 font-semibold">USDC on Algorand</span>
             </div>
           </div>
@@ -170,9 +222,10 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
           </button>
           <button
             className="flex-1 btn btn-primary rounded-xl text-sm font-extrabold shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform"
-            onClick={onConfirm}
+            onClick={handleConfirm}
+            disabled={selectedCount === 0}
           >
-            Confirm &amp; Pay ${plan.totalCost.toFixed(2)}
+            Confirm &amp; Pay ${totalCost.toFixed(2)}
           </button>
         </div>
       </div>
@@ -285,7 +338,7 @@ const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComplete }) => {
+const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComplete, selectedHistoryTask }) => {
   const { activeAddress, signTransactions } = useWallet();
 
   // ── Input state ──────────────────────────────────────────────────────────────
@@ -312,6 +365,102 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
 
   // ── Tab / history state ──────────────────────────────────────────────────────
   const [tasks, setTasks] = useState<any[]>([]);
+
+  // ── Persistent Chat Thread State ─────────────────────────────────────────────
+  const [chatHistory, setChatHistory] = useState<Array<{
+    id: string;
+    prompt: string;
+    files?: AttachedFile[];
+    result?: ExecuteTaskResponse;
+    reply?: string;
+    isChatReply?: boolean;
+    error?: string;
+    timestamp: Date;
+  }>>([]);
+
+  /** MongoDB Conversation._id for the active chat session (null = no session yet) */
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
+  const chatScrollBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedHistoryTask) return;
+
+    // Case 1: It's a saved Conversation (has a thread array)
+    if (selectedHistoryTask._type === 'conversation') {
+      const rawThread: any[] = selectedHistoryTask.thread || [];
+      // Re-hydrate timestamps as Date objects
+      const hydratedThread = rawThread.map((item: any) => ({
+        ...item,
+        timestamp: new Date(item.timestamp),
+      }));
+      setChatHistory(hydratedThread);
+      setConversationId(selectedHistoryTask._id);
+      return;
+    }
+
+    // Case 2: It's a legacy single Task record
+    setChatHistory([
+      {
+        id: `history-${selectedHistoryTask._id || Date.now()}`,
+        prompt: selectedHistoryTask.prompt || 'Historical Run',
+        result: {
+          category: selectedHistoryTask.category,
+          providerName: selectedHistoryTask.providerName || selectedHistoryTask.selectedEndpoint,
+          executionCount: selectedHistoryTask.executionQuantity ?? 1,
+          unitPrice: selectedHistoryTask.unitPrice ?? 0.45,
+          executionCost: selectedHistoryTask.executionCost ?? selectedHistoryTask.endpointCost ?? 0.45,
+          platformFee: selectedHistoryTask.platformFee ?? 0.75,
+          totalCost: selectedHistoryTask.totalCost ?? (selectedHistoryTask.endpointCost ?? 0.45) + 0.75,
+          groupTransactionId: selectedHistoryTask.groupTransactionId || selectedHistoryTask.transactionId,
+          result: selectedHistoryTask.output || selectedHistoryTask.result,
+          verification: { passed: selectedHistoryTask.verificationStatus === 'passed', score: 1 },
+        },
+        timestamp: new Date(selectedHistoryTask.createdAt || Date.now()),
+      },
+    ]);
+    // No conversationId for legacy tasks — a new convo will be created on next prompt
+    setConversationId(null);
+  }, [selectedHistoryTask]);
+
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      chatScrollBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, loading, isPlanning, error]);
+
+  /**
+   * Persists the full chatHistory thread to MongoDB.
+   * Creates a new Conversation if none exists yet (first message in session).
+   * Silently no-ops on auth/network errors so it never blocks the UI.
+   */
+  const saveThread = async (updatedHistory: typeof chatHistory, firstPrompt?: string) => {
+    try {
+      // Serialize — strip File objects (content_base64 can be large; save metadata only)
+      const serialized = updatedHistory.map((item) => ({
+        ...item,
+        files: item.files?.map((f) => ({ filename: f.filename })),
+        timestamp: item.timestamp instanceof Date ? item.timestamp.toISOString() : item.timestamp,
+      }));
+
+      let convoId = conversationId;
+
+      if (!convoId) {
+        // Create a new conversation named after the first prompt
+        const title = (firstPrompt || updatedHistory[0]?.prompt || 'New Chat')
+          .slice(0, 80);
+        const { data } = await api.post('/api/chat/conversations', { title, thread: serialized });
+        convoId = data._id;
+        setConversationId(convoId);
+      } else {
+        // Update existing conversation thread
+        await api.put(`/api/chat/conversations/${convoId}/thread`, { thread: serialized });
+      }
+    } catch (err) {
+      // Non-fatal — user can still use the app without persistence
+      console.warn('Thread save failed (non-fatal):', err);
+    }
+  };
 
   // ── Chat state ───────────────────────────────────────────────────────────────
   const [conversations, setConversations] = useState<any[]>([]);
@@ -438,12 +587,49 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
     setTaskResult(null);
 
     try {
-      const plan = await planTask(apiBaseUrl, taskDescription, attachedFiles);
+      // True if the current conversation already contains at least one completed task output
+      const hasPriorTaskResult = chatHistory.some(
+        (item) => item.result !== undefined && !item.isChatReply,
+      );
+
+      const plan = await planTask(apiBaseUrl, taskDescription, attachedFiles, hasPriorTaskResult);
+      if (plan.category === 'conversational' || plan.isChat) {
+        const newItem = {
+          id: `msg-chat-${Date.now()}`,
+          prompt: taskDescription,
+          files: attachedFiles,
+          reply: plan.reply || plan.message || "Hello! I'm Prism.",
+          isChatReply: true as const,
+          timestamp: new Date(),
+        };
+        setChatHistory((prev) => {
+          const updated = [...prev, newItem];
+          saveThread(updated, taskDescription);
+          return updated;
+        });
+        setTaskDescription('');
+        setAttachedFiles([]);
+        return;
+      }
       setExecutionPlan(plan);
       setShowSummaryModal(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning failed.';
       setError(msg);
+      const errItem = {
+        id: `msg-plan-err-${Date.now()}`,
+        prompt: taskDescription,
+        files: attachedFiles,
+        error: msg,
+        timestamp: new Date(),
+      };
+      setChatHistory((prev) => {
+        const updated = [...prev, errItem];
+        saveThread(updated, taskDescription);
+        return updated;
+      });
+      setTaskDescription('');
+      setAttachedFiles([]);
       console.error('Plan task error:', err);
     } finally {
       setIsPlanning(false);
@@ -462,7 +648,7 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
    * (executionQuantity × unitPrice + platformFee). After approval the server executes
    * the provider once per file internally and returns a per-step progress log.
    */
-  const handleConfirmAndPay = async () => {
+  const handleConfirmAndPay = async (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan) => {
     if (!executionPlan || !activeAddress || !signTransactions) return;
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -471,8 +657,8 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
     setLoading(true);
     setError('');
 
-    const total = executionPlan.executionQuantity;
-    const category = executionPlan.category;
+    const total = updatedPlan.executionQuantity;
+    const category = updatedPlan.category;
 
     // Show payment-approval phase immediately
     setExecProgress({ current: 1, total, category, phase: 'payment' });
@@ -483,9 +669,9 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
 
       const data = await executeTaskWithPayment(
         apiBaseUrl,
-        executionPlan,
+        updatedPlan,
         taskDescription,
-        attachedFiles,
+        filteredFiles,
         signer,
         (current, phase) => {
           setExecProgress({
@@ -493,7 +679,7 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
             total,
             category,
             phase,
-            currentFilename: executionPlan.paymentPreview?.find(
+            currentFilename: updatedPlan.paymentPreview?.find(
               (p) => p.type === 'execution' && p.index === current
             )?.filename,
           });
@@ -520,6 +706,22 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
       setTaskResult(data);
       setExecProgress(null);
 
+      // Append successful execution item to persistent chatHistory
+      const taskItem = {
+        id: `msg-${Date.now()}`,
+        prompt: taskDescription,
+        files: attachedFiles,
+        result: data,
+        timestamp: new Date(),
+      };
+      setChatHistory((prev) => {
+        const updated = [...prev, taskItem];
+        saveThread(updated, taskDescription);
+        return updated;
+      });
+      setTaskDescription('');
+      setAttachedFiles([]);
+
       fetchTasks();
       if (onTaskComplete) onTaskComplete();
     } catch (err) {
@@ -527,6 +729,21 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
       setError(msg);
       setPaymentStatus('');
       setExecProgress(null);
+
+      const errItem2 = {
+        id: `msg-err-${Date.now()}`,
+        prompt: taskDescription,
+        files: attachedFiles,
+        error: msg,
+        timestamp: new Date(),
+      };
+      setChatHistory((prev) => {
+        const updated = [...prev, errItem2];
+        saveThread(updated, taskDescription);
+        return updated;
+      });
+      setTaskDescription('');
+      setAttachedFiles([]);
       console.error('Execute task error:', err);
     } finally {
       setLoading(false);
@@ -609,6 +826,8 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Candidate Name</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Target/Matched Role</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Match Score</th>
+                <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Primary Domain</th>
+                <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Alternative Fits</th>
                 <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Key Skills</th>
               </tr>
             </thead>
@@ -622,17 +841,37 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
                   <tr key={index} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
                     <td className="font-semibold text-white">{c.name}</td>
                     <td className="text-slate-300">{c.role || 'N/A'}</td>
-                    <td className="w-1/4">
+                    <td className="w-1/6">
                       <div className="flex items-center gap-2">
-                        <progress className={`progress ${progressClass} w-20 bg-slate-800`} value={scorePercent} max="100" />
+                        <progress className={`progress ${progressClass} w-16 bg-slate-800`} value={scorePercent} max="100" />
                         <span className="font-extrabold text-xs text-slate-200">{scorePercent}%</span>
                       </div>
                     </td>
-                    <td>
-                      <div className="flex flex-wrap gap-1">
+                    <td className="py-3 px-3 align-top max-w-[150px]">
+                      <span className="inline-block px-2 py-1 rounded-md border border-emerald-500/20 text-emerald-300 bg-emerald-950/25 text-[11px] font-semibold leading-relaxed break-words">
+                        {c.primary_domain || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 align-top max-w-[200px]">
+                      <div className="flex flex-wrap gap-x-1.5 gap-y-2">
+                        {Array.isArray(c.alternative_roles) && c.alternative_roles.length > 0 ? (
+                          c.alternative_roles.map((alt: string, aIdx: number) => (
+                            <span key={aIdx} className="inline-flex items-center px-2 py-1 rounded-md border border-sky-500/20 text-sky-300 bg-sky-950/25 text-[10px] font-medium leading-normal break-words text-left">
+                              {alt}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 text-xs">None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 align-top max-w-[250px]">
+                      <div className="flex flex-wrap gap-x-1.5 gap-y-2">
                         {Array.isArray(c.key_skills) && c.key_skills.length > 0 ? (
                           c.key_skills.map((skill: string, sIdx: number) => (
-                            <span key={sIdx} className="badge badge-sm badge-outline border-indigo-500/30 text-indigo-300 bg-indigo-950/20">{skill}</span>
+                            <span key={sIdx} className="inline-flex items-center px-2 py-1 rounded-md border border-indigo-500/20 text-indigo-300 bg-indigo-950/25 text-[10px] font-medium leading-normal break-words text-left">
+                              {skill}
+                            </span>
                           ))
                         ) : (
                           <span className="text-slate-500 text-xs">None</span>
@@ -644,6 +883,10 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
               })}
             </tbody>
           </table>
+          <div className="mt-3 text-[11px] text-slate-500 flex items-center gap-1.5 font-medium pl-3 pb-1 border-t border-slate-800/20 pt-2">
+            <span className="info-icon text-indigo-400 font-bold">ℹ</span>
+            <span>How is the Match Score calculated? The score represents semantic similarity and skill overlap computed by the LLM based on keyword presence, experience level, skill relevance weight, and target role criteria.</span>
+          </div>
         </div>
       );
     }
@@ -687,36 +930,66 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
 
     if (category === 'invoice_extraction') {
       const lineItems = result.line_items ?? result.documents?.flatMap((d: any) => d.line_items ?? []) ?? [];
-      if (lineItems.length > 0) {
-        const totalAmount = lineItems.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
+      const vendorName = result.vendor_name || result.documents?.[0]?.vendor_name || 'N/A';
+      const invoiceNumber = result.invoice_number || result.documents?.[0]?.invoice_number || 'N/A';
+      const invoiceDate = result.date || result.documents?.[0]?.date || 'N/A';
+
+      if (lineItems.length > 0 || result.vendor_name || result.total_amount !== undefined) {
+        const totalAmount = typeof result.total_amount === 'number'
+          ? result.total_amount
+          : lineItems.reduce((sum: number, item: any) => sum + (Number(item.amount || item.total) || 0), 0);
+
         return (
-          <div className="overflow-x-auto w-full">
-            <table className="table w-full text-slate-300">
-              <thead>
-                <tr className="text-indigo-400 border-b border-slate-800/80">
-                  {lineItems[0]?.item_code !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Item Code</th>}
-                  <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Description</th>
-                  {lineItems[0]?.quantity !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Qty</th>}
-                  {lineItems[0]?.unit_price !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Unit Price</th>}
-                  <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.map((item: any, index: number) => (
-                  <tr key={index} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
-                    {item.item_code !== undefined && <td className="font-mono text-xs text-slate-400">{item.item_code}</td>}
-                    <td className="text-white">{item.description}</td>
-                    {item.quantity !== undefined && <td className="text-right text-slate-300">{item.quantity}</td>}
-                    {item.unit_price !== undefined && <td className="text-right text-slate-300">${Number(item.unit_price).toFixed(2)}</td>}
-                    <td className="text-right font-semibold text-white">${Number(item.amount).toFixed(2)}</td>
-                  </tr>
-                ))}
-                <tr className="font-bold border-t border-slate-800 bg-indigo-950/20 text-indigo-300">
-                  <td colSpan={lineItems[0]?.quantity !== undefined ? 4 : 2} className="text-right">Total:</td>
-                  <td className="text-right font-extrabold text-white text-base">${totalAmount.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="flex flex-col gap-3 w-full">
+            <div className="grid grid-cols-3 gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-xs">
+              <div>
+                <span className="text-slate-500 font-medium block text-[10px] uppercase">Vendor</span>
+                <span className="font-bold text-white">{vendorName}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium block text-[10px] uppercase">Invoice #</span>
+                <span className="font-mono text-slate-200">{invoiceNumber}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium block text-[10px] uppercase">Date</span>
+                <span className="text-slate-200">{invoiceDate}</span>
+              </div>
+            </div>
+
+            {lineItems.length > 0 ? (
+              <div className="overflow-x-auto w-full">
+                <table className="table w-full text-slate-300">
+                  <thead>
+                    <tr className="text-indigo-400 border-b border-slate-800/80">
+                      {lineItems[0]?.item_code !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Item Code</th>}
+                      <th className="bg-transparent text-xs font-bold uppercase tracking-wider">Description</th>
+                      {lineItems[0]?.quantity !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Qty</th>}
+                      {lineItems[0]?.unit_price !== undefined && <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Unit Price</th>}
+                      <th className="bg-transparent text-xs font-bold uppercase tracking-wider text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item: any, index: number) => (
+                      <tr key={index} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors">
+                        {item.item_code !== undefined && <td className="font-mono text-xs text-slate-400">{item.item_code}</td>}
+                        <td className="text-white">{item.description}</td>
+                        {item.quantity !== undefined && <td className="text-right text-slate-300">{item.quantity}</td>}
+                        {item.unit_price !== undefined && <td className="text-right text-slate-300">${Number(item.unit_price).toFixed(2)}</td>}
+                        <td className="text-right font-semibold text-white">${Number(item.amount || item.total || 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold border-t border-slate-800 bg-indigo-950/20 text-indigo-300">
+                      <td colSpan={lineItems[0]?.quantity !== undefined ? 4 : 2} className="text-right">Total:</td>
+                      <td className="text-right font-extrabold text-white text-base">${totalAmount.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-900/30 rounded-xl border border-slate-800/50 text-xs text-slate-400">
+                No individual line items extracted. Total Amount: <strong className="text-white">${totalAmount.toFixed(2)}</strong>
+              </div>
+            )}
           </div>
         );
       }
@@ -734,37 +1007,248 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full flex flex-col items-center py-6">
+    <div className="w-full flex flex-col items-center">
 
       {/* ── Execution Summary Modal ── */}
       {showSummaryModal && executionPlan && (
         <ExecutionSummaryModal
           plan={executionPlan}
           files={attachedFiles}
-          onConfirm={handleConfirmAndPay}
+          onConfirm={(filteredFiles, updatedPlan) => {
+            handleConfirmAndPay(filteredFiles, updatedPlan);
+          }}
           onCancel={handleCancelSummary}
         />
       )}
 
       {/* ── TERMINAL TAB ── */}
       {activeTab === 'terminal' && (
-        <div className="w-full flex flex-col items-center">
+        <div className={`w-full flex flex-col items-center relative ${chatHistory.length > 0 ? 'justify-between min-h-screen pt-24 pb-36' : 'justify-center min-h-[calc(100vh-80px)]'}`}>
 
-          {/* Greeting */}
-          {!taskResult && !loading && !isPlanning && (
-            <div className="text-center mb-8 animate-fade-in">
-              <h1 className="text-4xl font-extrabold text-white tracking-tight mb-3">
-                Hi {firstName}, I'm Prism.
-              </h1>
-              <p className="text-xl text-indigo-300 font-medium">
-                What do you need done?
-              </p>
+          {/* Initial Hero Container (Greeting + Centered Input Box when no chat history exists) */}
+          {chatHistory.length === 0 && !loading && !isPlanning && (
+            <div className="w-full max-w-4xl animate-fade-in flex flex-col items-center justify-center gap-8 my-auto">
+              <div className="text-center">
+                <h1 className="text-4xl font-extrabold text-white tracking-tight mb-3">
+                  Hi {firstName}, I'm Prism.
+                </h1>
+                <p className="text-xl text-indigo-300 font-medium">
+                  What do you need done?
+                </p>
+              </div>
+
+              {/* Centered Initial Input Box */}
+              <div className="w-full max-w-3xl liquid-glass p-5 flex flex-col gap-4 shadow-2xl border border-indigo-500/20 rounded-3xl">
+                {attachedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    {attachedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="badge badge-lg gap-2 bg-indigo-950/60 border border-indigo-900/50 text-indigo-300 px-3 py-3 rounded-full text-xs font-medium"
+                      >
+                        <span>{file.filename}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="hover:bg-indigo-900/50 rounded-full p-0.5 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 w-full">
+                  {/* Attach file */}
+                  <button
+                    type="button"
+                    className="btn btn-circle btn-ghost text-slate-400 hover:text-indigo-400 hover:bg-slate-800/50 transition-colors shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading || isPlanning}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept=".pdf,.docx,.txt"
+                    onChange={handleFileChange}
+                  />
+
+                  {/* Textarea — Increased Height */}
+                  <div className="flex-1 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2 flex shadow-inner">
+                    <textarea
+                      className="textarea textarea-ghost focus:bg-transparent resize-none flex-1 py-3 px-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none min-h-[120px] h-[120px] leading-relaxed"
+                      placeholder="e.g. Screen these resumes for a Senior Full Stack Engineer role, or analyze vendor invoices for line items."
+                      value={taskDescription}
+                      onChange={(e) => setTaskDescription(e.target.value)}
+                      disabled={loading || isPlanning}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSubmitTask();
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* Send */}
+                  <button
+                    className={`btn btn-circle shrink-0 ${
+                      !taskDescription.trim() || loading || isPlanning
+                        ? 'btn-ghost text-slate-700'
+                        : 'btn-primary text-white scale-105 shadow-md shadow-indigo-500/20'
+                    } transition-all duration-200`}
+                    onClick={handleSubmitTask}
+                    disabled={!taskDescription.trim() || loading || isPlanning}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3 Suggested Inputs Pills — Placed BELOW the Chatbox Container */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-3xl">
+                {[
+                  { label: "📄 Screen Resumes", text: "Screen these candidate resumes for a Senior Backend Developer role" },
+                  { label: "📜 Analyze Contract", text: "Review this NDA contract and flag any high risk termination clauses" },
+                  { label: "🧾 Extract Invoice Data", text: "Extract vendor name, line items, and total amount from this invoice" }
+                ].map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="btn btn-sm rounded-full bg-slate-900/90 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/25 hover:border-indigo-400 hover:text-white transition-all text-xs px-4 py-2 font-semibold shadow-lg backdrop-blur-md hover:scale-105"
+                    onClick={() => setTaskDescription(suggestion.text)}
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Persistent Scrollable Message History Area */}
+          {chatHistory.length > 0 && (
+            <div className="w-full max-w-4xl flex flex-col gap-6 w-full">
+              {chatHistory.map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 w-full animate-fade-in">
+                  
+                  {/* User Message Bubble */}
+                  <div className="flex justify-end w-full">
+                    <div className="bg-indigo-600/90 text-white rounded-2xl rounded-tr-sm px-5 py-3 text-sm max-w-[80%] shadow-lg border border-indigo-400/30 flex flex-col gap-1.5">
+                      <p className="whitespace-pre-wrap leading-relaxed">{item.prompt}</p>
+                      {item.files && item.files.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-indigo-400/20">
+                          {item.files.map((f, fIdx) => (
+                            <span key={fIdx} className="text-[10px] bg-indigo-950/60 text-indigo-200 px-2 py-0.5 rounded-full font-mono border border-indigo-400/20">
+                              📎 {f.filename}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Assistant / Execution Result Output Bubble */}
+                  {item.result && (
+                    <div className="flex justify-start w-full">
+                      <div className="w-full liquid-glass p-5 rounded-2xl shadow-xl border border-slate-800/80 flex flex-col gap-3">
+                        <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                              Execution Result Output
+                            </h4>
+                          </div>
+                          <span className="text-[10px] font-semibold text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-full border border-slate-800/60">
+                            {item.result.category}
+                          </span>
+                        </div>
+
+                        {/* Metadata Bar */}
+                        <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                          <div className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1">
+                            <FiCheckCircle className="text-xs" />
+                            Payment Verified · {item.result.executionCount ?? 1} execution(s)
+                          </div>
+                          <div className="flex items-center gap-1 text-indigo-300 font-semibold bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-2.5 py-1">
+                            <FiDollarSign className="text-xs" />
+                            ${(item.result.totalCost ?? 0).toFixed(2)} USDC
+                          </div>
+                          {item.result.groupTransactionId && (
+                            <div className="flex items-center gap-1 text-slate-400 font-mono bg-slate-900/60 border border-slate-800/60 rounded-lg px-2.5 py-1">
+                              <FiLink className="text-xs shrink-0" />
+                              Tx: {item.result.groupTransactionId.slice(0, 8)}…{item.result.groupTransactionId.slice(-6)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Efficiency breakdown */}
+                        {item.result.savings_this_request && (
+                          <div className="px-3 py-2 bg-slate-900/60 border border-slate-800/60 rounded-xl text-xs text-slate-300 flex flex-col gap-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400 font-medium">Token Savings:</span>
+                              <span className="text-emerald-400 font-bold">
+                                {Math.round(item.result.savings_this_request.reduction_percent ?? 0)}% fewer tokens
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-300">
+                              You paid ${(item.result.totalCost ?? 0.75).toFixed(2)} — saved ~${(item.result.savings_this_request.estimated_usd_saved ?? 0.05).toFixed(2)}. ({item.result.savings_this_request.savings_multiplier ?? 2.8}x efficiency).
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Formatted result content */}
+                        <div className="w-full bg-slate-950/40 rounded-xl border border-slate-800/60 p-3.5 mt-1">
+                          {renderFormattedResult(item.result.result, item.result.category)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assistant / Conversational Reply Bubble */}
+                  {(item.reply || item.isChatReply) && (
+                    <div className="flex justify-start w-full">
+                      <div className="bg-slate-900/90 text-slate-100 rounded-2xl rounded-tl-sm px-5 py-3 text-sm max-w-[80%] shadow-lg border border-slate-800/80 flex items-start gap-3">
+                        <img src="/icon.png" alt="Prism" className="w-6 h-6 rounded-full object-contain shrink-0 mt-0.5" />
+                        <p className="whitespace-pre-wrap leading-relaxed flex-1">{item.reply}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assistant / Error Response Bubble */}
+                  {item.error && (
+                    <div className="flex justify-start w-full">
+                      <div className={`p-4 rounded-2xl border text-xs max-w-[85%] leading-relaxed flex items-center gap-3 ${
+                        item.error.includes("I'm not sure what you'd like done")
+                          ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                          : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                      }`}>
+                        <span className="text-base">{item.error.includes("I'm not sure what you'd like done") ? '💡' : '⚠️'}</span>
+                        <div className="flex-1">{item.error}</div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              ))}
+              <div ref={chatScrollBottomRef} />
             </div>
           )}
 
           {/* Planning Indicator */}
           {isPlanning && (
-            <div className="text-center mb-8 flex flex-col items-center justify-center animate-fade-in">
+            <div className="text-center my-4 flex flex-col items-center justify-center animate-fade-in">
               <div className="loading loading-spinner loading-lg text-indigo-400 mb-3" />
               <h2 className="text-xl font-bold text-indigo-300 animate-pulse">Analysing task & discovering providers…</h2>
               <p className="text-xs text-slate-500 mt-1">Computing optimal routing and pricing</p>
@@ -782,140 +1266,117 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
             />
           )}
 
-          {/* Payment status (non-progress loading) */}
+          {/* Payment status loading */}
           {loading && !execProgress && (
-            <div className="text-center mb-8 flex flex-col items-center justify-center">
+            <div className="text-center my-4 flex flex-col items-center justify-center">
               <div className="loading loading-spinner loading-lg text-primary mb-3" />
               <h2 className="text-2xl font-bold text-indigo-700 animate-pulse">Prism is working…</h2>
               {paymentStatus && <span className="text-sm text-slate-500 mt-1">{paymentStatus}</span>}
             </div>
           )}
 
-          {/* Result Block */}
-          {taskResult && !loading && (
-            <div className="w-full liquid-glass p-6 mb-8 animate-fade-in">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-800/50 pb-3">
-                <h3 className="text-lg font-bold text-indigo-400">Task Execution Output</h3>
-                <button
-                  className="btn btn-ghost btn-xs text-slate-400 hover:text-slate-200 rounded-full"
-                  onClick={() => setTaskResult(null)}
-                >
-                  Clear Result
-                </button>
+          {/* Error Message Banner */}
+          {error && (
+            <div className={`w-full max-w-2xl mb-4 p-4 rounded-2xl border text-sm flex items-center gap-3 animate-fade-in ${
+              error.includes("I'm not sure what you'd like done")
+                ? 'bg-amber-950/30 border-amber-500/30 text-amber-300'
+                : 'bg-rose-950/30 border-rose-500/30 text-rose-300'
+            }`}>
+              <div className="shrink-0 text-base font-bold">
+                {error.includes("I'm not sure what you'd like done") ? '💡' : '⚠️'}
               </div>
+              <div className="flex-1 leading-relaxed">{error}</div>
+              <button
+                className="btn btn-ghost btn-xs text-slate-400 hover:text-white rounded-full"
+                onClick={() => setError('')}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-              {/* Payment / transaction metadata bar */}
-              <div className="flex flex-wrap items-center gap-3 mb-3 px-1">
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-bold bg-emerald-500/8 border border-emerald-500/15 rounded-lg px-2.5 py-1.5">
-                  <FiCheckCircle className="text-xs" />
-                  Payment Verified · {taskResult.executionCount ?? taskResult.executionQuantity} execution{(taskResult.executionCount ?? 1) !== 1 ? 's' : ''}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-indigo-300 font-semibold bg-indigo-500/8 border border-indigo-500/15 rounded-lg px-2.5 py-1.5">
-                  <FiDollarSign className="text-xs" />
-                  ${(taskResult.totalCost ?? 0).toFixed(2)} USDC · Consolidated tx
-                </div>
-                {taskResult.groupTransactionId && (
+          {/* Persistent Input Bar — fixed at bottom after conversation starts or during task execution */}
+          {(chatHistory.length > 0 || loading || isPlanning) && (
+            <div className="w-full max-w-3xl fixed bottom-6 left-1/2 -translate-x-1/2 z-40 liquid-glass p-4 flex flex-col gap-3 shadow-2xl border border-indigo-500/20 animate-fade-in">
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 pb-1">
+                {attachedFiles.map((file, index) => (
                   <div
-                    className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono bg-slate-900/60 border border-slate-800/60 rounded-lg px-2.5 py-1.5 cursor-pointer hover:bg-slate-800/60 transition-colors"
-                    title={taskResult.groupTransactionId}
-                    onClick={() => navigator.clipboard?.writeText(taskResult.groupTransactionId)}
+                    key={index}
+                    className="badge badge-lg gap-2 bg-indigo-950/60 border border-indigo-900/50 text-indigo-300 px-3 py-3 rounded-full text-xs font-medium"
                   >
-                    <FiLink className="text-xs shrink-0" />
-                    Tx: {taskResult.groupTransactionId.length > 20
-                      ? `${taskResult.groupTransactionId.slice(0, 10)}…${taskResult.groupTransactionId.slice(-8)}`
-                      : taskResult.groupTransactionId}
-                  </div>
-                )}
-              </div>
-
-              {/* Formatted result table / cards */}
-              <div className="w-full mt-2 bg-slate-950/40 rounded-xl border border-slate-800/60 p-4">
-                {renderFormattedResult(taskResult.result, taskResult.category)}
-              </div>
-            </div>
-          )}
-
-          {/* Input Area (only shown when no taskResult is present) */}
-          {!taskResult && (
-            <div className="w-full liquid-glass p-5 flex flex-col gap-3">
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 pb-2 mb-1">
-                  {attachedFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="badge badge-lg gap-2 bg-indigo-950/60 border border-indigo-900/50 text-indigo-300 px-3 py-3 rounded-full text-xs font-medium"
+                    <span>{file.filename}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="hover:bg-indigo-900/50 rounded-full p-0.5 transition-colors"
                     >
-                      <span>{file.filename}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="hover:bg-indigo-900/50 rounded-full p-0.5 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-4 w-full">
-                {/* Attach file */}
-                <button
-                  type="button"
-                  className="btn btn-circle btn-ghost text-slate-400 hover:text-indigo-450 hover:bg-slate-800/50 transition-colors shrink-0"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading || isPlanning}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
-
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.docx,.txt"
-                  onChange={handleFileChange}
-                />
-
-                {/* Textarea */}
-                <div className="flex-1 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-1.5 flex shadow-inner">
-                  <textarea
-                    className="textarea textarea-ghost focus:bg-transparent resize-none flex-1 py-3 px-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none min-h-[100px] h-[100px] leading-normal"
-                    placeholder="e.g. Screen these resumes for a backend engineer role"
-                    value={taskDescription}
-                    onChange={(e) => setTaskDescription(e.target.value)}
-                    disabled={loading || isPlanning}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmitTask();
-                      }
-                    }}
-                  />
-                </div>
-
-                {/* Send */}
-                <button
-                  className={`btn btn-circle shrink-0 ${
-                    !taskDescription.trim() || loading || isPlanning
-                      ? 'btn-ghost text-slate-700'
-                      : 'btn-primary text-white scale-105'
-                  } transition-all duration-200`}
-                  onClick={handleSubmitTask}
-                  disabled={!taskDescription.trim() || loading || isPlanning}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                  </svg>
-                </button>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+
+            <div className="flex items-center gap-3 w-full">
+              {/* Attach file */}
+              <button
+                type="button"
+                className="btn btn-circle btn-ghost text-slate-400 hover:text-indigo-400 hover:bg-slate-800/50 transition-colors shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading || isPlanning}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                multiple
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileChange}
+              />
+
+              {/* Textarea */}
+              <div className="flex-1 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-1.5 flex shadow-inner">
+                <textarea
+                  className="textarea textarea-ghost focus:bg-transparent resize-none flex-1 py-2.5 px-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none min-h-[50px] h-[50px] leading-normal"
+                  placeholder="e.g. Screen these resumes for a backend engineer role"
+                  value={taskDescription}
+                  onChange={(e) => setTaskDescription(e.target.value)}
+                  disabled={loading || isPlanning}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmitTask();
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Send */}
+              <button
+                className={`btn btn-circle shrink-0 ${
+                  !taskDescription.trim() || loading || isPlanning
+                    ? 'btn-ghost text-slate-700'
+                    : 'btn-primary text-white scale-105 shadow-md shadow-indigo-500/20'
+                } transition-all duration-200`}
+                onClick={handleSubmitTask}
+                disabled={!taskDescription.trim() || loading || isPlanning}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+              </button>
             </div>
-          )}
+          </div>
+        )}
+
         </div>
       )}
 
@@ -962,8 +1423,10 @@ const Weather: React.FC<WeatherProps> = ({ activeTab, setActiveTab, onTaskComple
                         </span>
                       </td>
                       <td>
-                        <span className={`admin-badge ${task.status === 'completed' ? 'admin-badge--green' : 'admin-badge--rose'}`}>
-                          {task.status}
+                        <span className={`admin-badge ${task.refundIssued || task.verificationStatus === 'failed' ? 'admin-badge--rose' : task.status === 'completed' ? 'admin-badge--green' : 'admin-badge--slate'}`}>
+                          {task.refundIssued || task.verificationStatus === 'failed'
+                            ? `Refunded ($${(task.refundAmount ?? task.totalCost ?? task.endpointCost ?? 0.75).toFixed(2)})`
+                            : task.status}
                         </span>
                       </td>
                       <td>

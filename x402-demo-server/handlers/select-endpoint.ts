@@ -24,7 +24,8 @@ export async function handleSelectEndpointRequest(c: Context) {
       return c.json({ error: `Valid category is required: ${validCategories.join(', ')}` }, 400);
     }
 
-    const repStore = readReputation();
+    const { readReputationAsync } = await import('./lib/reputation-store');
+    const repStore = await readReputationAsync();
     const getRep = (path: string) => repStore[path]?.score ?? 0.5;
 
     // Define endpoint candidates and their metadata

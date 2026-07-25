@@ -265,11 +265,10 @@ const WaitlistModal: React.FC<WaitlistModalProps> = ({ open, onClose, onSuccess 
                     return (
                       <label
                         key={feature}
-                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all text-sm ${
-                          selected
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all text-sm ${selected
                             ? 'border-indigo-500/50 bg-indigo-950/30 text-white'
                             : 'border-slate-800/80 bg-slate-950/40 text-slate-300 hover:border-slate-700'
-                        } ${submitting ? 'opacity-60 pointer-events-none' : ''}`}
+                          } ${submitting ? 'opacity-60 pointer-events-none' : ''}`}
                       >
                         <input
                           type="checkbox"
