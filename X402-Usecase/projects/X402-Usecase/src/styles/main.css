@@ -203,20 +203,23 @@ pre code {
 
 /* ─── Hero Section ──────────────────────────────────────────────────────── */
 .lp-hero-wrap {
-  min-height: calc(100vh - 60px);
+  min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6rem 1.5rem 5rem;
-  padding-top: 5.5rem;
+  padding: 6rem 1.5rem 4rem;
+  box-sizing: border-box;
 }
 .lp-hero-content {
-  max-width: 800px;
+  max-width: 950px;
   width: 100%;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  margin: auto 0;
 }
 .lp-hero-eyebrow {
   display: inline-flex;
@@ -234,12 +237,12 @@ pre code {
   margin-bottom: 2rem;
 }
 .lp-hero-heading {
-  font-size: clamp(2.6rem, 6vw, 4.5rem);
+  font-size: clamp(3.2rem, 6.8vw, 5.4rem);
   font-weight: 900;
   color: #fff;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin-bottom: 1.75rem;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  margin-bottom: 1.5rem;
 }
 .lp-hero-gradient {
   background: linear-gradient(135deg, #60a5fa 0%, #818cf8 40%, #c084fc 100%);
@@ -248,12 +251,12 @@ pre code {
   -webkit-text-fill-color: transparent;
 }
 .lp-hero-sub {
-  font-size: 1.15rem;
-  color: #94a3b8;
-  max-width: 600px;
-  line-height: 1.75;
-  margin-bottom: 2.5rem;
-  font-weight: 400;
+  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  color: #cbd5e1;
+  max-width: 720px;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-weight: 500;
 }
 .lp-hero-actions {
   display: flex;

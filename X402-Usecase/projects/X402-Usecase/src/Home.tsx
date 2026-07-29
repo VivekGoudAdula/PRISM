@@ -250,7 +250,7 @@ const Home: React.FC<HomeProps> = () => {
     const savedUser = localStorage.getItem('prism_logged_in_user')
     const token = localStorage.getItem('prism_access_token')
     const savedRole = localStorage.getItem('prism_user_role') || 'user'
-    
+
     if (savedUser && token) {
       setCurrentUser(savedUser)
       setUserRole(savedRole)
@@ -410,7 +410,7 @@ const Home: React.FC<HomeProps> = () => {
     localStorage.removeItem('prism_user_email');
     localStorage.removeItem('prism_user_credits');
     localStorage.removeItem('prism_user_plan');
-    
+
     setCurrentUser(null);
     setUserRole('user');
     setProfileData(null);
@@ -492,7 +492,7 @@ const Home: React.FC<HomeProps> = () => {
           animationType="rotate"
           timeScale={0.8}
           height={3.5}
-baseWidth={5.5}
+          baseWidth={5.5}
           scale={3.5}
           hueShift={0}
           colorFrequency={1}
@@ -513,11 +513,10 @@ baseWidth={5.5}
 
             {viewState === 'app' && savingsSummary && (
               <button
-                className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 ${
-                  isPulsing
-                    ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/40 border-emerald-400'
-                    : 'bg-slate-900/80 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-400'
-                }`}
+                className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 ${isPulsing
+                  ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/40 border-emerald-400'
+                  : 'bg-slate-900/80 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-400'
+                  }`}
                 onClick={() => setShowSavingsModal(true)}
               >
                 <FiDollarSign className="text-emerald-400 text-sm" />
@@ -527,11 +526,10 @@ baseWidth={5.5}
 
             {viewState === 'app' && (
               <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                  (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
-                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                    : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                }`}>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                  : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                  }`}>
                   {(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet' ? 'Mainnet' : 'TestNet'}
                 </span>
                 <button
@@ -547,10 +545,10 @@ baseWidth={5.5}
             {viewState === 'app' && userRole !== 'admin' && (
               <button
                 className="btn btn-ghost h-10 min-h-[40px] text-slate-300 hover:text-white rounded-full border border-slate-800/60 px-4 text-xs font-bold"
-                            onClick={() => {
+                onClick={() => {
                   // Fetch both conversations and tasks for the history modal
-                  api.get('/api/chat/conversations').then(({ data }) => setConversations(data)).catch(() => {});
-                  api.get('/api/analytics/tasks').then(({ data }) => setTasks(data)).catch(() => {});
+                  api.get('/api/chat/conversations').then(({ data }) => setConversations(data)).catch(() => { });
+                  api.get('/api/analytics/tasks').then(({ data }) => setTasks(data)).catch(() => { });
                   setHistoryTab('conversations');
                   setSelectedTask(null);
                   setShowHistoryModal(true);
@@ -620,7 +618,7 @@ baseWidth={5.5}
         {/* LANDING PAGE VIEW */}
         {viewState === 'landing' && (
           <div className="lp-hero-wrap w-full animate-fade-in relative">
-            
+
             {/* Floating Top-Left Logo */}
             <div
               className="absolute top-10 left-6 md:left-8 cursor-pointer z-50 transition-transform hover:scale-105"
@@ -640,19 +638,32 @@ baseWidth={5.5}
             </div>
 
             {/* ── Hero ── */}
-            <div className="lp-hero-content pt-16">
+            <div className="lp-hero-content pt-10 md:pt-14">
 
-              <h1 className="lp-hero-heading mb-10">
-                <span className="whitespace-nowrap">Decentralized AI Routing</span><br />
-                for<br />
-                <span className="lp-hero-gradient whitespace-nowrap">
-                  Agentic Workflows
-                </span>
+              <h1 className="lp-hero-heading mb-6">
+                Stop paying for AI tools<br />
+                <span className="lp-hero-gradient">you barely use.</span>
               </h1>
 
+              <p className="lp-hero-sub mb-6">
+                Ask for what you need: screening, contracts, invoices.
+              </p>
 
+              {/* ── Trust Strip ── */}
+              <div className="trust-strip my-6">
+                <span className="trust-badge">
+                  <span className="trust-icon"><FiCheckCircle /></span>
+                  No subscriptions — pay only when you use it
+                </span>
 
-              <div className="lp-hero-actions mt-12 mb-8">
+                <span className="trust-divider" />
+                <span className="trust-badge">
+                  <span className="trust-icon"><FiLink /></span>
+                  Secured on Algorand
+                </span>
+              </div>
+
+              <div className="lp-hero-actions mt-4 mb-8">
                 <button
                   className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform"
                   onClick={() => { navigate('/signup') }}
@@ -665,20 +676,6 @@ baseWidth={5.5}
                 >
                   Sign In
                 </button>
-              </div>
-
-              {/* ── Trust Strip ── */}
-              <div className="trust-strip mt-12">
-                <span className="trust-badge">
-                  <span className="trust-icon"><FiCheckCircle /></span>
-                  No subscriptions — pay only when you use it
-                </span>
-
-                <span className="trust-divider" />
-                <span className="trust-badge">
-                  <span className="trust-icon"><FiLink /></span>
-                  Secured on Algorand
-                </span>
               </div>
             </div>
           </div>
@@ -844,107 +841,107 @@ baseWidth={5.5}
             {/* Centered card */}
             <div className="w-full max-w-md liquid-glass p-8 animate-scale-up">
 
-            {/* Form Toggle Tabs */}
-            <div className="flex border-b border-slate-800 mb-6">
-              <button
-                className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${!isSignUp ? 'border-indigo-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                onClick={() => {
-                  navigate('/login')
-                  setAuthError('')
-                }}
-              >
-                Sign In
-              </button>
-              <button
-                className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${isSignUp ? 'border-indigo-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                onClick={() => {
-                  navigate('/signup')
-                  setAuthError('')
-                }}
-              >
-                Sign Up
-              </button>
-            </div>
-
-            <h2 className="text-2xl font-extrabold text-white mb-2">
-              {isSignUp ? 'Create your Account' : 'Welcome Back'}
-            </h2>
-            <p className="text-xs text-slate-400 mb-6">
-              {isSignUp ? 'Sign up to start screening and extracting documents.' : 'Sign in to access your Prism AI routing terminal.'}
-            </p>
-
-            {authError && (
-              <div className="bg-rose-950/40 border border-rose-900/50 text-rose-350 text-xs p-3 rounded-lg mb-4">
-                {authError}
+              {/* Form Toggle Tabs */}
+              <div className="flex border-b border-slate-800 mb-6">
+                <button
+                  className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${!isSignUp ? 'border-indigo-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  onClick={() => {
+                    navigate('/login')
+                    setAuthError('')
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${isSignUp ? 'border-indigo-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  onClick={() => {
+                    navigate('/signup')
+                    setAuthError('')
+                  }}
+                >
+                  Sign Up
+                </button>
               </div>
-            )}
 
-            <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="flex flex-col gap-4">
-              {isSignUp && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-300">Full Name</label>
-                  <input
-                    type="text"
-                    placeholder="John Doe"
-                    className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
+              <h2 className="text-2xl font-extrabold text-white mb-2">
+                {isSignUp ? 'Create your Account' : 'Welcome Back'}
+              </h2>
+              <p className="text-xs text-slate-400 mb-6">
+                {isSignUp ? 'Sign up to start screening and extracting documents.' : 'Sign in to access your Prism AI routing terminal.'}
+              </p>
+
+              {authError && (
+                <div className="bg-rose-950/40 border border-rose-900/50 text-rose-350 text-xs p-3 rounded-lg mb-4">
+                  {authError}
                 </div>
               )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-300">Email Address</label>
-                <input
-                  type="email"
-                  placeholder="john@example.com"
-                  className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+              <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="flex flex-col gap-4">
+                {isSignUp && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-300">Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="John Doe"
+                      className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-300">Password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-
-              {isSignUp && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-300">Confirm Password</label>
+                  <label className="text-xs font-bold text-slate-300">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="john@example.com"
+                    className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-300">Password</label>
                   <input
                     type="password"
                     placeholder="••••••••"
                     className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={authSubmitting}
-                className="btn btn-primary w-full rounded-lg font-bold text-sm mt-2 shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
-              >
-                {authSubmitting ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs text-white" />
-                    <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
-                  </>
-                ) : (
-                  <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                {isSignUp && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-300">Confirm Password</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-indigo-500 focus:outline-none"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button
+                  type="submit"
+                  disabled={authSubmitting}
+                  className="btn btn-primary w-full rounded-lg font-bold text-sm mt-2 shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
+                >
+                  {authSubmitting ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs text-white" />
+                      <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
+                    </>
+                  ) : (
+                    <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                  )}
+                </button>
+              </form>
             </div>
           </div>
         )}
@@ -955,14 +952,14 @@ baseWidth={5.5}
             {userRole === 'admin' ? (
               <AdminDashboard />
             ) : (
-              <Weather 
-                activeTab="terminal" 
-                setActiveTab={() => {}}
+              <Weather
+                activeTab="terminal"
+                setActiveTab={() => { }}
                 selectedHistoryTask={selectedTask}
                 onTaskComplete={() => {
                   fetchTasks();
                   fetchSavingsSummary();
-                }} 
+                }}
               />
             )}
           </div>
@@ -1041,21 +1038,19 @@ baseWidth={5.5}
             {/* Tabs */}
             <div className="flex gap-2 border-b border-slate-800/60 mb-2">
               <button
-                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${
-                  historyTab === 'conversations'
-                    ? 'border-indigo-500 text-white'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${historyTab === 'conversations'
+                  ? 'border-indigo-500 text-white'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
                 onClick={() => setHistoryTab('conversations')}
               >
                 💬 Conversations ({conversations.length})
               </button>
               <button
-                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${
-                  historyTab === 'tasks'
-                    ? 'border-indigo-500 text-white'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
+                className={`pb-2 px-3 text-xs font-bold border-b-2 transition-all ${historyTab === 'tasks'
+                  ? 'border-indigo-500 text-white'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
                 onClick={() => setHistoryTab('tasks')}
               >
                 📋 Task Logs ({tasks.length})
@@ -1119,7 +1114,7 @@ baseWidth={5.5}
                       </thead>
                       <tbody>
                         {tasks.map((task) => (
-                          <tr 
+                          <tr
                             key={task._id}
                             className="cursor-pointer hover:bg-slate-800/50 transition-colors border-b border-slate-800/40"
                             onClick={() => {
@@ -1174,7 +1169,7 @@ baseWidth={5.5}
             >
               ✕
             </button>
-            
+
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                 <FiDollarSign className="text-xl" />
