@@ -80,7 +80,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /resume-screen-fast': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.20',
+        price: '$0.10',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -91,7 +91,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /resume-screen-accurate': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.45',
+        price: '$0.25',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -102,7 +102,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /contract-analyze-fast': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.30',
+        price: '$0.15',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -113,7 +113,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /contract-analyze-accurate': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.60',
+        price: '$0.35',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -124,7 +124,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /invoice-extract-fast': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.15',
+        price: '$0.08',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -135,7 +135,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /invoice-extract-accurate': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.35',
+        price: '$0.20',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -146,7 +146,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     'POST /run-task': {
       accepts: [{
         scheme: 'exact',
-        price: '$0.75',
+        price: '$0.25',
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },

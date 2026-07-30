@@ -301,6 +301,37 @@ app.post('/execute-task', requireAuth, async (c) => {
 // ════════════════════════════════════════════════════════════════════
 
 /**
+ * Root endpoint - Content negotiation for HTML crawlers (GoPlausible scrapers) vs API clients
+ */
+app.get('/', (c) => {
+  const acceptHeader = c.req.header('accept') || '';
+  if (acceptHeader.includes('text/html')) {
+    return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PRISM - Intelligent x402 AI Orchestration Engine</title>
+  <meta name="description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
+  <meta property="og:site_name" content="PRISM">
+  <meta property="og:title" content="PRISM - Intelligent x402 AI Orchestration Engine">
+  <meta property="og:description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
+  <meta property="og:image" content="/logo.png">
+  <meta property="og:type" content="website">
+</head>
+<body>
+  <h1>PRISM Resource Server</h1>
+  <p>Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.</p>
+</body>
+</html>`);
+  }
+  return c.json({
+    service: 'PRISM x402 Resource Server',
+    status: 'ok',
+    uptime: process.uptime(),
+  });
+});
+
+/**
  * Health check - Use this to verify server is running
  * No payment required
  */

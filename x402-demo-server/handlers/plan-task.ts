@@ -9,7 +9,7 @@ import { AuditLog } from '../models/AuditLog';
 config();
 
 /** Fixed platform fee added on top of execution cost, in USDC */
-const PLATFORM_FEE = 0.75;
+const PLATFORM_FEE = 0.05;
 
 /** Human-readable provider display names keyed by endpoint path */
 const PROVIDER_NAMES: Record<string, string> = {

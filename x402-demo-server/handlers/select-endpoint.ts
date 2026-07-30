@@ -33,14 +33,14 @@ export async function handleSelectEndpointRequest(c: Context) {
       resume_screening: [
         {
           endpoint_path: '/resume-screen-fast',
-          price: 0.20,
+          price: 0.10,
           confidence: 0.75,
           latency_ms: 800,
           reputation_score: getRep('/resume-screen-fast'),
         },
         {
           endpoint_path: '/resume-screen-accurate',
-          price: 0.45,
+          price: 0.25,
           confidence: 0.93,
           latency_ms: 2200,
           reputation_score: getRep('/resume-screen-accurate'),
@@ -49,14 +49,14 @@ export async function handleSelectEndpointRequest(c: Context) {
       contract_analysis: [
         {
           endpoint_path: '/contract-analyze-fast',
-          price: 0.30,
+          price: 0.15,
           confidence: 0.75,
           latency_ms: 800,
           reputation_score: getRep('/contract-analyze-fast'),
         },
         {
           endpoint_path: '/contract-analyze-accurate',
-          price: 0.60,
+          price: 0.35,
           confidence: 0.93,
           latency_ms: 2200,
           reputation_score: getRep('/contract-analyze-accurate'),
@@ -65,14 +65,14 @@ export async function handleSelectEndpointRequest(c: Context) {
       invoice_extraction: [
         {
           endpoint_path: '/invoice-extract-fast',
-          price: 0.15,
+          price: 0.08,
           confidence: 0.75,
           latency_ms: 800,
           reputation_score: getRep('/invoice-extract-fast'),
         },
         {
           endpoint_path: '/invoice-extract-accurate',
-          price: 0.35,
+          price: 0.20,
           confidence: 0.93,
           latency_ms: 2200,
           reputation_score: getRep('/invoice-extract-accurate'),

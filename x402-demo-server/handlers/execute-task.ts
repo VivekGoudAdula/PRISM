@@ -15,8 +15,8 @@ import { AuditLog } from '../models/AuditLog';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 
-/** Fixed platform fee in USDC (must match plan-task.ts) */
-const PLATFORM_FEE = 0.75;
+/** Fixed platform fee added on top of execution cost, in USDC */
+const PLATFORM_FEE = 0.05;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
