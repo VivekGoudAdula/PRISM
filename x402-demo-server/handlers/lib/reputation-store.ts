@@ -14,7 +14,9 @@ const DEFAULT_ENDPOINTS = [
   "/contract-analyze-fast",
   "/contract-analyze-accurate",
   "/invoice-extract-fast",
-  "/invoice-extract-accurate"
+  "/invoice-extract-accurate",
+  "/code-review-fast",
+  "/code-review-accurate"
 ];
 
 /**

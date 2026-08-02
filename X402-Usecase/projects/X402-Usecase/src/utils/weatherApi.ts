@@ -140,19 +140,32 @@ export function buildPaymentPreview(
 ): PaymentPreviewItem[] {
   const items: PaymentPreviewItem[] = [];
 
-  const fileCount = Math.max(plan.executionQuantity, files.length);
-
-  for (let i = 0; i < fileCount; i++) {
-    const filename = files[i]?.filename;
-    items.push({
-      type: 'execution',
-      index: i + 1,
-      filename,
-      amount: plan.unitPrice,
-      label: filename
-        ? `#${i + 1} — ${filename}`
-        : `Execution #${i + 1}`,
+  const repoFiles = (plan as any).files;
+  if (plan.category === 'code_review' && Array.isArray(repoFiles) && repoFiles.length > 0) {
+    repoFiles.forEach((f: any, i: number) => {
+      items.push({
+        type: 'execution',
+        index: i + 1,
+        filename: f.path,
+        amount: plan.unitPrice,
+        label: `#${i + 1} — ${f.path}`,
+      });
     });
+  } else {
+    const fileCount = Math.max(plan.executionQuantity, files.length);
+
+    for (let i = 0; i < fileCount; i++) {
+      const filename = files[i]?.filename;
+      items.push({
+        type: 'execution',
+        index: i + 1,
+        filename,
+        amount: plan.unitPrice,
+        label: filename
+          ? `#${i + 1} — ${filename}`
+          : `Execution #${i + 1}`,
+      });
+    }
   }
 
   items.push({
@@ -367,21 +380,26 @@ export async function executeTaskWithPayment(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const executionCount = files.length > 0 ? files.length : 1
+  const plannedFiles = (plan as any).files || []
+  const executionCount = (plan.category === 'code_review' && plannedFiles.length > 0)
+    ? plannedFiles.length
+    : (files.length > 0 ? files.length : 1)
+
   const handlerResults: any[] = []
   const transactionIds: string[] = []
 
   try {
     for (let i = 0; i < executionCount; i++) {
       const singleFile = files[i]
+      const plannedFile = plannedFiles[i]
+
       if (onProgress) {
         onProgress(i + 1, 'payment')
       }
 
-      const payload = {
-        task_description: taskDescription,
-        files: singleFile ? [singleFile] : [],
-      }
+      const payload = (plan.category === 'code_review' && plannedFile)
+        ? { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
+        : { task_description: taskDescription, files: singleFile ? [singleFile] : [] }
 
       console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount}`)
 

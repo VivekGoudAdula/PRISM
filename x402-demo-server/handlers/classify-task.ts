@@ -38,7 +38,7 @@ export async function handleClassifyTaskRequest(c: Context) {
     }
 
     // Case 2: No files attached AND no prior result
-    // → No document to process; cannot perform any task-type action.
+    // → Check for conversational intent or GitHub repo URL/code review intent.
     if (!has_files && !has_prior_task_result) {
       const lowerDesc = task_description.toLowerCase().trim();
       const isConversationalIntent =
@@ -58,12 +58,17 @@ export async function handleClassifyTaskRequest(c: Context) {
         return c.json({ category: 'conversational', raw_input: task_description });
       }
 
-      // Any task-type keyword without files is unsupported (nothing to process).
-      console.log('[classify-task] Pre-check: no files, no prior result, task-type request → unsupported');
-      return c.json({ category: 'unsupported', raw_input: task_description });
+      const hasGitHubUrl = lowerDesc.includes('github.com/');
+      const hasCodeReviewIntent = lowerDesc.includes('review') || lowerDesc.includes('repo') || lowerDesc.includes('code');
+
+      if (!hasGitHubUrl && !hasCodeReviewIntent) {
+        // Any task-type keyword without files or github repo is unsupported (nothing to process).
+        console.log('[classify-task] Pre-check: no files, no prior result, no repo → unsupported');
+        return c.json({ category: 'unsupported', raw_input: task_description });
+      }
     }
 
-    // ── LLM Classification (only reached when files ARE attached) ─────────────
+    // ── LLM Classification ───────────────────────────────────────────────────
 
     const getGroqKeys = () => {
       const keys = [];
@@ -96,7 +101,7 @@ export async function handleClassifyTaskRequest(c: Context) {
               messages: [
                 {
                   role: 'system',
-                  content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, conversational, or unsupported.
+                  content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, conversational, or unsupported.
 
 Rules & Few-Shot Examples:
 - Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
@@ -106,10 +111,12 @@ Rules & Few-Shot Examples:
   Input: "how does pricing work?" -> conversational
   Input: "who are you?" -> conversational
 
-- Bare category mentions or document screening/analysis tasks (when files are attached):
+- Bare category mentions or document screening/analysis tasks (when files or repo URLs are provided):
   Input: "resume" -> resume_screening
   Input: "invoice" -> invoice_extraction
   Input: "contract" -> contract_analysis
+  Input: "review this github repo" -> code_review
+  Input: "code review https://github.com/owner/repo" -> code_review
   Input: "screen candidates for frontend developer" -> resume_screening
   Input: "review NDA termination clause" -> contract_analysis
   Input: "extract line items from vendor bill" -> invoice_extraction
@@ -118,7 +125,7 @@ Rules & Few-Shot Examples:
   Input: "asdkfjasdf" -> unsupported
   Input: "123987!@#" -> unsupported
 
-Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, conversational, or unsupported.`,
+Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, conversational, or unsupported.`,
                 },
                 {
                   role: 'user',
@@ -142,6 +149,8 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
               category = 'contract_analysis';
             } else if (normalized.includes('invoice_extraction')) {
               category = 'invoice_extraction';
+            } else if (normalized.includes('code_review')) {
+              category = 'code_review';
             } else {
               category = 'unsupported';
             }
@@ -174,7 +183,6 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
 
 /**
  * Fallback classification method if LLM API is not available.
- * Only reached when files are attached (after pre-check).
  */
 function localClassify(description: string): string {
   const desc = description.toLowerCase().trim();
@@ -185,6 +193,9 @@ function localClassify(description: string): string {
     desc.includes('who are you')
   ) {
     return 'conversational';
+  }
+  if (desc.includes('code') || desc.includes('repo') || desc.includes('github') || desc.includes('review')) {
+    return 'code_review';
   }
   if (desc.includes('resume') || desc.includes('resum') || desc.includes('cv') || desc.includes('candidate') || desc.includes('hiring')) {
     return 'resume_screening';

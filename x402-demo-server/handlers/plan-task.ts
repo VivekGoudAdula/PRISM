@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import type { Context } from 'hono';
 import { handleClassifyTaskRequest } from './classify-task';
 import { handleSelectEndpointRequest } from './select-endpoint';
+import { fetchRepoFiles, extractGitHubUrl } from './lib/fetch-repo';
 import { Task } from '../models/Task';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
@@ -19,6 +20,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   '/contract-analyze-accurate': 'ContractAI Accurate',
   '/invoice-extract-fast': 'InvoiceAI Fast',
   '/invoice-extract-accurate': 'InvoiceAI Accurate',
+  '/code-review-fast': 'CodeAI Fast',
+  '/code-review-accurate': 'CodeAI Accurate',
 };
 
 /**
@@ -101,9 +104,32 @@ export async function handlePlanTaskRequest(c: Context) {
     const winner = selectResult.winner;
     const allCandidates = selectResult.candidates || [];
 
-    // ── Step 3: Determine execution quantity ─────────────────────────────────
-    // 1 execution unit = 1 file. If no files attached, treat as 1 unit.
-    const executionQuantity: number = files.length > 0 ? files.length : 1;
+    // ── Step 3: Determine execution quantity & repo ingestion ───────────────
+    let repoFilesData: { files: any[]; skipped: number; owner?: string; repo?: string; branch?: string } | null = null;
+    let executionQuantity: number = 1;
+
+    if (category === 'code_review') {
+      const repoUrl = extractGitHubUrl(task_description);
+      if (!repoUrl) {
+        return c.json({
+          category: 'code_review',
+          error: 'No valid GitHub repository URL found in task description.',
+        }, 400);
+      }
+      try {
+        repoFilesData = await fetchRepoFiles(repoUrl);
+        executionQuantity = repoFilesData.files.length;
+      } catch (err: any) {
+        console.error('Failed to fetch GitHub repo files:', err);
+        return c.json({
+          category: 'code_review',
+          error: `Failed to fetch GitHub repository: ${err.message}`,
+        }, 400);
+      }
+    } else {
+      // 1 execution unit = 1 file. If no files attached, treat as 1 unit.
+      executionQuantity = files.length > 0 ? files.length : 1;
+    }
 
     // ── Step 4: Compute dynamic pricing ─────────────────────────────────────
     const unitPrice: number = winner.price;
@@ -136,7 +162,10 @@ export async function handlePlanTaskRequest(c: Context) {
         selectedEndpoint: winner.endpoint_path,
         allCandidateEndpoints: allCandidates,
         endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
-        plannerOutput: classifyResult,
+        plannerOutput: {
+          ...classifyResult,
+          ...(repoFilesData ? { files: repoFilesData.files, skipped: repoFilesData.skipped } : {}),
+        },
         providerName,
         unitPrice,
         executionQuantity,
@@ -177,6 +206,7 @@ export async function handlePlanTaskRequest(c: Context) {
       estimatedTimeSeconds,
       estimatedAccuracy,
       candidates: allCandidates,
+      ...(repoFilesData ? { files: repoFilesData.files, skipped: repoFilesData.skipped } : {}),
     });
   } catch (err: any) {
     console.error('Error in plan-task handler:', err);

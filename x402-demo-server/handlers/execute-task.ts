@@ -5,6 +5,8 @@ import { handleContractAnalyzeFastRequest } from './contract-analyze-fast';
 import { handleContractAnalyzeAccurateRequest } from './contract-analyze-accurate';
 import { handleInvoiceExtractFastRequest } from './invoice-extract-fast';
 import { handleInvoiceExtractAccurateRequest } from './invoice-extract-accurate';
+import { handleCodeReviewFastRequest } from './code-review-fast';
+import { handleCodeReviewAccurateRequest } from './code-review-accurate';
 import { verifyOutput } from './lib/verify-output';
 import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
@@ -47,6 +49,34 @@ function buildMockContext(bodyData: Record<string, any>): Context {
  */
 function aggregateResults(category: string, results: any[]): any {
   if (results.length === 0) return {};
+
+  if (category === 'code_review') {
+    const allFiles = results.map((r) => ({
+      file_path: r.file_path,
+      issues: r.issues ?? [],
+      overall_quality_score: r.overall_quality_score ?? 0,
+      confidence: r.confidence ?? 0,
+      latency_ms: r.latency_ms ?? 0,
+    }));
+    const totalFilesReviewed = allFiles.length;
+    const allIssues = results.flatMap((r) => r.issues ?? []);
+    const issuesBySeverity = {
+      low: allIssues.filter((i) => i.severity === 'low').length,
+      medium: allIssues.filter((i) => i.severity === 'medium').length,
+      high: allIssues.filter((i) => i.severity === 'high').length,
+    };
+    const avgQualityScore = results.reduce((sum, r) => sum + (r.overall_quality_score ?? 0), 0) / (results.length || 1);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
+
+    return {
+      totalFilesReviewed,
+      totalIssues: allIssues.length,
+      issuesBySeverity,
+      averageQualityScore: parseFloat(avgQualityScore.toFixed(3)),
+      averageConfidence: parseFloat(avgConfidence.toFixed(3)),
+      files: allFiles,
+    };
+  }
 
   if (category === 'resume_screening') {
     const allCandidates = results.flatMap((r) => r.candidates ?? []);
@@ -124,6 +154,8 @@ async function invokeProviderHandler(endpoint: string, bodyData: Record<string, 
     case '/contract-analyze-accurate': return handleContractAnalyzeAccurateRequest(ctx);
     case '/invoice-extract-fast':  return handleInvoiceExtractFastRequest(ctx);
     case '/invoice-extract-accurate': return handleInvoiceExtractAccurateRequest(ctx);
+    case '/code-review-fast':      return handleCodeReviewFastRequest(ctx);
+    case '/code-review-accurate':  return handleCodeReviewAccurateRequest(ctx);
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }
@@ -205,7 +237,7 @@ export async function handleExecuteTaskRequest(c: Context) {
 
     // ── Step 3: Extract results and transaction IDs ──────────────────────────
     const body = await c.req.json().catch(() => ({}));
-    const { results = [], transactionIds = [], status, error } = body;
+    let { results = [], transactionIds = [], status, error } = body;
 
     if (status === 'failed' || error) {
       console.log('🔍 [DIAGNOSTIC /execute-task 400]', {
@@ -227,9 +259,26 @@ export async function handleExecuteTaskRequest(c: Context) {
       return c.json({ error: error || 'Execution failed' }, 400);
     }
 
-    const actualQuantity = results.length > 0 ? results.length : 1;
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
+
+    // If results are not provided in body, but planned files exist (e.g. code_review execution)
+    if (results.length === 0 && Array.isArray(taskRecord.plannerOutput?.files)) {
+      const plannedFiles: any[] = taskRecord.plannerOutput.files;
+      console.log(`Executing ${plannedFiles.length} planned files for category '${category}' via ${winnerEndpoint}...`);
+      const executedResults: any[] = [];
+      for (const file of plannedFiles) {
+        const payload = {
+          file_path: file.path,
+          raw_url: file.raw_url,
+        };
+        const fileResult = await invokeProviderHandler(winnerEndpoint, payload);
+        executedResults.push(fileResult);
+      }
+      results = executedResults;
+    }
+
+    const actualQuantity = results.length > 0 ? results.length : 1;
 
     // ── Step 4: Aggregate results ────────────────────────────────────────────
     const combinedResult = aggregateResults(category, results);

@@ -71,6 +71,94 @@ const Home: React.FC<HomeProps> = () => {
   const renderFormattedResult = (result: any, category: string) => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
 
+    if (category === 'code_review' && result) {
+      const files = result.files ?? (result.file_path ? [result] : []);
+      const totalFiles = result.totalFilesReviewed ?? files.length;
+      const totalIssues = result.totalIssues ?? files.reduce((sum: number, f: any) => sum + (f.issues?.length || 0), 0);
+      const severity = result.issuesBySeverity ?? {
+        low: files.flatMap((f: any) => f.issues ?? []).filter((i: any) => i.severity === 'low').length,
+        medium: files.flatMap((f: any) => f.issues ?? []).filter((i: any) => i.severity === 'medium').length,
+        high: files.flatMap((f: any) => f.issues ?? []).filter((i: any) => i.severity === 'high').length,
+      };
+      const avgScore = Math.round((result.averageQualityScore ?? (result.overall_quality_score ?? 0.85)) * 100);
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Reviewed Files</span>
+              <span className="text-xl font-black text-white">{totalFiles}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Issues</span>
+              <span className="text-xl font-black text-amber-400">{totalIssues}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Severity Breakdown</span>
+              <div className="flex gap-2 text-xs font-bold mt-1">
+                <span className="text-rose-400">{severity.high} High</span>
+                <span className="text-amber-400">{severity.medium} Med</span>
+                <span className="text-emerald-400">{severity.low} Low</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quality Score</span>
+              <span className="text-xl font-black text-emerald-400">{avgScore}%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full mt-1">
+            {files.map((f: any, index: number) => {
+              const fileIssues = f.issues || [];
+              const scorePct = Math.round((f.overall_quality_score ?? 0.85) * 100);
+              return (
+                <div key={index} className="collapse collapse-arrow bg-slate-900/40 border border-slate-800/80 rounded-2xl p-3">
+                  <div className="text-sm font-semibold flex items-center justify-between text-white">
+                    <div className="flex items-center gap-3 font-mono">
+                      <span className="text-indigo-400 font-bold">📄 {f.file_path}</span>
+                      <span className="text-xs text-slate-400">({fileIssues.length} issue{fileIssues.length !== 1 ? 's' : ''})</span>
+                    </div>
+                    <span className="badge bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold px-2 py-0.5">
+                      Quality: {scorePct}%
+                    </span>
+                  </div>
+                  <div className="text-slate-300 text-xs flex flex-col gap-3 mt-2">
+                    {fileIssues.length > 0 ? (
+                      fileIssues.map((issue: any, iIdx: number) => {
+                        let badgeColor = 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400';
+                        if (issue.severity === 'high') badgeColor = 'bg-rose-500/15 border-rose-500/25 text-rose-400';
+                        else if (issue.severity === 'medium') badgeColor = 'bg-amber-500/15 border-amber-500/25 text-amber-400';
+                        return (
+                          <div key={iIdx} className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/60 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className={`badge ${badgeColor} border text-[10px] font-extrabold uppercase px-2 py-0.5`}>
+                                {issue.severity || 'low'}
+                              </span>
+                              {issue.line_estimate && (
+                                <span className="font-mono text-[11px] text-slate-400">Line ~{issue.line_estimate}</span>
+                              )}
+                            </div>
+                            <p className="text-slate-200 font-medium text-xs leading-relaxed">{issue.description}</p>
+                            {issue.suggestion && (
+                              <div className="bg-indigo-950/30 border border-indigo-900/30 p-2.5 rounded-lg text-indigo-300 text-[11px] mt-1 font-mono">
+                                <strong>Suggestion:</strong> {issue.suggestion}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-500 text-xs py-1">No code issues or vulnerabilities detected for this file.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (category === 'resume_screening' && result.candidates) {
       return (
         <div className="overflow-x-auto w-full">

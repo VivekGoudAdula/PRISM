@@ -253,6 +253,14 @@ app.post('/invoice-extract-accurate', async (c) => {
   const { handleInvoiceExtractAccurateRequest } = await import('./handlers/invoice-extract-accurate');
   return handleInvoiceExtractAccurateRequest(c);
 });
+app.post('/code-review-fast', async (c) => {
+  const { handleCodeReviewFastRequest } = await import('./handlers/code-review-fast');
+  return handleCodeReviewFastRequest(c);
+});
+app.post('/code-review-accurate', async (c) => {
+  const { handleCodeReviewAccurateRequest } = await import('./handlers/code-review-accurate');
+  return handleCodeReviewAccurateRequest(c);
+});
 
 app.post('/run-task', requireAuth, async (c) => {
   const { handleRunTaskRequest } = await import('./handlers/run-task');

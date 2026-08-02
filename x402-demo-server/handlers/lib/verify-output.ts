@@ -123,6 +123,29 @@ export function verifyOutput(category: string, result: any): { passed: boolean; 
       return { passed: true, reason: 'Valid risk clauses or non-zero overall risk score received' };
     }
 
+    case 'code_review': {
+      const files = result.files ?? (result.file_path ? [result] : []);
+      if (!Array.isArray(files) || files.length === 0) {
+        return { passed: false, reason: 'Missing or empty code review files array' };
+      }
+
+      const validFiles = files.filter((f: any) => {
+        const hasValidPath = typeof f.file_path === 'string' && f.file_path.trim().length > 0;
+        const hasIssuesArray = Array.isArray(f.issues);
+        const hasValidScore = typeof f.overall_quality_score === 'number' || typeof result.averageQualityScore === 'number';
+        return hasValidPath && hasIssuesArray && hasValidScore;
+      });
+
+      if (validFiles.length === 0) {
+        return {
+          passed: false,
+          reason: 'Missing or malformed code review issues array or quality score'
+        };
+      }
+
+      return { passed: true, reason: 'Valid code review report generated with verified file issues and quality scores' };
+    }
+
     default:
       return { passed: false, reason: `Unknown task category: ${category}` };
   }
