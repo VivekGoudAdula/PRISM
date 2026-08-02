@@ -58,6 +58,11 @@ export interface ExecutionPlan {
   /** Provider's reported confidence/accuracy (0-1) */
   estimatedAccuracy: number;
   candidates: ProviderCandidate[];
+  /** GitHub repo capping metadata */
+  capped?: boolean;
+  total_files_found?: number;
+  cap_message?: string;
+  skipped?: number;
   /** Conversational pre-classification flag and response */
   isChat?: boolean;
   reply?: string;
@@ -412,24 +417,34 @@ export async function executeTaskWithPayment(
         await new Promise((r) => setTimeout(r, 1500))
       }
 
-      const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      })
+      try {
+        const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${response.status}`)
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${response.status}`)
+        }
+
+        const paymentHeader = response.headers.get('x-payment') || response.headers.get('payment-signature')
+        if (paymentHeader) {
+          transactionIds.push(paymentHeader)
+        }
+
+        const result = await response.json()
+        handlerResults.push(result)
+      } catch (fileErr: any) {
+        console.warn(`File execution ${i + 1}/${executionCount} failed or stopped:`, fileErr?.message || fileErr)
+        if (handlerResults.length > 0) {
+          console.log(`Saving ${handlerResults.length} completed file review(s)...`)
+          break
+        } else {
+          throw fileErr
+        }
       }
-
-      const paymentHeader = response.headers.get('x-payment') || response.headers.get('payment-signature')
-      if (paymentHeader) {
-        transactionIds.push(paymentHeader)
-      }
-
-      const result = await response.json()
-      handlerResults.push(result)
     }
 
     if (onProgress) {

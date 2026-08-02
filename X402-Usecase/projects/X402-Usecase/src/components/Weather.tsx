@@ -109,16 +109,33 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
 
           {/* Banner confirmation for GitHub Code Review */}
           {plan.category === 'code_review' && (
-            <div className="mb-4 rounded-2xl border border-indigo-500/40 bg-indigo-950/40 p-4 text-xs text-indigo-200 flex flex-col gap-1 shadow-inner">
-              <span className="font-extrabold text-sm text-white">GitHub Repository Review Plan</span>
-              <p>
-                This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)} + ${plan.platformFee.toFixed(2)} platform fee). Continue?
-              </p>
-              {(plan as any).skipped > 0 && (
-                <span className="text-[11px] text-amber-300 font-medium mt-1">
-                  ℹ️ Note: {(plan as any).skipped} non-code/large files were automatically excluded or capped.
-                </span>
+            <div className="mb-4 flex flex-col gap-2.5">
+              {plan.capped && (
+                <div className="rounded-2xl border border-amber-500/60 bg-amber-950/50 p-4 text-xs text-amber-200 flex flex-col gap-1.5 shadow-lg">
+                  <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs uppercase tracking-wider">
+                    <span className="text-base">⚠️</span>
+                    <span>Repository File Limit Reached</span>
+                  </div>
+                  <p className="leading-relaxed font-medium">
+                    {plan.cap_message || `This repo has ${plan.total_files_found || (plan.executionQuantity + (plan.skipped || 0))} reviewable files. Reviewing the ${selectedCount} highest-priority source files first (${plan.skipped || 0} skipped).`}
+                  </p>
+                  <span className="text-[11px] text-amber-300/80 font-mono">
+                    Note: High-priority source files (.ts, .py, .go, .java, src/ folders) are prioritized first.
+                  </span>
+                </div>
               )}
+
+              <div className="rounded-2xl border border-indigo-500/40 bg-indigo-950/40 p-4 text-xs text-indigo-200 flex flex-col gap-1 shadow-inner">
+                <span className="font-extrabold text-sm text-white">GitHub Repository Review Plan</span>
+                <p>
+                  This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)} + ${plan.platformFee.toFixed(2)} platform fee). Continue?
+                </p>
+                {!plan.capped && (plan.skipped || 0) > 0 && (
+                  <span className="text-[11px] text-indigo-300/80 font-medium mt-1">
+                    ℹ️ Note: {plan.skipped} non-code/large files were automatically excluded.
+                  </span>
+                )}
+              </div>
             </div>
           )}
 

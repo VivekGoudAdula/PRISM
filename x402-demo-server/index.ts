@@ -40,7 +40,7 @@ import createPaymentConfig, { EndpointConfig, NETWORK_CONFIG, NETWORK_MODE } fro
 
 // Import Middlewares and Routers
 import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
-import { requireAuth } from './middleware/auth';
+import { requireAuth, optionalAuth } from './middleware/auth';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import waitlistRouter from './routes/waitlist';
@@ -285,7 +285,7 @@ app.post('/chat-reply', async (c) => {
  * + platformFee). Called only after the user confirms the Execution Summary
  * and the blockchain payment is verified.
  */
-app.post('/execute-task', requireAuth, async (c) => {
+app.post('/execute-task', optionalAuth, async (c) => {
   const { handleExecuteTaskRequest } = await import('./handlers/execute-task');
   return handleExecuteTaskRequest(c);
 });
@@ -368,7 +368,7 @@ app.post('/select-endpoint', async (c) => {
  * computes dynamic pricing (quantity × unitPrice + platform fee), and
  * returns a planId + full ExecutionPlan to the client.
  */
-app.post('/plan-task', requireAuth, async (c) => {
+app.post('/plan-task', optionalAuth, async (c) => {
   const { handlePlanTaskRequest } = await import('./handlers/plan-task');
   return handlePlanTaskRequest(c);
 });

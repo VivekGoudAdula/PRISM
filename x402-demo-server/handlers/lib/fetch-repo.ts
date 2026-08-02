@@ -10,6 +10,8 @@ export interface RepoFile {
 export interface FetchRepoFilesResult {
   files: RepoFile[];
   skipped: number;
+  capped: boolean;
+  total_files_found: number;
   owner: string;
   repo: string;
   branch: string;
@@ -40,6 +42,49 @@ const BINARY_EXTENSIONS = new Set([
   // Database / Documents
   'pdf', 'db', 'sqlite', 'sqlite3', 'pcap', 'ds_store',
 ]);
+
+const HIGH_PRIORITY_EXTS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'java', 'rs', 'c', 'cpp', 'h', 'hpp',
+  'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'sql', 'sh', 'vue', 'svelte', 'sol', 'teal'
+]);
+
+const MEDIUM_PRIORITY_EXTS = new Set([
+  'css', 'scss', 'less', 'html', 'xml', 'json', 'yaml', 'yml', 'toml', 'proto', 'graphql'
+]);
+
+const PRIORITY_FOLDERS = [
+  'src/', 'lib/', 'app/', 'pkg/', 'internal/', 'core/', 'components/',
+  'routes/', 'handlers/', 'services/', 'controllers/', 'models/', 'api/', 'views/'
+];
+
+/**
+ * Compute priority score for a file path based on extension and directory depth.
+ */
+export function getFilePriorityScore(filePath: string): number {
+  let score = 0;
+  const pathLower = filePath.toLowerCase();
+  const ext = pathLower.includes('.') ? pathLower.split('.').pop()! : '';
+
+  if (HIGH_PRIORITY_EXTS.has(ext)) {
+    score += 100;
+  } else if (MEDIUM_PRIORITY_EXTS.has(ext)) {
+    score += 50;
+  } else if (ext === 'md' || ext === 'txt') {
+    score += 10;
+  } else {
+    score += 30;
+  }
+
+  const isInPriorityFolder = PRIORITY_FOLDERS.some((folder) =>
+    pathLower.startsWith(folder) || pathLower.includes('/' + folder)
+  );
+
+  if (isInPriorityFolder) {
+    score += 50;
+  }
+
+  return score;
+}
 
 /**
  * Extract GitHub URL from text string if embedded within prompt.
@@ -83,7 +128,7 @@ function getGitHubHeaders(): Record<string, string> {
 
 /**
  * Fetches public GitHub repository file tree, filters out non-code/large files,
- * and returns reviewable file metadata without fetching full raw contents.
+ * ranks files by likely importance, and returns reviewable file metadata.
  */
 export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesResult> {
   const { owner, repo, branch: specifiedBranch } = parseGitHubUrl(repoUrl);
@@ -146,14 +191,32 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
     });
   }
 
-  // Step 4: Cap at 30 files max
+  // Step 4: Prioritize files by score before capping
+  filtered.sort((a, b) => {
+    const scoreA = getFilePriorityScore(a.path);
+    const scoreB = getFilePriorityScore(b.path);
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+    const depthA = a.path.split('/').length;
+    const depthB = b.path.split('/').length;
+    if (depthA !== depthB) {
+      return depthA - depthB;
+    }
+    return a.path.localeCompare(b.path);
+  });
+
+  const total_files_found = filtered.length;
   const MAX_FILES = 30;
   const files = filtered.slice(0, MAX_FILES);
-  const skipped = Math.max(0, filtered.length - MAX_FILES);
+  const skipped = Math.max(0, total_files_found - MAX_FILES);
+  const capped = total_files_found > MAX_FILES;
 
   return {
     files,
     skipped,
+    capped,
+    total_files_found,
     owner,
     repo,
     branch,

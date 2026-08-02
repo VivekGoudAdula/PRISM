@@ -10,6 +10,41 @@ export interface DecodedToken {
 }
 
 /**
+ * Optional Authentication Middleware
+ * Validates JWT access token if present, but does not block request if missing or expired.
+ */
+export async function optionalAuth(c: Context, next: Next) {
+  try {
+    let token = '';
+
+    const authHeader = c.req.header('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    if (!token) {
+      const cookieHeader = c.req.header('Cookie');
+      if (cookieHeader) {
+        const cookies = cookieHeader.split(';').reduce((acc, current) => {
+          const [name, value] = current.trim().split('=');
+          if (name && value) acc[name] = value;
+          return acc;
+        }, {} as Record<string, string>);
+        token = cookies['access_token'] || '';
+      }
+    }
+
+    if (token) {
+      const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+      c.set('user', decoded);
+    }
+  } catch (error: any) {
+    // Ignore invalid/expired token for optional auth
+  }
+  await next();
+}
+
+/**
  * Authentication Middleware
  * Validates JWT access token from Authorization header or cookie
  */

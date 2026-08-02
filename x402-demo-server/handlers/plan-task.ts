@@ -105,7 +105,7 @@ export async function handlePlanTaskRequest(c: Context) {
     const allCandidates = selectResult.candidates || [];
 
     // ── Step 3: Determine execution quantity & repo ingestion ───────────────
-    let repoFilesData: { files: any[]; skipped: number; owner?: string; repo?: string; branch?: string } | null = null;
+    let repoFilesData: { files: any[]; skipped: number; capped: boolean; total_files_found: number; owner?: string; repo?: string; branch?: string } | null = null;
     let executionQuantity: number = 1;
 
     if (category === 'code_review') {
@@ -143,6 +143,10 @@ export async function handlePlanTaskRequest(c: Context) {
     const estimatedAccuracy: number = winner.confidence ?? 0;
     const providerName: string = PROVIDER_NAMES[winner.endpoint_path] || winner.endpoint_path;
 
+    const cap_message = repoFilesData?.capped
+      ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
+      : undefined;
+
     // ── Step 6: Resolve the authenticated user ───────────────────────────────
     let userId: any = null;
     const tokenUser = c.get('user' as any);
@@ -164,7 +168,13 @@ export async function handlePlanTaskRequest(c: Context) {
         endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
         plannerOutput: {
           ...classifyResult,
-          ...(repoFilesData ? { files: repoFilesData.files, skipped: repoFilesData.skipped } : {}),
+          ...(repoFilesData ? {
+            files: repoFilesData.files,
+            skipped: repoFilesData.skipped,
+            capped: repoFilesData.capped,
+            total_files_found: repoFilesData.total_files_found,
+            cap_message,
+          } : {}),
         },
         providerName,
         unitPrice,
@@ -206,7 +216,13 @@ export async function handlePlanTaskRequest(c: Context) {
       estimatedTimeSeconds,
       estimatedAccuracy,
       candidates: allCandidates,
-      ...(repoFilesData ? { files: repoFilesData.files, skipped: repoFilesData.skipped } : {}),
+      ...(repoFilesData ? {
+        files: repoFilesData.files,
+        skipped: repoFilesData.skipped,
+        capped: repoFilesData.capped,
+        total_files_found: repoFilesData.total_files_found,
+        cap_message,
+      } : {}),
     });
   } catch (err: any) {
     console.error('Error in plan-task handler:', err);
