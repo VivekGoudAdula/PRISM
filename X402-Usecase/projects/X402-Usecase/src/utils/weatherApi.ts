@@ -384,42 +384,116 @@ export async function executeTaskWithPayment(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  if (onProgress) {
-    onProgress(1, 'payment')
+  const plannedFiles = (plan as any).files || []
+  const executionCount = (plan.category === 'code_review' && plannedFiles.length > 0)
+    ? plannedFiles.length
+    : (files.length > 0 ? files.length : 1)
+
+  console.log(`Executing ${executionCount} independent per-file x402 payment(s) for category '${plan.category}'`)
+
+  const handlerResults: any[] = []
+  const transactionIds: string[] = []
+
+  try {
+    for (let i = 0; i < executionCount; i++) {
+      const singleFile = files[i]
+      const plannedFile = plannedFiles[i]
+
+      if (onProgress) {
+        onProgress(i + 1, 'payment')
+      }
+
+      const payload = (plan.category === 'code_review' && plannedFile)
+        ? { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
+        : { task_description: taskDescription, files: singleFile ? [singleFile] : [] }
+
+      console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount} (${plannedFile?.path || singleFile?.filename || 'file'})`)
+
+      if (onProgress) {
+        onProgress(i + 1, 'executing')
+      }
+
+      if (i > 0) {
+        // Wait 1.5s between consecutive payment calls so wallet tx confirmation completes cleanly
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+
+      try {
+        const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${response.status}`)
+        }
+
+        const paymentHeader = response.headers.get('x-payment') || response.headers.get('payment-signature')
+        if (paymentHeader) {
+          transactionIds.push(paymentHeader)
+        }
+
+        const result = await response.json()
+        handlerResults.push(result)
+      } catch (fileErr: any) {
+        console.warn(`File execution ${i + 1}/${executionCount} stopped or failed:`, fileErr?.message || fileErr)
+        if (handlerResults.length > 0) {
+          console.log(`Saving ${handlerResults.length} completed file review(s)...`)
+          break
+        } else {
+          throw fileErr
+        }
+      }
+    }
+
+    if (onProgress) {
+      onProgress(handlerResults.length || executionCount, 'verifying')
+    }
+
+    // Report back to the server to record execution and aggregate results
+    const executeUrl = `${baseUrl}/execute-task?planId=${encodeURIComponent(plan.planId)}`
+    const saveResponse = await fetch(executeUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        results: handlerResults,
+        transactionIds,
+      }),
+    })
+
+    if (!saveResponse.ok) {
+      const errData = await saveResponse.json().catch(() => ({}))
+      throw new Error(errData.error || `Save task execution failed: HTTP ${saveResponse.status}`)
+    }
+
+    const data: ExecuteTaskResponse = await saveResponse.json()
+    console.log('SUCCESS — Execution result:', data)
+
+    if (onProgress) {
+      onProgress(handlerResults.length || executionCount, 'completed')
+    }
+
+    return data
+  } catch (err: any) {
+    console.error('Error during execution orchestration:', err)
+    
+    // Report failure to the server
+    const executeUrl = `${baseUrl}/execute-task?planId=${encodeURIComponent(plan.planId)}`
+    await fetch(executeUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        status: 'failed',
+        error: err.message || 'Execution failed',
+      }),
+    }).catch((saveErr) => {
+      console.error('Failed to report task failure to server:', saveErr)
+    })
+    
+    throw err
   }
-
-  const executeUrl = `${baseUrl}/execute-task?planId=${encodeURIComponent(plan.planId)}`
-
-  if (onProgress) {
-    onProgress(1, 'executing')
-  }
-
-  const response = await fetchFn(executeUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      task_description: taskDescription,
-      files,
-    }),
-  })
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}))
-    throw new Error(errData.error || `Execution failed: HTTP ${response.status}`)
-  }
-
-  if (onProgress) {
-    onProgress(plan.executionQuantity || 1, 'verifying')
-  }
-
-  const data: ExecuteTaskResponse = await response.json()
-  console.log('SUCCESS — Execution result:', data)
-
-  if (onProgress) {
-    onProgress(plan.executionQuantity || 1, 'completed')
-  }
-
-  return data
 }
 
 // ─── Legacy helpers (kept for backward compatibility) ─────────────────────────
