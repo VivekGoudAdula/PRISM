@@ -207,7 +207,7 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   });
 
   const total_files_found = filtered.length;
-  const MAX_FILES = 30;
+  const MAX_FILES = 500;
   const files = filtered.slice(0, MAX_FILES);
   const skipped = Math.max(0, total_files_found - MAX_FILES);
   const capped = total_files_found > MAX_FILES;
