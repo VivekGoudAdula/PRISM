@@ -72,7 +72,7 @@ const Home: React.FC<HomeProps> = () => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
 
     if (category === 'code_review' && result) {
-      const files = result.files ?? (result.file_path ? [result] : []);
+      const files = (result.files ?? (result.file_path ? [result] : [])).filter((f: any) => f && typeof f.file_path === 'string' && f.file_path.trim() !== '');
       const totalFiles = result.totalFilesReviewed ?? files.length;
       const totalIssues = result.totalIssues ?? files.reduce((sum: number, f: any) => sum + (f.issues?.length || 0), 0);
       const severity = result.issuesBySeverity ?? {
