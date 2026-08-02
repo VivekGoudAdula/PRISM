@@ -14,6 +14,7 @@
 
 import { ALGORAND_MAINNET_CAIP2, USDC_MAINNET_ASA_ID } from '@x402/avm';
 import type { DynamicPrice } from '@x402/core/server';
+import mongoose from 'mongoose';
 import { Task } from './models/Task';
 
 // ─── Network Mode Configuration ─────────────────────────────────────────────
@@ -183,7 +184,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
           try {
             const url = new URL(req.url, 'http://localhost');
             const planId = url.searchParams.get('planId');
-            if (planId) {
+            if (planId && mongoose.Types.ObjectId.isValid(planId)) {
               const task = await Task.findById(planId);
               if (task && typeof task.totalCost === 'number') {
                 return `$${task.totalCost.toFixed(2)}`;

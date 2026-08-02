@@ -147,64 +147,73 @@ export async function handlePlanTaskRequest(c: Context) {
       ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
       : undefined;
 
-    // ── Step 6: Resolve the authenticated user ───────────────────────────────
+    // ── Step 6: Resolve the user (with guest fallback) ───────────────────────
     let userId: any = null;
     const tokenUser = c.get('user' as any);
     if (tokenUser?.userId) {
       const user = await User.findById(tokenUser.userId);
       if (user) userId = user._id;
     }
+    if (!userId) {
+      let guestUser = await User.findOne({ email: 'guest@prism.ai' });
+      if (!guestUser) {
+        guestUser = await User.create({
+          fullName: 'Guest User',
+          email: 'guest@prism.ai',
+          passwordHash: 'guest-hashed-pwd',
+          role: 'user',
+        });
+      }
+      userId = guestUser._id;
+    }
 
     // ── Step 7: Persist the plan as a 'planned' Task document ────────────────
-    let taskRecord: any = null;
-    if (userId) {
-      taskRecord = await Task.create({
-        userId,
-        prompt: task_description,
+    const taskRecord = await Task.create({
+      userId,
+      prompt: task_description,
+      category,
+      status: 'planned',
+      selectedEndpoint: winner.endpoint_path,
+      allCandidateEndpoints: allCandidates,
+      endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
+      plannerOutput: {
+        ...classifyResult,
+        ...(repoFilesData ? {
+          files: repoFilesData.files,
+          skipped: repoFilesData.skipped,
+          capped: repoFilesData.capped,
+          total_files_found: repoFilesData.total_files_found,
+          cap_message,
+        } : {}),
+      },
+      providerName,
+      unitPrice,
+      executionQuantity,
+      executionCost,
+      platformFee: PLATFORM_FEE,
+      totalCost,
+      endpointCost: unitPrice,
+    });
+
+    await AuditLog.create({
+      userId,
+      action: 'Task Planned',
+      details: {
+        taskId: taskRecord._id,
         category,
-        status: 'planned',
-        selectedEndpoint: winner.endpoint_path,
-        allCandidateEndpoints: allCandidates,
-        endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
-        plannerOutput: {
-          ...classifyResult,
-          ...(repoFilesData ? {
-            files: repoFilesData.files,
-            skipped: repoFilesData.skipped,
-            capped: repoFilesData.capped,
-            total_files_found: repoFilesData.total_files_found,
-            cap_message,
-          } : {}),
-        },
         providerName,
         unitPrice,
         executionQuantity,
         executionCost,
         platformFee: PLATFORM_FEE,
         totalCost,
-        endpointCost: unitPrice,
-      });
-
-      await AuditLog.create({
-        userId,
-        action: 'Task Planned',
-        details: {
-          taskId: taskRecord._id,
-          category,
-          providerName,
-          unitPrice,
-          executionQuantity,
-          executionCost,
-          platformFee: PLATFORM_FEE,
-          totalCost,
-        },
-        ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
-      });
-    }
+      },
+      ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
+    });
 
     // Return the full execution plan
     return c.json({
-      planId: taskRecord?._id?.toString() ?? `plan-${Date.now()}`,
+      planId: taskRecord._id.toString(),
       category,
       providerName,
       endpointPath: winner.endpoint_path,

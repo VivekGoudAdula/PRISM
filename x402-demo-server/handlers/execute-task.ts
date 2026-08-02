@@ -201,8 +201,8 @@ export async function handleExecuteTaskRequest(c: Context) {
 
     // ── Step 1: Resolve plan ─────────────────────────────────────────────────
     const planId = c.req.query('planId');
-    if (!planId) {
-      return c.json({ error: 'planId query parameter is required' }, 400);
+    if (!planId || !mongoose.Types.ObjectId.isValid(planId)) {
+      return c.json({ error: `Invalid or missing planId parameter: ${planId}` }, 400);
     }
 
     taskRecord = await Task.findById(planId);
