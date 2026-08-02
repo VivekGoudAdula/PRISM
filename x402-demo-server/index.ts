@@ -226,43 +226,43 @@ app.use(paymentMiddleware(paymentConfig as any, x402Server));
  */
 
 // Example 1: Weather Data - Pay $0.005
-app.get('/weather', handleWeatherRequest);
+app.on(['GET', 'POST'], '/weather', handleWeatherRequest);
 
 // 6 new payment-protected endpoints
-app.post('/resume-screen-fast', async (c) => {
+app.on(['GET', 'POST'], '/resume-screen-fast', async (c) => {
   const { handleResumeScreenFastRequest } = await import('./handlers/resume-screen-fast');
   return handleResumeScreenFastRequest(c);
 });
-app.post('/resume-screen-accurate', async (c) => {
+app.on(['GET', 'POST'], '/resume-screen-accurate', async (c) => {
   const { handleResumeScreenAccurateRequest } = await import('./handlers/resume-screen-accurate');
   return handleResumeScreenAccurateRequest(c);
 });
-app.post('/contract-analyze-fast', async (c) => {
+app.on(['GET', 'POST'], '/contract-analyze-fast', async (c) => {
   const { handleContractAnalyzeFastRequest } = await import('./handlers/contract-analyze-fast');
   return handleContractAnalyzeFastRequest(c);
 });
-app.post('/contract-analyze-accurate', async (c) => {
+app.on(['GET', 'POST'], '/contract-analyze-accurate', async (c) => {
   const { handleContractAnalyzeAccurateRequest } = await import('./handlers/contract-analyze-accurate');
   return handleContractAnalyzeAccurateRequest(c);
 });
-app.post('/invoice-extract-fast', async (c) => {
+app.on(['GET', 'POST'], '/invoice-extract-fast', async (c) => {
   const { handleInvoiceExtractFastRequest } = await import('./handlers/invoice-extract-fast');
   return handleInvoiceExtractFastRequest(c);
 });
-app.post('/invoice-extract-accurate', async (c) => {
+app.on(['GET', 'POST'], '/invoice-extract-accurate', async (c) => {
   const { handleInvoiceExtractAccurateRequest } = await import('./handlers/invoice-extract-accurate');
   return handleInvoiceExtractAccurateRequest(c);
 });
-app.post('/code-review-fast', async (c) => {
+app.on(['GET', 'POST'], '/code-review-fast', async (c) => {
   const { handleCodeReviewFastRequest } = await import('./handlers/code-review-fast');
   return handleCodeReviewFastRequest(c);
 });
-app.post('/code-review-accurate', async (c) => {
+app.on(['GET', 'POST'], '/code-review-accurate', async (c) => {
   const { handleCodeReviewAccurateRequest } = await import('./handlers/code-review-accurate');
   return handleCodeReviewAccurateRequest(c);
 });
 
-app.post('/run-task', requireAuth, async (c) => {
+app.on(['GET', 'POST'], '/run-task', requireAuth, async (c) => {
   const { handleRunTaskRequest } = await import('./handlers/run-task');
   return handleRunTaskRequest(c);
 });
