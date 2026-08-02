@@ -311,23 +311,42 @@ app.post('/execute-task', optionalAuth, async (c) => {
 /**
  * Root endpoint - Content negotiation for HTML crawlers (GoPlausible scrapers) vs API clients
  */
+app.use('/logo.png', async (c) => {
+  const { serveStatic } = await import('@hono/node-server/serve-static');
+  return serveStatic({ path: './public/logo.png' })(c, async () => {});
+});
+
+app.use('/icon.png', async (c) => {
+  const { serveStatic } = await import('@hono/node-server/serve-static');
+  return serveStatic({ path: './public/icon.png' })(c, async () => {});
+});
+
 app.get('/', (c) => {
+  const host = c.req.header('host') || 'prism-99h2.onrender.com';
+  const proto = c.req.header('x-forwarded-proto') || 'https';
+  const logoUrl = `${proto}://${host}/logo.png`;
+  const iconUrl = `${proto}://${host}/icon.png`;
+
+  // Always return HTML if crawler/browser, or if User-Agent/Accept header doesn't explicitly block it
   const acceptHeader = c.req.header('accept') || '';
-  if (acceptHeader.includes('text/html')) {
+  const userAgent = c.req.header('user-agent') || '';
+  
+  if (acceptHeader.includes('text/html') || userAgent.toLowerCase().includes('bot') || userAgent.toLowerCase().includes('crawler') || acceptHeader.includes('*/*') || !acceptHeader) {
     return c.html(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PRISM - Intelligent x402 AI Orchestration Engine</title>
+  <title>PRISM</title>
+  <link rel="icon" type="image/png" href="${iconUrl}">
   <meta name="description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
   <meta property="og:site_name" content="PRISM">
-  <meta property="og:title" content="PRISM - Intelligent x402 AI Orchestration Engine">
+  <meta property="og:title" content="PRISM">
   <meta property="og:description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
-  <meta property="og:image" content="/logo.png">
+  <meta property="og:image" content="${logoUrl}">
   <meta property="og:type" content="website">
 </head>
 <body>
-  <h1>PRISM Resource Server</h1>
+  <h1>PRISM</h1>
   <p>Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.</p>
 </body>
 </html>`);
