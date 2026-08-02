@@ -176,31 +176,6 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.',
     },
-
-    'POST /execute-task': {
-      accepts: [{
-        scheme: 'exact',
-        price: async (req: any) => {
-          try {
-            const url = new URL(req.url, 'http://localhost');
-            const planId = url.searchParams.get('planId');
-            if (planId && mongoose.Types.ObjectId.isValid(planId)) {
-              const task = await Task.findById(planId);
-              if (task && typeof task.totalCost === 'number') {
-                return `$${task.totalCost.toFixed(2)}`;
-              }
-            }
-          } catch (err) {
-            console.error('Error computing dynamic price for /execute-task:', err);
-          }
-          return '$0.75';
-        },
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
-      }],
-      description: 'Executes planned task with dynamic batch payment in one consolidated transaction.',
-    },
   };
 }
 
