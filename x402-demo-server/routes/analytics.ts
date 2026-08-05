@@ -174,11 +174,23 @@ adminRouter.get('/tasks', async (c) => {
 });
 
 /**
- * ADMIN: Fetch Payments List
+ * ADMIN: Fetch Payments List (mainnet only — excludes any testnet records)
+ * Testnet transactions are identified by the blockchain field containing 'testnet'
+ * (case-insensitive) or an explicit network field set to 'testnet'.
  */
 adminRouter.get('/payments', async (c) => {
   try {
-    const payments = await Payments.find({}).populate('userId', 'fullName email').sort({ createdAt: -1 }).limit(100);
+    const payments = await Payments.find({
+      // Exclude testnet transactions — mainnet only
+      blockchain: { $not: /testnet/i },
+      $or: [
+        { network: { $exists: false } },
+        { network: { $not: /testnet/i } },
+      ],
+    })
+      .populate('userId', 'fullName email')
+      .sort({ createdAt: -1 })
+      .limit(200);
     return c.json(payments);
   } catch (error) {
     return c.json({ error: 'Failed to retrieve payments' }, 500);
@@ -262,5 +274,134 @@ adminRouter.get('/stats', async (c) => {
   } catch (error: any) {
     console.error('Admin Stats Error:', error);
     return c.json({ error: 'Failed to load admin stats.' }, 500);
+  }
+});
+
+/**
+ * ADMIN: Time-Series Analytics (over-time data for graphs)
+ * Query params (use one of the two modes):
+ *   Mode A — custom date range: startDate (YYYY-MM-DD) & endDate (YYYY-MM-DD)
+ *   Mode B — preset: days (integer, default 30)
+ * Returns daily series for: volume (USDC), settlements, transactions, newUsers.
+ */
+adminRouter.get('/analytics-overtime', async (c) => {
+  try {
+    const startDateParam = c.req.query('startDate');
+    const endDateParam   = c.req.query('endDate');
+    const daysParam      = parseInt(c.req.query('days') || '30', 10);
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (startDateParam && endDateParam) {
+      // Custom date range mode — user-supplied from/to dates
+      startDate = new Date(startDateParam + 'T00:00:00.000Z');
+      endDate   = new Date(endDateParam   + 'T23:59:59.999Z');
+    } else {
+      // Preset mode — N days back from today
+      const days = Math.min(Math.max(daysParam, 1), 365);
+      endDate   = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    // Clamp: endDate must not exceed today
+    const now = new Date();
+    if (endDate > now) endDate = now;
+
+    // Safety: if startDate is after endDate, swap them
+    if (startDate > endDate) [startDate, endDate] = [endDate, startDate];
+
+    // Build a day-keyed template with zeroes for every day in range
+    const template = new Map<string, {
+      date: string;
+      volume: number;
+      settlements: number;
+      transactions: number;
+      newUsers: number;
+    }>();
+
+    const cursor = new Date(startDate);
+    cursor.setHours(0, 0, 0, 0);
+    const endDay = new Date(endDate);
+    endDay.setHours(0, 0, 0, 0);
+
+    while (cursor <= endDay) {
+      const key = cursor.toISOString().split('T')[0];
+      template.set(key, { date: key, volume: 0, settlements: 0, transactions: 0, newUsers: 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Daily payment volume + settlement count (mainnet only)
+    const paymentDocs = await Payments.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+      status: 'completed',
+      blockchain: { $not: /testnet/i },
+      $or: [
+        { network: { $exists: false } },
+        { network: { $not: /testnet/i } },
+      ],
+    }).select('amount createdAt').lean();
+
+    for (const p of paymentDocs) {
+      const key = (p.createdAt as Date).toISOString().split('T')[0];
+      const entry = template.get(key);
+      if (entry) {
+        entry.volume += p.amount || 0;
+        entry.settlements += 1;
+      }
+    }
+
+    // Daily task (transaction) count
+    const taskDocs = await Task.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+      status: { $ne: 'planned' },
+    }).select('createdAt').lean();
+
+    for (const t of taskDocs) {
+      const key = (t.createdAt as Date).toISOString().split('T')[0];
+      const entry = template.get(key);
+      if (entry) {
+        entry.transactions += 1;
+      }
+    }
+
+    // Daily new user registrations (non-admin)
+    const userDocs = await User.find({
+      role: { $ne: 'admin' },
+      createdAt: { $gte: startDate, $lte: endDate },
+    }).select('createdAt').lean();
+
+    for (const u of userDocs) {
+      const key = (u.createdAt as Date).toISOString().split('T')[0];
+      const entry = template.get(key);
+      if (entry) {
+        entry.newUsers += 1;
+      }
+    }
+
+    const series = Array.from(template.values());
+
+    // Summary totals for the selected period
+    const totalVolume       = series.reduce((s, d) => s + d.volume, 0);
+    const totalSettlements  = series.reduce((s, d) => s + d.settlements, 0);
+    const totalTransactions = series.reduce((s, d) => s + d.transactions, 0);
+    const totalNewUsers     = series.reduce((s, d) => s + d.newUsers, 0);
+
+    return c.json({
+      startDate: startDate.toISOString().split('T')[0],
+      endDate:   endDate.toISOString().split('T')[0],
+      series,
+      totals: {
+        volume:       totalVolume,
+        settlements:  totalSettlements,
+        transactions: totalTransactions,
+        newUsers:     totalNewUsers,
+      },
+    });
+  } catch (error: any) {
+    console.error('Analytics Overtime Error:', error);
+    return c.json({ error: 'Failed to load analytics.' }, 500);
   }
 });

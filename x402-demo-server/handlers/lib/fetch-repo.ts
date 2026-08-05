@@ -17,15 +17,44 @@ export interface FetchRepoFilesResult {
   branch: string;
 }
 
+// ─── In-Memory Cache ──────────────────────────────────────────────────────────
+
+/** TTL for cached repo tree results: 10 minutes */
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface CacheEntry {
+  result: FetchRepoFilesResult;
+  expiresAt: number;
+}
+
+/**
+ * Keyed by canonical "<owner>/<repo>@<branch>" or "<owner>/<repo>" when branch
+ * is not yet known (resolved after the repo metadata fetch).
+ */
+const repoCache = new Map<string, CacheEntry>();
+
+/** Return a cached result if it exists and hasn't expired; else null. */
+function getCached(key: string): FetchRepoFilesResult | null {
+  const entry = repoCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    repoCache.delete(key);
+    return null;
+  }
+  console.log(`[fetch-repo] Cache HIT for "${key}" — skipping GitHub API calls`);
+  return entry.result;
+}
+
+/** Store a result in cache with the TTL. */
+function setCached(key: string, result: FetchRepoFilesResult): void {
+  repoCache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+  console.log(`[fetch-repo] Cached "${key}" (expires in ${CACHE_TTL_MS / 1000}s)`);
+}
+
+// ─── File Filtering Config ───────────────────────────────────────────────────
+
 const EXCLUDED_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'vendor',
-  '.git',
-  '.next',
-  'out',
-  'coverage',
+  'node_modules', 'dist', 'build', 'vendor', '.git', '.next', 'out', 'coverage',
 ]);
 
 const BINARY_EXTENSIONS = new Set([
@@ -45,17 +74,19 @@ const BINARY_EXTENSIONS = new Set([
 
 const HIGH_PRIORITY_EXTS = new Set([
   'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'java', 'rs', 'c', 'cpp', 'h', 'hpp',
-  'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'sql', 'sh', 'vue', 'svelte', 'sol', 'teal'
+  'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'sql', 'sh', 'vue', 'svelte', 'sol', 'teal',
 ]);
 
 const MEDIUM_PRIORITY_EXTS = new Set([
-  'css', 'scss', 'less', 'html', 'xml', 'json', 'yaml', 'yml', 'toml', 'proto', 'graphql'
+  'css', 'scss', 'less', 'html', 'xml', 'json', 'yaml', 'yml', 'toml', 'proto', 'graphql',
 ]);
 
 const PRIORITY_FOLDERS = [
   'src/', 'lib/', 'app/', 'pkg/', 'internal/', 'core/', 'components/',
-  'routes/', 'handlers/', 'services/', 'controllers/', 'models/', 'api/', 'views/'
+  'routes/', 'handlers/', 'services/', 'controllers/', 'models/', 'api/', 'views/',
 ];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
  * Compute priority score for a file path based on extension and directory depth.
@@ -75,22 +106,20 @@ export function getFilePriorityScore(filePath: string): number {
     score += 30;
   }
 
-  const isInPriorityFolder = PRIORITY_FOLDERS.some((folder) =>
-    pathLower.startsWith(folder) || pathLower.includes('/' + folder)
+  const isInPriorityFolder = PRIORITY_FOLDERS.some(
+    (folder) => pathLower.startsWith(folder) || pathLower.includes('/' + folder),
   );
 
-  if (isInPriorityFolder) {
-    score += 50;
-  }
+  if (isInPriorityFolder) score += 50;
 
   return score;
 }
 
 /**
- * Extract GitHub URL from text string if embedded within prompt.
+ * Extract GitHub URL from text string if embedded within a prompt.
  */
 export function extractGitHubUrl(text: string): string | null {
-  const match = text.match(/https?:\/\/(?:www\.)?github\.com\/[^\s"'>]+/i);
+  const match = text.match(/https?:\/\/(?:www\.)?github\.com\/[^\s"'<>]+/i);
   return match ? match[0] : null;
 }
 
@@ -98,21 +127,22 @@ export function extractGitHubUrl(text: string): string | null {
  * Parse owner, repo, and optional branch from a GitHub URL.
  */
 export function parseGitHubUrl(url: string): { owner: string; repo: string; branch?: string } {
-  const match = url.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s]+)\/([^\/\s#\?]+)(?:\/tree\/([^\/\s#\?]+))?/i);
+  const match = url.match(
+    /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s]+)\/([^\/\s#\?]+)(?:\/tree\/([^\/\s#\?]+))?/i,
+  );
   if (!match) {
     throw new Error(`Invalid GitHub repository URL: ${url}`);
   }
   const owner = match[1];
   let repo = match[2];
-  if (repo.endsWith('.git')) {
-    repo = repo.slice(0, -4);
-  }
+  if (repo.endsWith('.git')) repo = repo.slice(0, -4);
   const branch = match[3];
   return { owner, repo, branch };
 }
 
 /**
- * Fetch headers for GitHub API requests.
+ * Build HTTP headers for GitHub API requests.
+ * Uses GITHUB_TOKEN or GH_TOKEN from env if available (raises rate limit to 5000/hr).
  */
 function getGitHubHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
@@ -127,31 +157,90 @@ function getGitHubHeaders(): Record<string, string> {
 }
 
 /**
- * Fetches public GitHub repository file tree, filters out non-code/large files,
- * ranks files by likely importance, and returns reviewable file metadata.
+ * Produce a human-readable rate-limit error with remaining time if available.
+ */
+function buildRateLimitError(headers: Headers): Error {
+  const resetEpoch = headers.get('x-ratelimit-reset');
+  const remaining  = headers.get('x-ratelimit-remaining');
+  let hint = '';
+
+  if (resetEpoch) {
+    const resetAt = new Date(parseInt(resetEpoch, 10) * 1000);
+    const minutesLeft = Math.ceil((resetAt.getTime() - Date.now()) / 60_000);
+    hint = ` Rate limit resets in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`;
+  }
+  if (remaining === '0') {
+    hint += ' You have 0 requests remaining on this token.';
+  }
+
+  const tokenMsg = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+    ? 'Your authenticated GitHub token has hit its rate limit.'
+    : 'GitHub API rate limit exceeded (unauthenticated: 60 req/hr). Set a GITHUB_TOKEN in the server .env to get 5,000 req/hr.';
+
+  return new Error(
+    `GitHub rate limit exceeded — please wait a moment before reviewing the same repository again. ${tokenMsg}${hint}`,
+  );
+}
+
+// ─── Main Export ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetches a GitHub repository's file tree, filters non-code/large files,
+ * ranks by importance, and returns reviewable file metadata.
+ *
+ * Results are cached in memory for CACHE_TTL_MS (10 min) to avoid
+ * hitting GitHub rate limits when the same repo is submitted multiple times.
  */
 export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesResult> {
   const { owner, repo, branch: specifiedBranch } = parseGitHubUrl(repoUrl);
   const headers = getGitHubHeaders();
 
+  // ── Check cache before any network request ────────────────────────────────
+  const partialKey = `${owner}/${repo}`;
+
+  // Try branch-specific key first (if branch was specified in the URL)
+  if (specifiedBranch) {
+    const branchKey = `${partialKey}@${specifiedBranch}`;
+    const cached = getCached(branchKey);
+    if (cached) return cached;
+  } else {
+    // Try partial key (branch unknown yet) — this covers the most common case
+    const cached = getCached(partialKey);
+    if (cached) return cached;
+  }
+
   let branch = specifiedBranch;
 
-  // Step 1: If branch is not specified in URL, fetch default branch via GitHub API
+  // ── Step 1: Resolve default branch if not specified ───────────────────────
   if (!branch) {
     const repoInfoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+
+    if (repoInfoRes.status === 429 || repoInfoRes.status === 403) {
+      throw buildRateLimitError(repoInfoRes.headers);
+    }
     if (!repoInfoRes.ok) {
       if (repoInfoRes.status === 404) {
         throw new Error(`GitHub repository not found: ${owner}/${repo}`);
       }
       throw new Error(`Failed to fetch repository metadata for ${owner}/${repo}: ${repoInfoRes.statusText}`);
     }
+
     const repoInfo: any = await repoInfoRes.json();
     branch = repoInfo.default_branch || 'main';
+
+    // Now that we know the branch, check the full key too
+    const branchKey = `${partialKey}@${branch}`;
+    const cachedWithBranch = getCached(branchKey);
+    if (cachedWithBranch) return cachedWithBranch;
   }
 
-  // Step 2: Call GitHub recursive tree API
+  // ── Step 2: Fetch the recursive file tree ────────────────────────────────
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   const treeRes = await fetch(treeUrl, { headers });
+
+  if (treeRes.status === 429 || treeRes.status === 403) {
+    throw buildRateLimitError(treeRes.headers);
+  }
   if (!treeRes.ok) {
     throw new Error(`Failed to fetch file tree for ${owner}/${repo}@${branch}: ${treeRes.statusText}`);
   }
@@ -159,7 +248,7 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   const treeData: any = await treeRes.json();
   const treeItems: any[] = Array.isArray(treeData.tree) ? treeData.tree : [];
 
-  // Step 3: Filter files
+  // ── Step 3: Filter files ──────────────────────────────────────────────────
   const filtered: RepoFile[] = [];
 
   for (const item of treeItems) {
@@ -168,41 +257,29 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
 
     const filePath: string = item.path || '';
 
-    // Check directory exclusion
+    // Exclude known non-code directories
     const pathSegments = filePath.split('/');
-    const isExcludedDir = pathSegments.some((segment) => EXCLUDED_DIRS.has(segment.toLowerCase()));
+    const isExcludedDir = pathSegments.some((seg) => EXCLUDED_DIRS.has(seg.toLowerCase()));
     if (isExcludedDir) continue;
 
-    // Check extension exclusion
+    // Exclude binary / non-text file types
     const ext = filePath.includes('.') ? filePath.split('.').pop()!.toLowerCase() : '';
     if (BINARY_EXTENSIONS.has(ext)) continue;
 
-    // Check size limit (max 50KB = 50 * 1024 bytes)
+    // Exclude very large files (>50 KB)
     const fileSize: number = item.size ?? 0;
     if (fileSize > 50 * 1024) continue;
 
-    // Build raw content URL
     const raw_url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
-
-    filtered.push({
-      path: filePath,
-      raw_url,
-      size: fileSize,
-    });
+    filtered.push({ path: filePath, raw_url, size: fileSize });
   }
 
-  // Step 4: Prioritize files by score before capping
+  // ── Step 4: Sort by priority score ────────────────────────────────────────
   filtered.sort((a, b) => {
-    const scoreA = getFilePriorityScore(a.path);
-    const scoreB = getFilePriorityScore(b.path);
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA;
-    }
-    const depthA = a.path.split('/').length;
-    const depthB = b.path.split('/').length;
-    if (depthA !== depthB) {
-      return depthA - depthB;
-    }
+    const scoreDiff = getFilePriorityScore(b.path) - getFilePriorityScore(a.path);
+    if (scoreDiff !== 0) return scoreDiff;
+    const depthDiff = a.path.split('/').length - b.path.split('/').length;
+    if (depthDiff !== 0) return depthDiff;
     return a.path.localeCompare(b.path);
   });
 
@@ -212,13 +289,12 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   const skipped = Math.max(0, total_files_found - MAX_FILES);
   const capped = total_files_found > MAX_FILES;
 
-  return {
-    files,
-    skipped,
-    capped,
-    total_files_found,
-    owner,
-    repo,
-    branch,
-  };
+  const result: FetchRepoFilesResult = { files, skipped, capped, total_files_found, owner, repo, branch };
+
+  // ── Cache under both partial and full branch keys ─────────────────────────
+  const branchKey = `${partialKey}@${branch}`;
+  setCached(branchKey, result);
+  setCached(partialKey, result);  // Also cache under partial key for fast lookup next time
+
+  return result;
 }

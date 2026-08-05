@@ -121,9 +121,18 @@ export async function handlePlanTaskRequest(c: Context) {
         executionQuantity = repoFilesData.files.length;
       } catch (err: any) {
         console.error('Failed to fetch GitHub repo files:', err);
+
+        // Detect rate-limit error specifically and show a clear, actionable message
+        const msg: string = err.message || '';
+        const isRateLimit = msg.toLowerCase().includes('rate limit') || msg.includes('403') || msg.includes('429');
+        const userMessage = isRateLimit
+          ? `⚠️ GitHub API rate limit hit — you've submitted this repository too many times in a short period. Please wait a few minutes and try again. Tip: adding a GITHUB_TOKEN to the server increases the limit from 60 to 5,000 requests/hour.`
+          : `Failed to access the GitHub repository: ${msg}`;
+
         return c.json({
           category: 'code_review',
-          error: `Failed to fetch GitHub repository: ${err.message}`,
+          error: userMessage,
+          message: userMessage,
         }, 400);
       }
     } else {
