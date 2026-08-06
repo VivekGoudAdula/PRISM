@@ -297,9 +297,15 @@ export async function handleExecuteTaskRequest(c: Context) {
     const combinedResult = aggregateResults(category, results);
     const executionTime = Date.now() - startTime;
 
-    // ── Step 5: Output verification ──────────────────────────────────────────
+    // ── Step 5: Compute final pricing (must be declared before verification/refund block)
+    const unitPrice: number = taskRecord.unitPrice ?? 0;
+    const finalExecutionCost: number = parseFloat((unitPrice * actualQuantity).toFixed(2));
+    const finalTotalCost: number = finalExecutionCost; // No platform fee on independent calls
+
+    // ── Step 6: Output verification ──────────────────────────────────────────
     const verification = verifyOutput(category, combinedResult);
-    updateReputation(winnerEndpoint, verification.passed);
+    // await so the MongoDB reputation write completes before we continue
+    await updateReputation(winnerEndpoint, verification.passed);
     const verificationScore = verification.passed ? 1 : 0;
 
     let refund: { issued: boolean; amount: number; tx_id: string } | undefined = undefined;
@@ -307,17 +313,13 @@ export async function handleExecuteTaskRequest(c: Context) {
     if (!verification.passed) {
       const { issueRefund } = await import('./lib/refund');
       const refundRecipient = user.walletAddress || c.req.header('x-payer-address') || c.req.header('payment-sender') || '';
+      // finalTotalCost is now in scope (declared above)
       refund = await issueRefund(refundRecipient, finalTotalCost, taskRecord._id.toString(), verification.reason);
-      
+
       taskRecord.refundIssued = true;
       taskRecord.refundTxId = refund.tx_id;
       taskRecord.refundAmount = refund.amount;
     }
-
-    // ── Step 6: Compute final pricing (strictly for DB logging, no payment check)
-    const unitPrice: number = taskRecord.unitPrice ?? 0;
-    const finalExecutionCost: number = parseFloat((unitPrice * actualQuantity).toFixed(2));
-    const finalTotalCost: number = finalExecutionCost; // No platform fee on independent calls
 
     // ── Step 7: Update Task record ───────────────────────────────────────────
     taskRecord.status = 'completed';
