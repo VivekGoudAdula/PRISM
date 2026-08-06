@@ -319,8 +319,11 @@ export async function planTask(
     headers,
     body: JSON.stringify({
       task_description: taskDescription,
-      // Send file metadata only (filename) for quantity calculation — not base64 content
-      files: files.map((f) => ({ filename: f.filename })),
+      // Send full file content (including base64) for non-code-review tasks.
+      // The server stores this in plannerOutput.files during /plan-task so that
+      // per-file x402 calls can reference files by index (tiny payload) instead
+      // of re-sending the full base64 on every payment request.
+      files: files.map((f) => ({ filename: f.filename, content_base64: f.content_base64 || '' })),
       // Context flag: tells classifier whether prior task output already exists
       has_prior_task_result: hasPriorTaskResult,
     }),
@@ -386,12 +389,27 @@ export async function executeTaskWithPayment(
     headers['Authorization'] = `Bearer ${token}`
   }
 
+  /**
+   * For non-code-review tasks (resume / contract / invoice), the plan now returns
+   * `uploadedFiles: [{index, filename}]` — the file content was stored server-side
+   * during /plan-task. We use this to send a tiny {file_index, plan_id} payload per
+   * x402 call instead of re-sending the full base64 content each time.
+   *
+   * For code_review, the plan returns `files: [{path, raw_url}]` (GitHub refs).
+   */
+  const isDocumentTask = plan.category !== 'code_review'
+  const uploadedFileMeta: Array<{ index: number; filename: string }> = (plan as any).uploadedFiles || []
+  const hasStoredFiles = isDocumentTask && uploadedFileMeta.length > 0
+
   const plannedFiles = (plan as any).files || []
   const executionCount = (plan.category === 'code_review' && plannedFiles.length > 0)
     ? plannedFiles.length
     : (files.length > 0 ? files.length : 1)
 
-  console.log(`Executing ${executionCount} independent per-file x402 payment transaction(s) for category '${plan.category}'`)
+  console.log(
+    `Executing ${executionCount} independent per-file x402 payment(s) for '${plan.category}'`,
+    hasStoredFiles ? '(reference mode: file_index/plan_id)' : '(inline mode: base64 payload)'
+  )
 
   const handlerResults: any[] = []
   const transactionIds: string[] = []
@@ -410,11 +428,27 @@ export async function executeTaskWithPayment(
         onProgress(i + 1, 'payment')
       }
 
-      const payload = (plan.category === 'code_review' && plannedFile)
-        ? { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
-        : { task_description: taskDescription, files: singleFile ? [singleFile] : [] }
+      /**
+       * Payload strategy:
+       *  - code_review: {file_path, raw_url} — GitHub ref, always tiny
+       *  - document tasks with stored files: {file_index, plan_id, task_description} — tiny reference
+       *  - document tasks without stored files (fallback): {task_description, files:[singleFile]} — full base64
+       */
+      let payload: Record<string, unknown>
+      let fileLabel: string
 
-      const fileLabel = plannedFile?.path || singleFile?.filename || `file-${i + 1}`
+      if (plan.category === 'code_review' && plannedFile) {
+        payload = { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
+        fileLabel = plannedFile.path
+      } else if (hasStoredFiles) {
+        // New lightweight reference mode — file content is stored server-side
+        payload = { file_index: i, plan_id: plan.planId, task_description: taskDescription }
+        fileLabel = uploadedFileMeta[i]?.filename || `file-${i + 1}`
+      } else {
+        // Fallback: send inline (old behavior for backward compatibility)
+        payload = { task_description: taskDescription, files: singleFile ? [singleFile] : [] }
+        fileLabel = singleFile?.filename || `file-${i + 1}`
+      }
       console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount} (${fileLabel})`)
 
       if (onProgress) {

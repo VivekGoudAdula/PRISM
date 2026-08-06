@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
+import { resolveFiles } from './lib/resolve-files';
 
 /**
  * POST /resume-screen-fast
@@ -10,7 +11,9 @@ export async function handleResumeScreenFastRequest(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED - POST /resume-screen-fast handler executing');
     const body = await c.req.json().catch(() => ({}));
-    const { task_description, files = [] } = body;
+    // Supports both inline {task_description, files:[{filename,content_base64}]}
+    // and lightweight reference {file_index, plan_id} (new flow for leaderboard tracking)
+    const { files, taskDescription: task_description } = await resolveFiles(body);
 
     if (!files || files.length === 0) {
       return c.json({ error: 'No files provided. At least one resume file must be uploaded.' }, 400);

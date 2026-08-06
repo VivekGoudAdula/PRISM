@@ -262,29 +262,47 @@ export async function handleExecuteTaskRequest(c: Context) {
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
 
-    // If results are not provided in body, but planned files exist (e.g. code_review execution)
+    /**
+     * Server-side fallback execution path.
+     *
+     * Triggered when the client sent no results but the plan has stored files.
+     * Covers two patterns:
+     *  - code_review: files stored as {path, raw_url} (GitHub refs)
+     *  - resume / contract / invoice: files stored as {filename, content_base64} (uploads)
+     *
+     * In both cases we invoke the provider handler directly (no x402) so results
+     * can still be aggregated and saved — the x402 payments already happened per
+     * individual file call on the client side.
+     */
     if (results.length === 0 && Array.isArray(taskRecord.plannerOutput?.files)) {
-      const plannedFiles: any[] = taskRecord.plannerOutput.files;
-      console.log(`Executing ${plannedFiles.length} planned files for category '${category}' via ${winnerEndpoint}...`);
+      const storedFiles: any[] = taskRecord.plannerOutput.files;
+      const isCodeReview = category === 'code_review';
+      console.log(`Fallback: running ${storedFiles.length} stored files for '${category}' via ${winnerEndpoint}...`);
+
       const executedResults: any[] = [];
       const BATCH_SIZE = 5;
-      for (let i = 0; i < plannedFiles.length; i += BATCH_SIZE) {
-        const chunk = plannedFiles.slice(i, i + BATCH_SIZE);
+
+      for (let i = 0; i < storedFiles.length; i += BATCH_SIZE) {
+        const chunk = storedFiles.slice(i, i + BATCH_SIZE);
         const chunkResults = await Promise.all(
-          chunk.map((file) =>
-            invokeProviderHandler(winnerEndpoint, {
-              file_path: file.path,
-              raw_url: file.raw_url,
-            }).catch((err) => {
-              console.warn(`File review failed for ${file.path}:`, err?.message || err);
-              return {
-                file_path: file.path,
-                issues: [],
-                overall_quality_score: 0.8,
-                confidence: 0.7,
-              };
-            })
-          )
+          chunk.map((file) => {
+            // Build the correct payload for each category type
+            const handlerBody = isCodeReview
+              ? { file_path: file.path, raw_url: file.raw_url }
+              : {
+                  task_description: taskRecord.prompt,
+                  files: [{ filename: file.filename, content_base64: file.content_base64 }],
+                };
+
+            return invokeProviderHandler(winnerEndpoint, handlerBody).catch((err) => {
+              const label = isCodeReview ? file.path : file.filename;
+              console.warn(`Fallback: file processing failed for ${label}:`, err?.message || err);
+              // Safe fallback so one failure does not abort the entire batch
+              return isCodeReview
+                ? { file_path: file.path, issues: [], overall_quality_score: 0.8, confidence: 0.7 }
+                : { candidates: [], confidence: 0 };
+            });
+          })
         );
         executedResults.push(...chunkResults);
       }

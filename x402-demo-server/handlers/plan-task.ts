@@ -37,6 +37,7 @@ const PROVIDER_NAMES: Record<string, string> = {
 export async function handlePlanTaskRequest(c: Context) {
   try {
     const body = await c.req.json().catch(() => ({}));
+    // files may include content_base64 for non-code-review categories (resume, contract, invoice)
     const { task_description, files = [], has_prior_task_result = false } = body;
 
     if (!task_description || typeof task_description !== 'string') {
@@ -140,6 +141,17 @@ export async function handlePlanTaskRequest(c: Context) {
       executionQuantity = files.length > 0 ? files.length : 1;
     }
 
+    // For non-code-review categories: store uploaded file content in the plan so that
+    // per-file x402 calls can use lightweight {file_index, plan_id} references.
+    // This avoids sending large base64 payloads through the x402 middleware on every call.
+    const uploadedFiles = (category !== 'code_review' && files.length > 0)
+      ? files.map((f: any, idx: number) => ({
+          index: idx,
+          filename: f.filename || `file-${idx + 1}`,
+          content_base64: f.content_base64 || '',
+        }))
+      : [];
+
     // ── Step 4: Compute dynamic pricing ─────────────────────────────────────
     const unitPrice: number = winner.price;
     const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(2));
@@ -194,6 +206,9 @@ export async function handlePlanTaskRequest(c: Context) {
           total_files_found: repoFilesData.total_files_found,
           cap_message,
         } : {}),
+        // Store uploaded file content for resume/contract/invoice so per-file x402 calls
+        // can use lightweight references instead of re-sending large base64 payloads.
+        ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}),
       },
       providerName,
       unitPrice,
@@ -220,7 +235,12 @@ export async function handlePlanTaskRequest(c: Context) {
       ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
     });
 
-    // Return the full execution plan
+    // Return the full execution plan.
+    // NOTE: for non-code-review categories, we include a lightweight files array
+    // (index + filename only, NO base64) so the client can build the payment preview
+    // and loop per-file x402 calls using file_index references.
+    const uploadedFilesMetadata = uploadedFiles.map(({ index, filename }: { index: number; filename: string }) => ({ index, filename }));
+
     return c.json({
       planId: taskRecord._id.toString(),
       category,
@@ -241,6 +261,8 @@ export async function handlePlanTaskRequest(c: Context) {
         total_files_found: repoFilesData.total_files_found,
         cap_message,
       } : {}),
+      // Include uploaded file metadata (no base64) so the client knows which files are stored
+      ...(uploadedFilesMetadata.length > 0 ? { uploadedFiles: uploadedFilesMetadata } : {}),
     });
   } catch (err: any) {
     console.error('Error in plan-task handler:', err);

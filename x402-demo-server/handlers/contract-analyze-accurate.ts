@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
+import { resolveFiles } from './lib/resolve-files';
 
 /**
  * POST /contract-analyze-accurate
@@ -9,7 +10,7 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED - POST /contract-analyze-accurate handler executing');
     const body = await c.req.json().catch(() => ({}));
-    const { task_description, files = [] } = body;
+    const { files, taskDescription: task_description } = await resolveFiles(body);
 
     if (!files || files.length === 0) {
       return c.json({ error: 'No files provided. At least one contract file must be uploaded.' }, 400);
