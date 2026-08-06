@@ -374,7 +374,9 @@ export async function executeTaskWithPayment(
   console.log('Plan ID:', plan.planId)
   console.log('Endpoint:', plan.endpointPath)
 
-  const fetchFn = await createX402Fetch(walletSigner)
+  // NOTE: fetchFn is intentionally created fresh per-file inside the loop below.
+  // A single shared x402Client can accumulate stale wallet state after a failed
+  // handshake, causing all subsequent files to also fail (observed: file 6 -> break).
 
   const token = localStorage.getItem('prism_access_token')
   const headers: Record<string, string> = {
@@ -393,6 +395,11 @@ export async function executeTaskWithPayment(
 
   const handlerResults: any[] = []
   const transactionIds: string[] = []
+  /** Track skipped files so we can surface them in the result. */
+  const skippedFiles: Array<{ index: number; path: string; reason: string }> = []
+  /** Stop the batch only if this many consecutive files fail (likely a wallet/network issue). */
+  const MAX_CONSECUTIVE_FAILURES = 3
+  let consecutiveFailures = 0
 
   try {
     for (let i = 0; i < executionCount; i++) {
@@ -407,7 +414,8 @@ export async function executeTaskWithPayment(
         ? { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
         : { task_description: taskDescription, files: singleFile ? [singleFile] : [] }
 
-      console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount} (${plannedFile?.path || singleFile?.filename || 'file'})`)
+      const fileLabel = plannedFile?.path || singleFile?.filename || `file-${i + 1}`
+      console.log(`Executing endpoint: ${plan.endpointPath} for file ${i + 1}/${executionCount} (${fileLabel})`)
 
       if (onProgress) {
         onProgress(i + 1, 'executing')
@@ -419,7 +427,11 @@ export async function executeTaskWithPayment(
       }
 
       try {
-        const response = await fetchFn(`${baseUrl}${plan.endpointPath}`, {
+        // Create a fresh x402 fetch client per file so no stale x402Client state
+        // from a previous wallet handshake can bleed into this request.
+        const fileFetchFn = await createX402Fetch(walletSigner)
+
+        const response = await fileFetchFn(`${baseUrl}${plan.endpointPath}`, {
           method: 'POST',
           headers,
           body: JSON.stringify(payload),
@@ -437,14 +449,23 @@ export async function executeTaskWithPayment(
 
         const result = await response.json()
         handlerResults.push(result)
+        consecutiveFailures = 0 // reset on success
       } catch (fileErr: any) {
-        console.warn(`File execution ${i + 1}/${executionCount} stopped or failed:`, fileErr?.message || fileErr)
-        if (handlerResults.length > 0) {
-          console.log(`Saving ${handlerResults.length} completed file review(s)...`)
+        consecutiveFailures++
+        const reason = fileErr?.message || String(fileErr)
+        console.warn(
+          `File ${i + 1}/${executionCount} skipped (consecutive failures: ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`,
+          reason,
+        )
+        skippedFiles.push({ index: i + 1, path: fileLabel, reason })
+
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          // Likely a wallet disconnect or hard network error — abort the batch.
+          console.error(`Aborting batch: ${MAX_CONSECUTIVE_FAILURES} consecutive file failures.`)
           break
-        } else {
-          throw fileErr
         }
+        // Otherwise skip this file and continue with the next one.
+        continue
       }
     }
 
@@ -460,6 +481,7 @@ export async function executeTaskWithPayment(
       body: JSON.stringify({
         results: handlerResults,
         transactionIds,
+        skipped_files: skippedFiles,
       }),
     })
 
