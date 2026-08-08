@@ -6,6 +6,7 @@ import { Payments } from '../models/Payments';
 import { EndpointUsage } from '../models/EndpointUsage';
 import { AuditLog } from '../models/AuditLog';
 import { UserSession } from '../models/UserSession';
+import { TokenUsage } from '../models/TokenUsage';
 import mongoose from 'mongoose';
 
 export const analyticsRouter = new Hono();
@@ -19,7 +20,7 @@ analyticsRouter.use('*', requireAuth);
  */
 analyticsRouter.get('/dashboard', async (c) => {
   try {
-    const userPayload = c.get('user');
+    const userPayload = (c as any).get('user');
     const userId = new mongoose.Types.ObjectId(userPayload.userId);
 
     // Basic User info & Totals
@@ -117,7 +118,7 @@ analyticsRouter.get('/dashboard', async (c) => {
  */
 analyticsRouter.get('/tasks', async (c) => {
   try {
-    const userPayload = c.get('user');
+    const userPayload = (c as any).get('user');
     const tasks = await Task.find({ 
       userId: userPayload.userId,
       status: { $ne: 'planned' }
@@ -126,6 +127,139 @@ analyticsRouter.get('/tasks', async (c) => {
   } catch (error) {
     console.error('Get user tasks error:', error);
     return c.json({ error: 'Failed to fetch tasks history' }, 500);
+  }
+});
+
+/**
+ * USER TOKEN USAGE SUMMARY (Time-based aggregation)
+ * GET /api/analytics/token-usage/summary?period=today|7d|30d|all
+ */
+analyticsRouter.get('/token-usage/summary', async (c) => {
+  try {
+    const userPayload = (c as any).get('user');
+    const userId = new mongoose.Types.ObjectId(userPayload.userId);
+    const period = c.req.query('period') || '30d';
+
+    let dateFilter: any = {};
+    const now = new Date();
+
+    if (period === 'today') {
+      const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+      dateFilter = { $gte: startOfDay };
+    } else if (period === '7d') {
+      const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7));
+      dateFilter = { $gte: sevenDaysAgo };
+    } else if (period === '30d') {
+      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
+      dateFilter = { $gte: thirtyDaysAgo };
+    }
+
+    const matchQuery: any = { userId };
+    if (dateFilter.$gte) {
+      matchQuery.createdAt = dateFilter;
+    }
+
+    const aggregation = await TokenUsage.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalExecutions: { $sum: 1 },
+          totalOriginalInputTokens: { $sum: '$originalInputTokens' },
+          totalOptimizedInputTokens: { $sum: '$optimizedInputTokens' },
+          totalOutputTokens: { $sum: '$outputTokens' },
+          totalTokensProcessed: { $sum: '$totalTokens' },
+          totalTokensSaved: { $sum: '$tokensSaved' },
+          totalEstimatedOriginalCost: { $sum: '$estimatedOriginalCost' },
+          totalOptimizedCost: { $sum: '$optimizedCost' },
+          totalCostSaved: { $sum: '$costSaved' },
+          avgCompressionRatio: { $avg: '$compressionRatio' },
+          cacheHits: { $sum: { $cond: ['$cacheHit', 1, 0] } },
+        },
+      },
+    ]);
+
+    const stats = aggregation[0] || {
+      totalExecutions: 0,
+      totalOriginalInputTokens: 0,
+      totalOptimizedInputTokens: 0,
+      totalOutputTokens: 0,
+      totalTokensProcessed: 0,
+      totalTokensSaved: 0,
+      totalEstimatedOriginalCost: 0,
+      totalOptimizedCost: 0,
+      totalCostSaved: 0,
+      avgCompressionRatio: 0,
+      cacheHits: 0,
+    };
+
+    const cacheHitRate = stats.totalExecutions > 0 
+      ? parseFloat(((stats.cacheHits / stats.totalExecutions) * 100).toFixed(1))
+      : 0;
+
+    return c.json({
+      period,
+      ...stats,
+      totalEstimatedOriginalCost: parseFloat((stats.totalEstimatedOriginalCost || 0).toFixed(4)),
+      totalOptimizedCost: parseFloat((stats.totalOptimizedCost || 0).toFixed(4)),
+      totalCostSaved: parseFloat((stats.totalCostSaved || 0).toFixed(4)),
+      avgCompressionRatio: parseFloat((stats.avgCompressionRatio || 0).toFixed(1)),
+      cacheHitRate,
+    });
+  } catch (error: any) {
+    console.error('Token Usage Summary Error:', error);
+    return c.json({ error: 'Failed to fetch token usage summary' }, 500);
+  }
+});
+
+/**
+ * USER TOKEN USAGE HISTORY
+ * GET /api/analytics/token-usage/history
+ */
+analyticsRouter.get('/token-usage/history', async (c) => {
+  try {
+    const userPayload = (c as any).get('user');
+    const userId = new mongoose.Types.ObjectId(userPayload.userId);
+
+    const history = await TokenUsage.find({ userId })
+      .populate('taskId', 'prompt category status executionTime')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    return c.json(history);
+  } catch (error) {
+    console.error('Token Usage History Error:', error);
+    return c.json({ error: 'Failed to fetch token history' }, 500);
+  }
+});
+
+/**
+ * SINGLE TASK TOKEN USAGE
+ * GET /api/analytics/token-usage/task/:taskId
+ */
+analyticsRouter.get('/token-usage/task/:taskId', async (c) => {
+  try {
+    const userPayload = (c as any).get('user');
+    const userId = new mongoose.Types.ObjectId(userPayload.userId);
+    const taskId = c.req.param('taskId');
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return c.json({ error: 'Invalid taskId' }, 400);
+    }
+
+    const usage = await TokenUsage.findOne({
+      taskId: new mongoose.Types.ObjectId(taskId),
+      userId,
+    }).populate('taskId', 'prompt category status');
+
+    if (!usage) {
+      return c.json({ error: 'Token usage metrics not found for task' }, 404);
+    }
+
+    return c.json(usage);
+  } catch (error) {
+    console.error('Task Token Usage Error:', error);
+    return c.json({ error: 'Failed to fetch task token usage' }, 500);
   }
 });
 
@@ -225,16 +359,16 @@ adminRouter.get('/stats', async (c) => {
 
     // DAU (Daily Active Users in user sessions)
     const activeToday = await UserSession.distinct('userId', {
-      userId: { $in: nonAdminUserIds },
+      userId: { $in: nonAdminUserIds as any },
       lastActivity: { $gte: today }
-    });
+    } as any);
     const dau = activeToday.length;
 
     // MAU (Monthly Active Users)
     const activeMonth = await UserSession.distinct('userId', {
-      userId: { $in: nonAdminUserIds },
+      userId: { $in: nonAdminUserIds as any },
       lastActivity: { $gte: thirtyDaysAgo }
-    });
+    } as any);
     const mau = activeMonth.length;
 
     // Revenue (Sum of all completed payments)
@@ -405,3 +539,114 @@ adminRouter.get('/analytics-overtime', async (c) => {
     return c.json({ error: 'Failed to load analytics.' }, 500);
   }
 });
+
+/**
+ * ADMIN: Global Token Usage Analytics
+ * GET /api/admin/analytics/token-usage
+ */
+adminRouter.get('/analytics/token-usage', async (c) => {
+  try {
+    const globalAggregation = await TokenUsage.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalExecutions: { $sum: 1 },
+          totalOriginalInputTokens: { $sum: '$originalInputTokens' },
+          totalOptimizedInputTokens: { $sum: '$optimizedInputTokens' },
+          totalOutputTokens: { $sum: '$outputTokens' },
+          totalTokensProcessed: { $sum: '$totalTokens' },
+          totalTokensSaved: { $sum: '$tokensSaved' },
+          totalEstimatedOriginalCost: { $sum: '$estimatedOriginalCost' },
+          totalOptimizedCost: { $sum: '$optimizedCost' },
+          totalCostSaved: { $sum: '$costSaved' },
+          avgCompressionRatio: { $avg: '$compressionRatio' },
+          cacheHits: { $sum: { $cond: ['$cacheHit', 1, 0] } },
+        },
+      },
+    ]);
+
+    const stats = globalAggregation[0] || {
+      totalExecutions: 0,
+      totalOriginalInputTokens: 0,
+      totalOptimizedInputTokens: 0,
+      totalOutputTokens: 0,
+      totalTokensProcessed: 0,
+      totalTokensSaved: 0,
+      totalEstimatedOriginalCost: 0,
+      totalOptimizedCost: 0,
+      totalCostSaved: 0,
+      avgCompressionRatio: 0,
+      cacheHits: 0,
+    };
+
+    // Top endpoints by token consumption
+    const topEndpoints = await TokenUsage.aggregate([
+      {
+        $group: {
+          _id: '$endpointId',
+          totalTokens: { $sum: '$totalTokens' },
+          tokensSaved: { $sum: '$tokensSaved' },
+          costSaved: { $sum: '$costSaved' },
+          executions: { $sum: 1 },
+        },
+      },
+      { $sort: { totalTokens: -1 } },
+      { $limit: 10 },
+    ]);
+
+    // Top optimized users
+    const topUsers = await TokenUsage.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+          totalTokensSaved: { $sum: '$tokensSaved' },
+          totalCostSaved: { $sum: '$costSaved' },
+          totalExecutions: { $sum: 1 },
+        },
+      },
+      { $sort: { totalTokensSaved: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          _id: 1,
+          fullName: '$user.fullName',
+          email: '$user.email',
+          totalTokensSaved: 1,
+          totalCostSaved: 1,
+          totalExecutions: 1,
+        },
+      },
+    ]);
+
+    return c.json({
+      totals: {
+        totalExecutions: stats.totalExecutions,
+        totalInputTokens: stats.totalOriginalInputTokens,
+        totalOptimizedInputTokens: stats.totalOptimizedInputTokens,
+        totalOutputTokens: stats.totalOutputTokens,
+        totalTokensProcessed: stats.totalTokensProcessed,
+        totalTokensSaved: stats.totalTokensSaved,
+        estimatedOriginalCost: parseFloat((stats.totalEstimatedOriginalCost || 0).toFixed(4)),
+        optimizedCost: parseFloat((stats.totalOptimizedCost || 0).toFixed(4)),
+        totalCostSaved: parseFloat((stats.totalCostSaved || 0).toFixed(4)),
+        avgCompressionRatio: parseFloat((stats.avgCompressionRatio || 0).toFixed(1)),
+        cacheHits: stats.cacheHits,
+      },
+      topEndpoints,
+      topUsers,
+    });
+  } catch (error: any) {
+    console.error('Admin Token Analytics Error:', error);
+    return c.json({ error: 'Failed to load admin token analytics' }, 500);
+  }
+});
+

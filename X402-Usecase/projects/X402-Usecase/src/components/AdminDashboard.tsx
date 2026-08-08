@@ -549,6 +549,7 @@ const AdminDashboard: React.FC = () => {
   const [tasks, setTasks] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [endpoints, setEndpoints] = useState<any[]>([]);
+  const [tokenStats, setTokenStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -564,18 +565,22 @@ const AdminDashboard: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const [statsRes, usersRes, tasksRes, paymentsRes, endpointsRes] = await Promise.all([
+      const [statsRes, usersRes, tasksRes, paymentsRes, endpointsRes, tokenRes] = await Promise.all([
         api.get('/api/admin/stats'),
         api.get('/api/admin/users'),
         api.get('/api/admin/tasks'),
         api.get('/api/admin/payments'),
         api.get('/api/admin/endpoints'),
+        api.get('/api/admin/analytics/token-usage').catch(() => ({ data: null })),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
       setTasks(tasksRes.data);
       setPayments(paymentsRes.data);
       setEndpoints(endpointsRes.data);
+      if (tokenRes?.data) {
+        setTokenStats(tokenRes.data);
+      }
     } catch (err: any) {
       console.error('Failed to load admin dashboard data:', err);
       setError(err.response?.data?.error || 'Failed to load admin stats. Please check permissions.');

@@ -3,7 +3,7 @@ import path from 'path';
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const keys = [];
+const keys: string[] = [];
 if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
 for (let i = 1; i <= 10; i++) {
   const k = process.env[`GROQ_API_KEY_${i}`];

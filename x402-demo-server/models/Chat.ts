@@ -19,7 +19,7 @@ export interface IMessage {
 const ConversationSchema = new Schema<IConversation>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   title: { type: String, required: true },
-  thread: { type: [Schema.Types.Mixed], default: [] },
+  thread: { type: Schema.Types.Mixed, default: [] },
 }, {
   timestamps: true
 });

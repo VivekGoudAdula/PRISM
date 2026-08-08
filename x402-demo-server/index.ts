@@ -45,6 +45,7 @@ import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import waitlistRouter from './routes/waitlist';
 import { analyticsRouter, adminRouter } from './routes/analytics';
+import promptTutorRouter from './routes/promptTutor';
 
 // Load environment variables
 config();
@@ -197,6 +198,7 @@ app.route('/api/chat', chatRouter);
 app.route('/api/waitlist', waitlistRouter);
 app.route('/api/analytics', analyticsRouter);
 app.route('/api/admin', adminRouter);
+app.route('/api/prompt-tutor', promptTutorRouter);
 
 /**
  * X402 Payment Middleware
@@ -267,7 +269,7 @@ app.on(['GET', 'POST'], '/run-task', requireAuth, async (c) => {
   return handleRunTaskRequest(c);
 });
 
-app.get('/savings-summary', async (c) => {
+app.get('/savings-summary', optionalAuth, async (c) => {
   const { handleSavingsSummaryRequest } = await import('./handlers/savings-summary');
   return handleSavingsSummaryRequest(c);
 });

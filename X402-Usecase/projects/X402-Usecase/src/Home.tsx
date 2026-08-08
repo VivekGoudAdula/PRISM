@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign } from 'react-icons/fi'
 import ConnectWallet from './components/ConnectWallet'
-import Weather from './components/Weather'
+import PrismConsole from './components/PrismConsole'
 import Prism from './components/Prism'
 import AdminDashboard from './components/AdminDashboard'
 // import WaitlistModal from './components/WaitlistModal'
@@ -1040,7 +1040,7 @@ const Home: React.FC<HomeProps> = () => {
             {userRole === 'admin' ? (
               <AdminDashboard />
             ) : (
-              <Weather
+              <PrismConsole
                 activeTab="terminal"
                 setActiveTab={() => { }}
                 selectedHistoryTask={selectedTask}
@@ -1296,7 +1296,7 @@ const Home: React.FC<HomeProps> = () => {
                 <span className="font-mono text-white font-semibold">{savingsSummary.total_raw_tokens ?? 0}</span>
               </div>
               <div className="flex justify-between border-b border-slate-800/60 pb-1">
-                <span className="text-slate-400">Total Structured Map Tokens:</span>
+                <span className="text-slate-400">Measured Input Context:</span>
                 <span className="font-mono text-white font-semibold">{savingsSummary.total_map_tokens ?? 0}</span>
               </div>
               <div className="flex justify-between pt-0.5">

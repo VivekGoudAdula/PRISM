@@ -15,6 +15,7 @@ import { Payments } from '../models/Payments';
 import { EndpointUsage } from '../models/EndpointUsage';
 import { AuditLog } from '../models/AuditLog';
 import { User } from '../models/User';
+import { recordExecutionMetrics, estimateTokens } from '../services/tokenAnalytics';
 import mongoose from 'mongoose';
 
 /** Fixed platform fee added on top of execution cost, in USDC */
@@ -353,7 +354,7 @@ export async function handleExecuteTaskRequest(c: Context) {
     taskRecord.groupTransactionId = transactionIds[0] || `grouped-${new mongoose.Types.ObjectId()}`;
 
     // Create progress log
-    const progressLog: ProgressEntry[] = results.map((r, i) => ({
+    const progressLog: ProgressEntry[] = results.map((r: any, i: number) => ({
       step: i + 1,
       filename: r.candidates?.[0]?.name || `Execution #${i + 1}`,
       status: 'completed',
@@ -392,10 +393,56 @@ export async function handleExecuteTaskRequest(c: Context) {
       taskId: taskRecord._id,
     });
 
-    // ── Step 10: Update user aggregate stats ─────────────────────────────────
+    // ── Step 10: Record Central Token Analytics ──────────────────────────────
+    let origInputTokens = taskRecord.plannerOutput?.originalInputTokens;
+    if (!origInputTokens || origInputTokens <= 0) {
+      origInputTokens = estimateTokens(taskRecord.prompt) + (actualQuantity * 250);
+    }
+    
+    // Check if provider usage metrics exist in results
+    let sumPromptTokens = 0;
+    let sumCompletionTokens = 0;
+    let hasProviderUsage = false;
+
+    for (const res of results) {
+      if (res?.usage?.prompt_tokens !== undefined || res?.usage?.completion_tokens !== undefined) {
+        hasProviderUsage = true;
+        sumPromptTokens += res.usage?.prompt_tokens || 0;
+        sumCompletionTokens += res.usage?.completion_tokens || 0;
+      }
+    }
+
+    const optInputTokens = hasProviderUsage && sumPromptTokens > 0 
+      ? sumPromptTokens 
+      : origInputTokens;
+      
+    const outputTokens = hasProviderUsage && sumCompletionTokens > 0 
+      ? sumCompletionTokens 
+      : estimateTokens(JSON.stringify(combinedResult));
+
+    const modelName = winnerEndpoint.includes('accurate') ? 'llama-3.3-70b-versatile' : 'llama3-8b-8192';
+    const measurementSource = hasProviderUsage ? 'provider_usage' : 'estimated';
+
+    const tokenAnalytics = await recordExecutionMetrics({
+      userId: user._id,
+      taskId: taskRecord._id,
+      executionId: transactionIds[0] || `exec-${taskRecord._id}-${Date.now()}`,
+      endpointId: winnerEndpoint,
+      endpointPath: winnerEndpoint,
+      providerName: taskRecord.providerName || (winnerEndpoint.includes('accurate') ? 'Groq-70B' : 'Groq-Llama3'),
+      originalInputTokens: origInputTokens,
+      optimizedInputTokens: optInputTokens,
+      outputTokens,
+      modelName,
+      cacheHit: false,
+      cacheTokensSaved: 0,
+      measurementSource,
+    });
+
+    // ── Step 11: Update user aggregate stats ─────────────────────────────────
     user.totalTasks = (user.totalTasks ?? 0) + 1;
     user.totalSpent = (user.totalSpent ?? 0) + finalTotalCost;
-    user.totalSaved = (user.totalSaved ?? 0) + Math.max(0, (actualQuantity * 1.50) - finalTotalCost);
+    user.totalSaved = (user.totalSaved ?? 0) + tokenAnalytics.costSaved;
     const userEndpoints = await EndpointUsage.distinct('endpointName', { userId: user._id });
     user.totalEndpointsUsed = userEndpoints.length;
     await user.save();
@@ -415,6 +462,7 @@ export async function handleExecuteTaskRequest(c: Context) {
         paymentMode: 'grouped',
         verificationPassed: verification.passed,
         verificationReason: verification.reason,
+        tokenAnalytics,
       },
       ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
     });
@@ -437,6 +485,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       paymentMode: 'grouped',
       executionProgressLog: progressLog,
       result: combinedResult,
+      tokenAnalytics,
     });
   } catch (error: any) {
     console.error('Error in execute-task handler:', error);

@@ -1,57 +1,84 @@
 import type { Context } from 'hono';
-import { SavingsLog } from '../models/AnalyticsData';
+import mongoose from 'mongoose';
+import { TokenUsage } from '../models/TokenUsage';
+import { User } from '../models/User';
 
 /**
  * GET /savings-summary
- * Returns cumulative token and cost savings computed from MongoDB SavingsLog collection
+ * Returns cumulative token and cost savings for the authenticated individual user.
  */
 export async function handleSavingsSummaryRequest(c: Context) {
   try {
-    const logs = await SavingsLog.find({});
+    const userPayload = (c as any).get('user');
 
-    if (!logs || logs.length === 0) {
+    // If no user payload (unauthenticated guest), return 0 savings
+    if (!userPayload || !userPayload.userId) {
       return c.json({
         total_raw_tokens: 0,
         total_map_tokens: 0,
         total_tokens_saved: 0,
         average_reduction_percent: 0,
         estimated_usd_saved: 0,
-        total_documents_processed: 0
+        savings_multiplier: 1.0,
+        total_requests_processed: 0,
+        cache_hit_rate_percent: 0,
+        total_documents_processed: 0,
       });
     }
 
-    let total_raw_tokens = 0;
-    let total_map_tokens = 0;
-    let total_tokens_saved = 0;
+    const userId = new mongoose.Types.ObjectId(userPayload.userId);
 
-    for (const entry of logs) {
-      total_raw_tokens += entry.rawTokens || 0;
-      total_map_tokens += entry.mapTokens || 0;
-      total_tokens_saved += entry.tokensSaved || 0;
-    }
+    // 1. Query TokenUsage collection for this specific user
+    const aggregation = await TokenUsage.aggregate([
+      { $match: { userId } },
+      {
+        $group: {
+          _id: null,
+          totalExecutions: { $sum: 1 },
+          totalOriginalInputTokens: { $sum: '$originalInputTokens' },
+          totalOptimizedInputTokens: { $sum: '$optimizedInputTokens' },
+          totalTokensSaved: { $sum: '$tokensSaved' },
+          totalCostSaved: { $sum: '$costSaved' },
+          cacheHits: { $sum: { $cond: ['$cacheHit', 1, 0] } },
+        },
+      },
+    ]);
 
-    const average_reduction_percent = total_raw_tokens > 0 
-      ? parseFloat(((total_tokens_saved / total_raw_tokens) * 100).toFixed(2)) 
+    const stats = aggregation[0];
+
+    // 2. Fetch User model for totalSaved fallback/validation
+    const dbUser = await User.findById(userId).select('totalSaved totalTasks');
+
+    let total_raw_tokens = stats?.totalOriginalInputTokens || 0;
+    let total_map_tokens = stats?.totalOptimizedInputTokens || 0;
+    let total_tokens_saved = stats?.totalTokensSaved || 0;
+    let estimated_usd_saved = stats?.totalCostSaved || dbUser?.totalSaved || 0;
+    let total_requests_processed = stats?.totalExecutions || dbUser?.totalTasks || 0;
+
+    // Calculate reduction percent
+    const average_reduction_percent = total_raw_tokens > 0
+      ? parseFloat(((total_tokens_saved / total_raw_tokens) * 100).toFixed(1))
       : 0;
 
-    // Estimate USD savings at ~$0.0015 per 1k tokens saved (approximate LLM cost)
-    const estimated_usd_saved = parseFloat(((total_tokens_saved / 1000) * 0.0015).toFixed(4));
-    
-    // Average efficiency multiplier relative to unoptimized raw calls
-    const raw_cost_est = (total_raw_tokens / 1000) * 0.005;
-    const map_cost_est = (total_map_tokens / 1000) * 0.0015;
-    const savings_multiplier = map_cost_est > 0 ? parseFloat((raw_cost_est / map_cost_est).toFixed(1)) : 2.5;
+    // Calculate multiplier
+    const savings_multiplier = total_map_tokens > 0 && total_raw_tokens > 0
+      ? parseFloat((total_raw_tokens / total_map_tokens).toFixed(1))
+      : 1.0;
+
+    const cache_hit_rate_percent = total_requests_processed > 0 && stats?.cacheHits
+      ? parseFloat(((stats.cacheHits / total_requests_processed) * 100).toFixed(1))
+      : 0;
 
     return c.json({
       total_raw_tokens,
       total_map_tokens,
       total_tokens_saved,
       average_reduction_percent,
-      estimated_usd_saved,
+      estimated_usd_saved: parseFloat(estimated_usd_saved.toFixed(2)),
       savings_multiplier,
-      total_requests_processed: logs.length,
-      cache_hit_rate_percent: parseFloat((average_reduction_percent * 0.85).toFixed(1)),
-      total_documents_processed: logs.length
+      total_requests_processed,
+      cache_hit_rate_percent,
+      total_documents_processed: total_requests_processed,
     });
   } catch (error: any) {
     console.error('Error in savings-summary handler:', error);

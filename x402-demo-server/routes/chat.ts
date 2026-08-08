@@ -13,7 +13,7 @@ chatRouter.use('*', requireAuth);
  */
 chatRouter.get('/conversations', async (c) => {
   try {
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const conversations = await Conversation.find({ userId: user.userId }).sort({ updatedAt: -1 });
     return c.json(conversations);
   } catch (error: any) {
@@ -28,7 +28,7 @@ chatRouter.get('/conversations', async (c) => {
  */
 chatRouter.post('/conversations', async (c) => {
   try {
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const { title, thread = [] } = await c.req.json().catch(() => ({}));
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -54,7 +54,7 @@ chatRouter.post('/conversations', async (c) => {
  */
 chatRouter.put('/conversations/:id/thread', async (c) => {
   try {
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const { id } = c.req.param();
     const { thread } = await c.req.json().catch(() => ({}));
 
@@ -84,7 +84,7 @@ chatRouter.put('/conversations/:id/thread', async (c) => {
  */
 chatRouter.get('/conversations/:id/thread', async (c) => {
   try {
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const { id } = c.req.param();
 
     const conversation = await Conversation.findOne({ _id: id, userId: user.userId });
@@ -109,7 +109,7 @@ chatRouter.get('/messages', async (c) => {
       return c.json({ error: 'conversationId is required.' }, 400);
     }
 
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const conversation = await Conversation.findOne({
       _id: conversationId,
       userId: user.userId
@@ -142,7 +142,7 @@ chatRouter.post('/messages', async (c) => {
       return c.json({ error: 'Invalid role. Must be user or assistant.' }, 400);
     }
 
-    const user = c.get('user');
+    const user = (c as any).get('user');
     const conversation = await Conversation.findOne({
       _id: conversationId,
       userId: user.userId

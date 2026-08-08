@@ -38,7 +38,7 @@ function generateTokens(user: { _id: any; email: string; role: string }) {
  */
 authRouter.post('/signup', validateAuthBody('signup'), async (c) => {
   try {
-    const body = c.get('parsedBody');
+    const body = (c as any).get('parsedBody');
     const { fullName, email, password } = body;
 
     const existingUser = await User.findOne({ email });
@@ -103,7 +103,7 @@ authRouter.post('/signup', validateAuthBody('signup'), async (c) => {
  */
 authRouter.post('/login', validateAuthBody('login'), async (c) => {
   try {
-    const body = c.get('parsedBody');
+    const body = (c as any).get('parsedBody');
     const { email, password } = body;
 
     const user = await User.findOne({ email });
@@ -230,7 +230,7 @@ authRouter.post('/logout', async (c) => {
  * GET ME (check session status)
  */
 authRouter.get('/me', requireAuth, async (c) => {
-  const tokenUser = c.get('user');
+  const tokenUser = (c as any).get('user');
   const user = await User.findById(tokenUser.userId).select('-passwordHash');
   if (!user) {
     return c.json({ error: 'User not found.' }, 404);
@@ -243,7 +243,7 @@ authRouter.get('/me', requireAuth, async (c) => {
  */
 authRouter.post('/connect-wallet', requireAuth, async (c) => {
   try {
-    const tokenUser = c.get('user');
+    const tokenUser = (c as any).get('user');
     const { walletAddress } = await c.req.json().catch(() => ({}));
 
     if (!walletAddress) {

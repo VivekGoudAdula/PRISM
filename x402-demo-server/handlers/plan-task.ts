@@ -6,6 +6,7 @@ import { fetchRepoFiles, extractGitHubUrl } from './lib/fetch-repo';
 import { Task } from '../models/Task';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
+import { estimateTokens } from '../services/tokenAnalytics';
 
 config();
 
@@ -141,23 +142,59 @@ export async function handlePlanTaskRequest(c: Context) {
       executionQuantity = files.length > 0 ? files.length : 1;
     }
 
-    // For non-code-review categories: store uploaded file content in the plan so that
-    // per-file x402 calls can use lightweight {file_index, plan_id} references.
-    // This avoids sending large base64 payloads through the x402 middleware on every call.
-    const uploadedFiles = (category !== 'code_review' && files.length > 0)
-      ? files.map((f: any, idx: number) => ({
+    // For non-code-review categories: extract actual document text and store uploaded file content
+    // so per-file x402 calls can use lightweight {file_index, plan_id} references.
+    const uploadedFiles: Array<{ index: number; filename: string; content_base64: string; extracted_text: string }> = [];
+    if (category !== 'code_review' && files.length > 0) {
+      const { extractText } = await import('./lib/extract-document');
+      for (let idx = 0; idx < files.length; idx++) {
+        const f = files[idx];
+        const filename = f.filename || `file-${idx + 1}`;
+        const content_base64 = f.content_base64 || '';
+        let extracted_text = f.text || '';
+        if (!extracted_text && content_base64) {
+          try {
+            const extResult = await extractText(filename, content_base64);
+            extracted_text = extResult.text || '';
+          } catch (extErr) {
+            console.warn(`Text extraction fallback during plan-task for ${filename}:`, extErr);
+            extracted_text = '';
+          }
+        }
+        uploadedFiles.push({
           index: idx,
-          filename: f.filename || `file-${idx + 1}`,
-          content_base64: f.content_base64 || '',
-        }))
-      : [];
+          filename,
+          content_base64,
+          extracted_text,
+        });
+      }
+    }
 
-    // ── Step 4: Compute dynamic pricing ─────────────────────────────────────
+    // ── Step 4: Compute original input tokens (before Prism optimization) ───
+    let originalInputTokens = estimateTokens(task_description);
+    if (category === 'code_review' && repoFilesData?.files) {
+      for (const f of repoFilesData.files) {
+        originalInputTokens += estimateTokens(f.path) + estimateTokens(f.content || '');
+      }
+    } else if (uploadedFiles.length > 0) {
+      for (const f of uploadedFiles) {
+        // Count filename + actual extracted document text (NOT Base64 transport encoding)
+        originalInputTokens += estimateTokens(f.filename) + estimateTokens(f.extracted_text);
+      }
+    } else if (files && files.length > 0) {
+      for (const f of files) {
+        originalInputTokens += estimateTokens(f.filename || '') + estimateTokens(f.text || '');
+      }
+    }
+    // Add baseline system instruction prompt overhead (~250 tokens per execution unit)
+    originalInputTokens += (executionQuantity * 250);
+
+    // ── Step 5: Compute dynamic pricing ─────────────────────────────────────
     const unitPrice: number = winner.price;
     const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(2));
     const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(2));
 
-    // ── Step 5: Derive metadata ──────────────────────────────────────────────
+    // ── Step 6: Derive metadata ──────────────────────────────────────────────
     // Latency per unit: accurate models ~2200 ms, fast models ~800 ms
     const latencyPerUnit = winner.endpoint_path.includes('accurate') ? 2200 : 800;
     const estimatedTimeSeconds = Math.ceil((executionQuantity * latencyPerUnit) / 1000);
@@ -168,7 +205,7 @@ export async function handlePlanTaskRequest(c: Context) {
       ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
       : undefined;
 
-    // ── Step 6: Resolve the user (with guest fallback) ───────────────────────
+    // ── Step 7: Resolve the user (with guest fallback) ───────────────────────
     let userId: any = null;
     const tokenUser = c.get('user' as any);
     if (tokenUser?.userId) {
@@ -188,7 +225,7 @@ export async function handlePlanTaskRequest(c: Context) {
       userId = guestUser._id;
     }
 
-    // ── Step 7: Persist the plan as a 'planned' Task document ────────────────
+    // ── Step 8: Persist the plan as a 'planned' Task document ────────────────
     const taskRecord = await Task.create({
       userId,
       prompt: task_description,
@@ -199,6 +236,7 @@ export async function handlePlanTaskRequest(c: Context) {
       endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
       plannerOutput: {
         ...classifyResult,
+        originalInputTokens,
         ...(repoFilesData ? {
           files: repoFilesData.files,
           skipped: repoFilesData.skipped,
@@ -251,6 +289,7 @@ export async function handlePlanTaskRequest(c: Context) {
       executionCost,
       platformFee: PLATFORM_FEE,
       totalCost,
+      originalInputTokens,
       estimatedTimeSeconds,
       estimatedAccuracy,
       candidates: allCandidates,
