@@ -393,7 +393,26 @@ export async function handleExecuteTaskRequest(c: Context) {
       taskId: taskRecord._id,
     });
 
-    // ── Step 10: Record Central Token Analytics ──────────────────────────────
+    // ── Step 10: Check Semantic Cache & Record Central Token Analytics ──────
+    const { findSimilarContext, saveContext } = await import('../services/semanticCache');
+    const cacheCheck = await findSimilarContext({
+      userId: user._id,
+      taskType: category,
+      prompt: taskRecord.prompt,
+      files: taskRecord.plannerOutput?.files || [],
+    });
+
+    if (!cacheCheck.hit) {
+      // Asynchronously store semantic context representation on MISS
+      saveContext({
+        userId: user._id,
+        taskType: category,
+        prompt: taskRecord.prompt,
+        files: taskRecord.plannerOutput?.files || [],
+        semanticContext: combinedResult,
+      }).catch(() => {});
+    }
+
     let origInputTokens = taskRecord.plannerOutput?.originalInputTokens;
     if (!origInputTokens || origInputTokens <= 0) {
       origInputTokens = estimateTokens(taskRecord.prompt) + (actualQuantity * 250);
@@ -414,7 +433,7 @@ export async function handleExecuteTaskRequest(c: Context) {
 
     const optInputTokens = hasProviderUsage && sumPromptTokens > 0 
       ? sumPromptTokens 
-      : origInputTokens;
+      : (cacheCheck.hit ? cacheCheck.cachedContextTokens : origInputTokens);
       
     const outputTokens = hasProviderUsage && sumCompletionTokens > 0 
       ? sumCompletionTokens 
@@ -434,8 +453,12 @@ export async function handleExecuteTaskRequest(c: Context) {
       optimizedInputTokens: optInputTokens,
       outputTokens,
       modelName,
-      cacheHit: false,
-      cacheTokensSaved: 0,
+      cacheHit: cacheCheck.hit,
+      cacheStatus: cacheCheck.hit ? 'hit' : 'miss',
+      cachedContextTokens: cacheCheck.cachedContextTokens,
+      cacheTokensSaved: cacheCheck.hit ? Math.max(0, origInputTokens - cacheCheck.cachedContextTokens) : 0,
+      cacheSimilarity: cacheCheck.similarity,
+      cacheEntryId: cacheCheck.cacheEntryId,
       measurementSource,
     });
 
@@ -486,6 +509,14 @@ export async function handleExecuteTaskRequest(c: Context) {
       executionProgressLog: progressLog,
       result: combinedResult,
       tokenAnalytics,
+      semanticCache: {
+        cacheHit: cacheCheck.hit,
+        cacheStatus: cacheCheck.hit ? 'hit' : 'miss',
+        similarity: cacheCheck.similarity,
+        cachedContextTokens: cacheCheck.cachedContextTokens,
+        cacheTokensSaved: cacheCheck.hit ? Math.max(0, origInputTokens - cacheCheck.cachedContextTokens) : 0,
+        cacheEntryId: cacheCheck.cacheEntryId || '',
+      },
     });
   } catch (error: any) {
     console.error('Error in execute-task handler:', error);

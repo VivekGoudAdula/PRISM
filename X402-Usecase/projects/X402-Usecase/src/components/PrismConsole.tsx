@@ -10,6 +10,7 @@ import {
   type ExecuteTaskResponse,
   type PromptAnalysisResult,
   type DataMapResult,
+  type SemanticCacheData,
 } from '../utils/prismApi';
 import { api } from '../utils/api';
 import { FiCheckCircle, FiPlus, FiSend, FiMessageSquare, FiDollarSign, FiLink, FiMap } from 'react-icons/fi';
@@ -17,6 +18,7 @@ import ExecutionSummaryModal from './ExecutionSummaryModal';
 import ExecutionProgress from './ExecutionProgress';
 import TokenAnalysisModal from './TokenAnalysisModal';
 import TokenSavingsDashboard from './TokenSavingsDashboard';
+import CacheHistoryPanel from './CacheHistoryPanel';
 import PromptTutorModal from './PromptTutorModal';
 import DataMapModal from './DataMapModal';
 import DataMapsView from './DataMapsView';
@@ -81,6 +83,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
   const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysisResult | null>(null);
   const [showPromptTutorModal, setShowPromptTutorModal] = useState(false);
   const [dataMap, setDataMap] = useState<DataMapResult | null>(null);
+  const [dataMapSemanticCache, setDataMapSemanticCache] = useState<SemanticCacheData | null>(null);
   const [showDataMapModal, setShowDataMapModal] = useState(false);
   const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -367,7 +370,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         analysisToUse = await analyzePromptWithTutor(apiBaseUrl, taskDescription, attachedFiles);
         setPromptAnalysis(analysisToUse);
       }
-      const map = await fetchGeneratedDataMap(
+      const mapResponse = await fetchGeneratedDataMap(
         apiBaseUrl,
         analysisToUse,
         taskDescription,
@@ -375,8 +378,11 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         undefined,
         undefined,
         conversationId || undefined
-      );
-      setDataMap(map);
+      ) as any;
+      // Capture semantic cache metadata returned alongside the map
+      const { semanticCache: sc, ...mapData } = mapResponse;
+      setDataMap(mapData);
+      setDataMapSemanticCache(sc ?? null);
       setShowDataMapModal(true);
     } catch (err) {
       console.warn('Data Map generation error (non-fatal):', err);
@@ -849,6 +855,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       {showDataMapModal && dataMap && (
         <DataMapModal
           dataMap={dataMap}
+          semanticCache={dataMapSemanticCache}
           onClose={() => setShowDataMapModal(false)}
           onProceedToExecution={() => {
             setShowDataMapModal(false);
@@ -1057,61 +1064,106 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
                           )}
                         </div>
 
-                        {/* Compact Prism Optimization Card */}
-                        {item.result.tokenAnalytics && (
-                          <div className="px-4 py-3 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950/60 border border-indigo-500/25 rounded-2xl flex flex-col gap-2 shadow-lg">
-                            <div className="flex items-center justify-between border-b border-indigo-500/15 pb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                                <span className="text-xs font-black text-white tracking-wide">Prism Optimization</span>
+                        {/* ─── Prism Optimization Card ─────────────────────────────────── */}
+                        {item.result.tokenAnalytics && (() => {
+                          const ta = item.result.tokenAnalytics;
+                          const sc = item.result.semanticCache;
+                          const isHit = sc?.cacheHit || sc?.cacheStatus === 'hit';
+                          const similarity = sc?.similarity ?? 0;
+                          const tokensAvoided = sc?.cacheTokensSaved ?? 0;
+                          const cachedCtxTokens = sc?.cachedContextTokens ?? 0;
+                          return (
+                            <div className="px-4 py-3 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950/60 border border-indigo-500/25 rounded-2xl flex flex-col gap-2 shadow-lg">
+                              {/* Header */}
+                              <div className="flex items-center justify-between border-b border-indigo-500/15 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                                  <span className="text-xs font-black text-white tracking-wide">Prism Optimization</span>
+                                </div>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                  {ta.measurementSource === 'provider_usage' ? 'Provider Usage' : 'Estimated Usage'}
+                                </span>
                               </div>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                                {item.result.tokenAnalytics.measurementSource === 'provider_usage' ? 'Provider Usage' : 'Estimated Usage'}
-                              </span>
-                            </div>
 
-                            {item.result.tokenAnalytics.tokensSaved > 0 ? (
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center py-1">
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-slate-400 font-medium">Input Tokens</span>
-                                  <span className="text-xs font-bold text-slate-200">
-                                    {item.result.tokenAnalytics.originalInputTokens.toLocaleString()} → {item.result.tokenAnalytics.optimizedInputTokens.toLocaleString()}
-                                  </span>
+                              {/* Row 1: Data Map Compression */}
+                              <div className="flex flex-col gap-1 py-1 border-b border-slate-800/40">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">DATA MAP COMPRESSION</span>
                                 </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-slate-400 font-medium">Tokens Saved</span>
-                                  <span className="text-xs font-extrabold text-emerald-400">
-                                    {item.result.tokenAnalytics.tokensSaved.toLocaleString()} ({(item.result.tokenAnalytics.compressionRatio || 0).toFixed(1)}%)
-                                  </span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-slate-400 font-medium">Estimated AI Cost</span>
-                                  <span className="text-xs font-bold text-slate-200">
-                                    ${(item.result.tokenAnalytics.estimatedOriginalCost || 0).toFixed(3)} → ${(item.result.tokenAnalytics.optimizedCost || 0).toFixed(3)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-slate-400 font-medium">You Saved</span>
-                                  <span className="text-xs font-extrabold text-emerald-300">
-                                    ${(item.result.tokenAnalytics.costSaved || 0).toFixed(3)}
-                                  </span>
-                                </div>
+                                {ta.tokensSaved > 0 ? (
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Input Tokens</span>
+                                      <span className="text-xs font-bold text-slate-200">
+                                        {ta.originalInputTokens.toLocaleString()} → {ta.optimizedInputTokens.toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Tokens Saved</span>
+                                      <span className="text-xs font-extrabold text-emerald-400">
+                                        {ta.tokensSaved.toLocaleString()} ({(ta.compressionRatio || 0).toFixed(1)}%)
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">AI Cost</span>
+                                      <span className="text-xs font-bold text-slate-200">
+                                        ${(ta.estimatedOriginalCost || 0).toFixed(3)} → ${(ta.optimizedCost || 0).toFixed(3)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">You Saved</span>
+                                      <span className="text-xs font-extrabold text-emerald-300">
+                                        ${(ta.costSaved || 0).toFixed(3)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-slate-400">
+                                    Optimization baseline established — {ta.originalInputTokens.toLocaleString()} input tokens measured
+                                  </p>
+                                )}
                               </div>
-                            ) : (
-                              <div className="flex flex-col gap-1 py-1 text-xs text-slate-300">
+
+                              {/* Row 2: Semantic Cache — always visible */}
+                              <div className={`flex flex-col gap-2 py-1 rounded-xl px-2 transition-all ${isHit ? 'bg-emerald-950/20 border border-emerald-500/20' : 'bg-slate-950/30 border border-slate-800/40'}`}>
                                 <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-indigo-200">Optimization baseline established</span>
-                                  <span className="font-mono text-slate-400">
-                                    {item.result.tokenAnalytics.originalInputTokens.toLocaleString()} input tokens measured
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-sky-400">SEMANTIC CACHE</span>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isHit ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800/60 text-slate-400 border-slate-700/50'}`}>
+                                    {isHit ? '✓ CACHE HIT' : '⚡ CACHE MISS'}
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-slate-400">
-                                  Optimization savings will appear as Prism optimization features are enabled.
-                                </p>
+                                {isHit ? (
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Similarity</span>
+                                      <span className="text-xs font-extrabold text-emerald-300">{(similarity * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Cached Context</span>
+                                      <span className="text-xs font-bold text-sky-300">{cachedCtxTokens.toLocaleString()} tokens</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Tokens Avoided</span>
+                                      <span className="text-xs font-extrabold text-emerald-400">{tokensAvoided.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-slate-400 font-medium">Context Reused</span>
+                                      <span className="text-xs font-extrabold text-emerald-300">Yes ✓</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-slate-400 flex flex-col gap-0.5">
+                                    <span>No reusable semantic context found for this query.</span>
+                                    <span className="text-[10px] text-slate-500 font-mono">New semantic context stored for future requests.</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          );
+                        })()}
+
 
                         <div className="w-full bg-slate-950/40 rounded-xl border border-slate-800/60 p-3.5 mt-1">
                           {renderFormattedResult(item.result.result, item.result.category)}
@@ -1278,6 +1330,11 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         <div className="w-full flex flex-col gap-6">
           {/* Global Token Savings Dashboard */}
           <TokenSavingsDashboard />
+
+          {/* Semantic Cache History — real data from /api/semantic-cache/history */}
+          <div className="liquid-glass p-5 rounded-3xl border border-sky-500/15">
+            <CacheHistoryPanel />
+          </div>
 
           <h2 className="text-xl font-bold text-white mb-2 uppercase tracking-wide">Task History</h2>
           {tasks.length === 0 ? (

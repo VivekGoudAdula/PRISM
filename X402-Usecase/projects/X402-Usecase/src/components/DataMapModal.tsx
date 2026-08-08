@@ -35,9 +35,12 @@ import {
   FiActivity,
   FiZap,
 } from 'react-icons/fi';
+import type { SemanticCacheData } from '../utils/prismApi';
 
 export interface DataMapModalProps {
   dataMap: DataMapResult;
+  /** Optional semantic cache metadata from the /generate response */
+  semanticCache?: SemanticCacheData | null;
   onClose: () => void;
   onProceedToExecution?: () => void;
 }
@@ -243,7 +246,7 @@ const getLayoutedElements = (nodes: DataMapNode[], edges: DataMapEdge[], directi
   return { flowNodes, flowEdges };
 };
 
-export const DataMapModal: React.FC<DataMapModalProps> = ({ dataMap, onClose, onProceedToExecution }) => {
+export const DataMapModal: React.FC<DataMapModalProps> = ({ dataMap, semanticCache, onClose, onProceedToExecution }) => {
   const { nodes = [], edges = [], metadata } = dataMap;
 
   // Search & Filter State
@@ -253,6 +256,14 @@ export const DataMapModal: React.FC<DataMapModalProps> = ({ dataMap, onClose, on
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showCacheDetails, setShowCacheDetails] = useState(false);
+
+  // Resolve cache status
+  const cacheIsHit = semanticCache?.cacheHit || semanticCache?.cacheStatus === 'hit' || false;
+  const cacheSimilarity = semanticCache?.similarity ?? 0;
+  const cachedCtxTokens = semanticCache?.cachedContextTokens ?? 0;
+  const cacheTokensAvoided = semanticCache?.cacheTokensSaved ?? 0;
+  const cacheEntryId = semanticCache?.cacheEntryId || '';
 
   // Compute Dagre Graph Layout
   const { flowNodes: initialNodes, flowEdges: initialEdges } = useMemo(() => {
@@ -376,29 +387,100 @@ export const DataMapModal: React.FC<DataMapModalProps> = ({ dataMap, onClose, on
             </div>
           </div>
 
-          {/* Metrics Bar */}
-          <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs">
-            <div>
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">Nodes</span>
-              <span className="font-extrabold text-white">{metadata?.nodeCount || nodes.length}</span>
+          {/* Metrics Bar + Cache Badge */}
+          <div className="hidden lg:flex items-center gap-3">
+            <div className="flex items-center gap-4 px-4 py-1.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs">
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">Nodes</span>
+                <span className="font-extrabold text-white">{metadata?.nodeCount || nodes.length}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-800" />
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">Edges</span>
+                <span className="font-extrabold text-indigo-300">{metadata?.edgeCount || edges.length}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-800" />
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">Relevance</span>
+                <span className="font-extrabold text-emerald-400">{metadata?.relevancePercent || 100}%</span>
+              </div>
+              <div className="h-6 w-px bg-slate-800" />
+              <div>
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">Context Tokens</span>
+                <span className="font-extrabold text-slate-200">
+                  {(metadata?.estimatedContextTokens || 0).toLocaleString()}
+                </span>
+              </div>
             </div>
-            <div className="h-6 w-px bg-slate-800" />
-            <div>
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">Edges</span>
-              <span className="font-extrabold text-indigo-300">{metadata?.edgeCount || edges.length}</span>
-            </div>
-            <div className="h-6 w-px bg-slate-800" />
-            <div>
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">Relevance</span>
-              <span className="font-extrabold text-emerald-400">{metadata?.relevancePercent || 100}%</span>
-            </div>
-            <div className="h-6 w-px bg-slate-800" />
-            <div>
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">Context Tokens</span>
-              <span className="font-extrabold text-slate-200">
-                {(metadata?.estimatedContextTokens || 0).toLocaleString()}
-              </span>
-            </div>
+
+            {/* Semantic Cache Status Badge */}
+            {semanticCache !== undefined && (
+              <button
+                id="datamap-cache-badge"
+                onClick={() => setShowCacheDetails((prev) => !prev)}
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                  cacheIsHit
+                    ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/50'
+                    : 'bg-slate-900/60 border-slate-700/60 text-slate-400 hover:bg-slate-800/40'
+                }`}
+                title="Click for Semantic Cache details"
+              >
+                <span>{cacheIsHit ? '✓' : '⚡'}</span>
+                <span>SEMANTIC CACHE</span>
+                <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                  cacheIsHit ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-500'
+                }`}>
+                  {cacheIsHit ? `${(cacheSimilarity * 100).toFixed(0)}% HIT` : 'MISS'}
+                </span>
+              </button>
+            )}
+
+            {/* Cache Details Popover */}
+            {showCacheDetails && semanticCache && (
+              <div className="absolute top-16 right-4 z-50 w-72 bg-slate-950 border border-indigo-500/30 rounded-2xl p-4 shadow-2xl text-xs flex flex-col gap-2 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">SEMANTIC CACHE DETAILS</span>
+                  <button onClick={() => setShowCacheDetails(false)} className="text-slate-500 hover:text-white">
+                    <FiX className="text-xs" />
+                  </button>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Status</span>
+                  <span className={`font-black uppercase ${cacheIsHit ? 'text-emerald-300' : 'text-slate-400'}`}>
+                    {cacheIsHit ? '✓ HIT' : '⚡ MISS'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Similarity</span>
+                  <span className="font-mono font-bold text-indigo-300">
+                    {cacheSimilarity > 0 ? `${(cacheSimilarity * 100).toFixed(1)}%` : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Cached Context</span>
+                  <span className="font-mono text-sky-300">{cachedCtxTokens.toLocaleString()} tokens</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Tokens Avoided</span>
+                  <span className={`font-mono font-bold ${cacheIsHit ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {cacheIsHit ? cacheTokensAvoided.toLocaleString() : '0'}
+                  </span>
+                </div>
+                {cacheEntryId && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Entry ID</span>
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {cacheEntryId.slice(0, 8)}…{cacheEntryId.slice(-5)}
+                    </span>
+                  </div>
+                )}
+                {!cacheIsHit && (
+                  <p className="text-[10px] text-slate-500 italic border-t border-slate-800/40 pt-2">
+                    New context stored — will be reused for future similar requests.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

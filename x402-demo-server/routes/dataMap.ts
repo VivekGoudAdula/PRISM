@@ -67,16 +67,55 @@ dataMapRouter.post('/generate', async (c) => {
 
     const generatedTitle = generateDataMapTitle(originalPrompt || promptAnalysis.intent, generatedMap.taskType);
 
+    // Check semantic cache
+    const { findSimilarContext, saveContext } = await import('../services/semanticCache');
+    const cacheCheck = await findSimilarContext({
+      userId,
+      chatId,
+      taskType: generatedMap.taskType,
+      prompt: originalPrompt || promptAnalysis.intent || '',
+      files,
+    });
+
+    let semanticContextToUse = generatedMap;
+
+    if (cacheCheck.hit && cacheCheck.semanticContext) {
+      console.log(`✓ SEMANTIC CACHE HIT (${(cacheCheck.similarity * 100).toFixed(1)}% similarity) - Reusing cached semantic context`);
+      // Re-use cached nodes/edges for data graph while preserving generated metadata for prompt intent
+      semanticContextToUse = {
+        ...generatedMap,
+        nodes: cacheCheck.semanticContext.nodes || generatedMap.nodes,
+        edges: cacheCheck.semanticContext.edges || generatedMap.edges,
+      };
+    } else {
+      console.log(`⚡ SEMANTIC CACHE MISS - Saving newly generated Data Map representation`);
+      // Save semantic context asynchronously
+      saveContext({
+        userId,
+        chatId,
+        taskType: generatedMap.taskType,
+        prompt: originalPrompt || promptAnalysis.intent || '',
+        files,
+        semanticContext: generatedMap,
+      }).catch(() => {});
+    }
+
     // Build DB record
     const mapData: any = {
       userId,
       chatId: chatId || undefined,
       title: generatedTitle,
-      taskType: generatedMap.taskType,
-      rootNodeId: generatedMap.rootNodeId,
-      nodes: generatedMap.nodes,
-      edges: generatedMap.edges,
-      metadata: generatedMap.metadata,
+      taskType: semanticContextToUse.taskType || generatedMap.taskType,
+      rootNodeId: semanticContextToUse.rootNodeId || generatedMap.rootNodeId,
+      nodes: semanticContextToUse.nodes || generatedMap.nodes,
+      edges: semanticContextToUse.edges || generatedMap.edges,
+      metadata: {
+        ...generatedMap.metadata,
+        cacheHit: cacheCheck.hit,
+        cacheSimilarity: cacheCheck.similarity,
+        cacheEntryId: cacheCheck.cacheEntryId,
+        cachedContextTokens: cacheCheck.cachedContextTokens,
+      },
     };
 
     if (taskId && mongoose.Types.ObjectId.isValid(taskId)) {
@@ -92,13 +131,13 @@ dataMapRouter.post('/generate', async (c) => {
       savedDoc = await DataMap.findOneAndUpdate(
         { chatId: mapData.chatId },
         mapData,
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } else if (mapData.taskId) {
       savedDoc = await DataMap.findOneAndUpdate(
         { taskId: mapData.taskId },
         mapData,
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } else {
       savedDoc = await DataMap.create(mapData);
@@ -108,6 +147,14 @@ dataMapRouter.post('/generate', async (c) => {
       id: savedDoc._id.toString(),
       chatId: savedDoc.chatId,
       title: savedDoc.title,
+      semanticCache: {
+        cacheHit: cacheCheck.hit,
+        cacheStatus: cacheCheck.hit ? 'hit' : 'miss',
+        similarity: cacheCheck.similarity,
+        cachedContextTokens: cacheCheck.cachedContextTokens,
+        cacheTokensSaved: cacheCheck.hit ? Math.max(0, (generatedMap.metadata?.estimatedContextTokens || 2000) - cacheCheck.cachedContextTokens) : 0,
+        cacheEntryId: cacheCheck.cacheEntryId || '',
+      },
       ...generatedMap,
     });
   } catch (error: any) {
@@ -201,7 +248,7 @@ dataMapRouter.patch('/:mapId/title', async (c) => {
       return c.json({ error: 'Title is required' }, 400);
     }
 
-    const updated = await DataMap.findByIdAndUpdate(mapId, { title: title.trim() }, { new: true });
+    const updated = await DataMap.findByIdAndUpdate(mapId, { title: title.trim() }, { returnDocument: 'after' });
     if (!updated) {
       return c.json({ error: 'Data Map not found' }, 404);
     }

@@ -1,5 +1,6 @@
 
 
+import { api } from './api';
 import { x402Client, wrapFetchWithPayment } from '@x402-avm/fetch';
 import { ALGORAND_TESTNET_CAIP2, ALGORAND_MAINNET_CAIP2 } from '@x402-avm/avm';
 import type { ClientAvmSigner } from '@x402-avm/avm';
@@ -132,6 +133,25 @@ export interface TokenAnalytics {
   currency: string;
 }
 
+export interface SemanticCacheData {
+  /** Whether the cache was hit on this request */
+  cacheHit: boolean;
+  /** Explicit status string from backend */
+  cacheStatus: 'hit' | 'miss' | 'bypass';
+  /** 0.0–1.0 cosine + Jaccard similarity score */
+  similarity: number;
+  /** Tokens in the cached context (reused context size) */
+  cachedContextTokens: number;
+  /** Tokens avoided = originalContextTokens - cachedContextTokens (only on HIT) */
+  cacheTokensSaved: number;
+  /** MongoDB _id of the matched SemanticCache entry */
+  cacheEntryId?: string;
+  /** ISO timestamp when the matched cache entry was last used */
+  lastUsedAt?: string;
+  /** Whether context was reused from an existing semantic representation */
+  contextReused?: boolean;
+}
+
 export interface ExecuteTaskResponse {
   planId?: string;
   category: string;
@@ -150,6 +170,7 @@ export interface ExecuteTaskResponse {
   executionProgressLog?: ExecutionProgressEntry[];
   extracted_files?: Array<{ filename: string; method: string }>;
   tokenAnalytics?: TokenAnalytics;
+  semanticCache?: SemanticCacheData;
   savings_this_request?: {
     raw_tokens: number;
     map_tokens?: number;
@@ -588,6 +609,30 @@ export async function renameDataMap(baseUrl: string, mapId: string, title: strin
   });
   if (!response.ok) throw new Error('Failed to rename Data Map');
   return await response.json();
+}
+
+/**
+ * Fetches Semantic Cache stats for the user.
+ */
+export async function fetchSemanticCacheStats(): Promise<any> {
+  const { data } = await api.get('/api/semantic-cache/stats');
+  return data;
+}
+
+/**
+ * Checks semantic cache for a given task/prompt.
+ */
+export async function checkSemanticCache(prompt: string, taskType: string, files: AttachedFile[] = []): Promise<SemanticCacheData> {
+  const { data } = await api.post('/api/semantic-cache/check', { prompt, taskType, files });
+  return data;
+}
+
+/**
+ * Fetches saved semantic cache history.
+ */
+export async function fetchSemanticCacheHistory(): Promise<any[]> {
+  const { data } = await api.get('/api/semantic-cache/history');
+  return data;
 }
 
 

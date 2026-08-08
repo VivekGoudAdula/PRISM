@@ -56,20 +56,4 @@ const SavingsLogSchema = new Schema<ISavingsLog>({
 
 export const SavingsLog = model<ISavingsLog>('SavingsLog', SavingsLogSchema);
 
-export interface ISemanticCache {
-  text: string;
-  embedding: number[];
-  category: string;
-  map: any;
-  timestamp: Date;
-}
 
-const SemanticCacheSchema = new Schema<ISemanticCache>({
-  text: { type: String, required: true, index: true },
-  embedding: [{ type: Number }],
-  category: { type: String },
-  map: { type: Schema.Types.Mixed },
-  timestamp: { type: Date, default: Date.now }
-}, { timestamps: true });
-
-export const SemanticCache = model<ISemanticCache>('SemanticCache', SemanticCacheSchema);

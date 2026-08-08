@@ -70,7 +70,7 @@ chatRouter.put('/conversations/:id/thread', async (c) => {
     const conversation = await Conversation.findOneAndUpdate(
       { _id: id, userId: user.userId },
       { thread, updatedAt: new Date() },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     if (!conversation) {

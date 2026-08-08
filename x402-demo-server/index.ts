@@ -44,6 +44,7 @@ import { requireAuth, optionalAuth } from './middleware/auth';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
 import waitlistRouter from './routes/waitlist';
+import semanticCacheRouter from './routes/semanticCache';
 import { analyticsRouter, adminRouter } from './routes/analytics';
 import promptTutorRouter from './routes/promptTutor';
 import dataMapRouter from './routes/dataMap';
@@ -201,6 +202,7 @@ app.route('/api/analytics', analyticsRouter);
 app.route('/api/admin', adminRouter);
 app.route('/api/prompt-tutor', promptTutorRouter);
 app.route('/api/data-map', dataMapRouter);
+app.route('/api/semantic-cache', semanticCacheRouter);
 
 /**
  * X402 Payment Middleware

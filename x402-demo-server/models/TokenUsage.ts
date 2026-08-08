@@ -24,7 +24,11 @@ export interface ITokenUsage {
   compressionRatio: number;
 
   cacheHit: boolean;
+  cacheStatus?: 'hit' | 'miss' | 'bypass';
+  cachedContextTokens?: number;
   cacheTokensSaved: number;
+  cacheSimilarity?: number;
+  cacheEntryId?: string;
 
   measurementSource: MeasurementSource;
   costSource?: string;
@@ -61,7 +65,11 @@ const TokenUsageSchema = new Schema<ITokenUsage>(
     compressionRatio: { type: Number, default: 0 },
 
     cacheHit: { type: Boolean, default: false },
+    cacheStatus: { type: String, enum: ['hit', 'miss', 'bypass'], default: 'miss' },
+    cachedContextTokens: { type: Number, default: 0 },
     cacheTokensSaved: { type: Number, default: 0 },
+    cacheSimilarity: { type: Number, default: 0 },
+    cacheEntryId: { type: String, default: '' },
 
     measurementSource: {
       type: String,

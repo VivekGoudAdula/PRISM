@@ -79,7 +79,7 @@ const DataMapSchema = new Schema<IDataMap>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     taskId: { type: Schema.Types.ObjectId, ref: 'Task', index: true },
-    chatId: { type: String, index: true },
+    chatId: { type: String },
     title: { type: String },
     executionId: { type: String },
     taskType: { type: String, required: true },

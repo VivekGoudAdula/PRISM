@@ -92,7 +92,11 @@ export interface RecordExecutionMetricsInput {
   outputTokens: number;
   modelName?: string;
   cacheHit?: boolean;
+  cacheStatus?: 'hit' | 'miss' | 'bypass';
+  cachedContextTokens?: number;
   cacheTokensSaved?: number;
+  cacheSimilarity?: number;
+  cacheEntryId?: string;
   measurementSource?: MeasurementSource;
 }
 
@@ -107,7 +111,11 @@ export interface TokenAnalyticsResult {
   optimizedCost: number;
   costSaved: number;
   cacheHit: boolean;
+  cacheStatus: 'hit' | 'miss' | 'bypass';
+  cachedContextTokens: number;
   cacheTokensSaved: number;
+  cacheSimilarity: number;
+  cacheEntryId?: string;
   measurementSource: MeasurementSource;
   currency: string;
 }
@@ -139,7 +147,14 @@ export async function recordExecutionMetrics(
   const costSaved = calculateCostSavings(estimatedOriginalCost, optimizedCost);
 
   const cacheHit = Boolean(input.cacheHit);
-  const cacheTokensSaved = input.cacheTokensSaved || 0;
+  const cacheStatus = input.cacheStatus || (cacheHit ? 'hit' : 'miss');
+  const cachedContextTokens = input.cachedContextTokens || 0;
+  // Calculate: cacheTokensSaved = max(0, originalContextTokens - cachedContextTokens) ONLY on hit
+  const cacheTokensSaved = cacheHit
+    ? Math.max(0, originalInput - cachedContextTokens)
+    : (input.cacheTokensSaved || 0);
+  const cacheSimilarity = input.cacheSimilarity || (cacheHit ? 1.0 : 0);
+  const cacheEntryId = input.cacheEntryId || '';
   const measurementSource: MeasurementSource = input.measurementSource || 'estimated';
 
   const analyticsResult: TokenAnalyticsResult = {
@@ -153,7 +168,11 @@ export async function recordExecutionMetrics(
     optimizedCost,
     costSaved,
     cacheHit,
+    cacheStatus,
+    cachedContextTokens,
     cacheTokensSaved,
+    cacheSimilarity,
+    cacheEntryId,
     measurementSource,
     currency: 'USD',
   };
@@ -180,7 +199,11 @@ export async function recordExecutionMetrics(
           costSaved,
           compressionRatio,
           cacheHit,
+          cacheStatus,
+          cachedContextTokens,
           cacheTokensSaved,
+          cacheSimilarity,
+          cacheEntryId,
           measurementSource,
           costSource: `Pricing model: ${modelName}`,
           inputTokenPrice: pricing.inputPer1M,
@@ -188,7 +211,7 @@ export async function recordExecutionMetrics(
           currency: 'USD',
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   } catch (err: any) {
     console.error('Error recording token analytics (non-blocking):', err?.message || err);

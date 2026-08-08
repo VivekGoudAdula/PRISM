@@ -152,19 +152,20 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
             const normalized = content.toLowerCase();
             if (normalized.includes('conversational')) {
               category = 'conversational';
-            } else if (normalized.includes('resume_screening')) {
+            } else if (normalized.includes('resume_screening') || normalized.includes('resume screening') || normalized.includes('resume')) {
               category = 'resume_screening';
-            } else if (normalized.includes('contract_analysis')) {
+            } else if (normalized.includes('contract_analysis') || normalized.includes('contract analysis') || normalized.includes('contract')) {
               category = 'contract_analysis';
-            } else if (normalized.includes('invoice_extraction')) {
+            } else if (normalized.includes('invoice_extraction') || normalized.includes('invoice extraction') || normalized.includes('invoice')) {
               category = 'invoice_extraction';
-            } else if (normalized.includes('code_review')) {
+            } else if (normalized.includes('code_review') || normalized.includes('code review') || normalized.includes('code')) {
               category = 'code_review';
             } else {
-              category = 'unsupported';
+              // Try local keyword fallback if LLM returned something unexpected
+              category = localClassify(task_description);
             }
             success = true;
-            console.log(`Successfully classified task with key index ${index + 1}`);
+            console.log(`Successfully classified task as '${category}' with key index ${index + 1}`);
             break;
           } else {
             console.warn(`Groq API key index ${index + 1} failed with status: ${response.status}`);
@@ -175,9 +176,25 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
       }
     }
 
-    if (!success) {
-      console.warn('All Groq API keys failed or none provided. Falling back to local classification.');
+    if (!success || category === 'unsupported') {
+      console.warn('LLM classification unsupported or unavailable. Running local classification fallback.');
       category = localClassify(task_description);
+    }
+
+    // Safety net: If files are attached and category is still unsupported, run file-sensitive fallback
+    if (category === 'unsupported' && has_files) {
+      const lower = task_description.toLowerCase();
+      if (lower.includes('contract') || lower.includes('nda') || lower.includes('agreement')) {
+        category = 'contract_analysis';
+      } else if (lower.includes('invoice') || lower.includes('bill') || lower.includes('receipt')) {
+        category = 'invoice_extraction';
+      } else if (lower.includes('code') || lower.includes('repo') || lower.includes('review')) {
+        category = 'code_review';
+      } else {
+        // Default document screening task when files are present
+        category = 'resume_screening';
+      }
+      console.log(`[classify-task] File-attached safety fallback applied: category = '${category}'`);
     }
 
     return c.json({
@@ -221,7 +238,9 @@ function localClassify(description: string): string {
     desc.includes('job') || desc.includes('role') || desc.includes('developer') ||
     desc.includes('engineer') || desc.includes('qualification') ||
     desc.includes('recommendation') || desc.includes('backend') ||
-    desc.includes('frontend') || desc.includes('fullstack') || desc.includes('full-stack')
+    desc.includes('frontend') || desc.includes('fullstack') || desc.includes('full-stack') ||
+    desc.includes('profile') || desc.includes('rank') || desc.includes('suitability') ||
+    desc.includes('soft skills') || desc.includes('technical skills')
   ) {
     return 'resume_screening';
   }

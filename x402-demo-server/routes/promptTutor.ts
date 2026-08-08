@@ -61,7 +61,7 @@ promptTutorRouter.post('/analyze', async (c) => {
           improvedPrompt: analysisResult.improvedPrompt,
           modelUsed: analysisResult.modelUsed,
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } else {
       savedDoc = await PromptAnalysis.create({
