@@ -166,7 +166,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                   Payment Breakdown
                 </span>
               </div>
-              <div className="flex flex-col divide-y divide-slate-800/40">
+              <div className="flex flex-col divide-y divide-slate-800/40 max-h-48 overflow-y-auto">
                 {preview.map((item, idx) => {
                   const isChecked =
                     item.type === 'execution'
@@ -216,22 +216,6 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Time & Accuracy */}
-          <div className="flex gap-3 mt-3">
-            <div className="flex-1 rounded-xl border border-slate-800/60 bg-slate-950/60 p-3 flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">
-                <FiClock className="text-xs" /> Est. Time
-              </div>
-              <span className="text-sm font-extrabold text-slate-200">~{plan.estimatedTimeSeconds}s</span>
-            </div>
-            <div className="flex-1 rounded-xl border border-slate-800/60 bg-slate-950/60 p-3 flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">
-                <FiShield className="text-xs" /> Accuracy
-              </div>
-              <span className="text-sm font-extrabold text-emerald-400">{accuracyPct}%</span>
-            </div>
-          </div>
 
           {/* Total */}
           <div className="mt-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/8 p-4 flex items-center justify-between">
