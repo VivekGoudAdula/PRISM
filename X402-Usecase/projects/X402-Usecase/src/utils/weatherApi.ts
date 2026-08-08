@@ -467,24 +467,42 @@ export async function executeTaskWithPayment(
       }
 
       if (i > 0) {
-        // Wait 1.5s between consecutive payment calls so wallet tx confirmation completes cleanly
-        await new Promise((r) => setTimeout(r, 1500))
+        // Wait 3.5s between consecutive payment calls so Algorand mainnet block round completes cleanly (~2.8s block time)
+        await new Promise((r) => setTimeout(r, 3500))
       }
 
       try {
-        // Create a fresh x402 fetch client per file so no stale x402Client state
-        // from a previous wallet handshake can bleed into this request.
-        const fileFetchFn = await createX402Fetch(walletSigner)
+        let response: Response | null = null
+        let lastErr: any = null
 
-        const response = await fileFetchFn(`${baseUrl}${plan.endpointPath}`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-        })
+        // Try up to 2 attempts per file to handle transient wallet or mempool timing hiccups
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            if (attempt > 1) {
+              console.log(`Retrying file ${i + 1}/${executionCount} (${fileLabel}), attempt ${attempt}...`)
+              await new Promise((r) => setTimeout(r, 3500))
+            }
+            const fileFetchFn = await createX402Fetch(walletSigner)
+            const res = await fileFetchFn(`${baseUrl}${plan.endpointPath}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+            })
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}))
-          throw new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${response.status}`)
+            if (res.ok) {
+              response = res
+              break
+            } else {
+              const errData = await res.json().catch(() => ({}))
+              lastErr = new Error(errData.error || `Invocation ${i + 1} failed: HTTP ${res.status}`)
+            }
+          } catch (err) {
+            lastErr = err
+          }
+        }
+
+        if (!response || !response.ok) {
+          throw lastErr || new Error(`Invocation ${i + 1} failed after retries`)
         }
 
         const paymentHeader = response.headers.get('x-payment') || response.headers.get('payment-signature')
