@@ -67,6 +67,8 @@ export interface ExecutionPlan {
   isChat?: boolean;
   reply?: string;
   message?: string;
+  /** Uploaded document metadata when in reference mode */
+  uploadedFiles?: Array<{ index: number; filename: string }>;
   /**
    * Per-file payment preview items, computed client-side from the plan.
    * Populated by buildPaymentPreview() before showing the confirmation modal.
@@ -402,9 +404,16 @@ export async function executeTaskWithPayment(
   const hasStoredFiles = isDocumentTask && uploadedFileMeta.length > 0
 
   const plannedFiles = (plan as any).files || []
-  const executionCount = (plan.category === 'code_review' && plannedFiles.length > 0)
-    ? plannedFiles.length
-    : (files.length > 0 ? files.length : 1)
+  let executionCount = 1
+  if (plan.category === 'code_review' && plannedFiles.length > 0) {
+    executionCount = plannedFiles.length
+  } else if (hasStoredFiles) {
+    executionCount = uploadedFileMeta.length
+  } else if (files.length > 0) {
+    executionCount = files.length
+  } else if (plan.executionQuantity > 0) {
+    executionCount = plan.executionQuantity
+  }
 
   console.log(
     `Executing ${executionCount} independent per-file x402 payment(s) for '${plan.category}'`,
@@ -441,9 +450,11 @@ export async function executeTaskWithPayment(
         payload = { file_path: plannedFile.path, raw_url: plannedFile.raw_url }
         fileLabel = plannedFile.path
       } else if (hasStoredFiles) {
-        // New lightweight reference mode — file content is stored server-side
-        payload = { file_index: i, plan_id: plan.planId, task_description: taskDescription }
-        fileLabel = uploadedFileMeta[i]?.filename || `file-${i + 1}`
+        // Lightweight reference mode — file content is stored server-side
+        const fileMeta = uploadedFileMeta[i]
+        const actualIndex = typeof fileMeta?.index === 'number' ? fileMeta.index : i
+        payload = { file_index: actualIndex, plan_id: plan.planId, task_description: taskDescription }
+        fileLabel = fileMeta?.filename || `file-${actualIndex + 1}`
       } else {
         // Fallback: send inline (old behavior for backward compatibility)
         payload = { task_description: taskDescription, files: singleFile ? [singleFile] : [] }

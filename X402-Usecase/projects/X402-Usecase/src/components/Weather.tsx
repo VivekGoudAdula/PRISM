@@ -72,6 +72,9 @@ const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({ plan, fil
       executionQuantity: selectedCount,
       executionCost: executionCost,
       totalCost: totalCost,
+      uploadedFiles: (plan as any).uploadedFiles
+        ? (plan as any).uploadedFiles.filter((item: any) => selectedIndices.has(item.index))
+        : undefined,
       paymentPreview: plan.paymentPreview ? plan.paymentPreview.filter(item => {
         if (item.type === 'platform_fee') return true;
         return item.index !== undefined && selectedIndices.has(item.index - 1);
