@@ -137,6 +137,7 @@ export interface ExecutionPlan {
   reply?: string;
   message?: string;
   uploadedFiles?: Array<{ index: number; filename: string }>;
+  files?: any[];
   paymentPreview?: PaymentPreviewItem[];
 }
 
@@ -402,15 +403,13 @@ export async function executeTaskWithPayment(
   const hasStoredFiles = isDocumentTask && uploadedFileMeta.length > 0;
 
   const plannedFiles = (plan as any).files || [];
-  let executionCount = 1;
+  let executionCount = plan.executionQuantity > 0 ? plan.executionQuantity : 1;
   if (plan.category === 'code_review' && plannedFiles.length > 0) {
-    executionCount = plannedFiles.length;
+    executionCount = Math.min(plan.executionQuantity, plannedFiles.length);
   } else if (hasStoredFiles) {
-    executionCount = uploadedFileMeta.length;
+    executionCount = Math.min(plan.executionQuantity, uploadedFileMeta.length);
   } else if (files.length > 0) {
-    executionCount = files.length;
-  } else if (plan.executionQuantity > 0) {
-    executionCount = plan.executionQuantity;
+    executionCount = Math.min(plan.executionQuantity, files.length);
   }
 
   const handlerResults: any[] = [];

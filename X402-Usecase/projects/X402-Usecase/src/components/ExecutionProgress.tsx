@@ -23,20 +23,21 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
   currentFilename,
 }) => {
   const label = unitLabel[category] ?? 'File';
+  const displayCurrent = Math.min(current, total > 0 ? total : current);
   const pct =
     phase === 'completed'
       ? 100
       : phase === 'verifying'
       ? 95
       : total > 0
-      ? Math.round(((current - 0.5) / total) * 90)
+      ? Math.min(90, Math.max(0, Math.round(((displayCurrent - 0.5) / total) * 90)))
       : 0;
 
   const phaseSteps = [
     { key: 'payment', label: 'Payment Approved', done: phase !== 'payment' },
     {
       key: 'executing',
-      label: `Executing ${current} / ${total}`,
+      label: `Executing ${displayCurrent} / ${total}`,
       done: phase === 'verifying' || phase === 'completed',
       active: phase === 'executing' || phase === 'payment',
     },
@@ -84,7 +85,7 @@ export const ExecutionProgress: React.FC<ExecutionProgressProps> = ({
             <span>{step.label}</span>
             {step.key === 'executing' && phase === 'executing' && total > 1 && (
               <span className="ml-auto text-[10px] text-indigo-400 font-bold">
-                {label} {current}/{total}
+                {label} {displayCurrent}/{total}
               </span>
             )}
           </div>

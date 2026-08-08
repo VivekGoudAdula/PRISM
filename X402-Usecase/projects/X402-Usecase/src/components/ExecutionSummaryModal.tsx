@@ -55,6 +55,9 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
       uploadedFiles: (plan as any).uploadedFiles
         ? (plan as any).uploadedFiles.filter((item: any) => selectedIndices.has(item.index))
         : undefined,
+      files: (plan as any).files
+        ? (plan as any).files.filter((_: any, idx: number) => selectedIndices.has(idx))
+        : undefined,
       paymentPreview: plan.paymentPreview
         ? plan.paymentPreview.filter((item) => {
             if (item.type === 'platform_fee') return true;
