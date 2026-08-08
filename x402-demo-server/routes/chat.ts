@@ -62,6 +62,11 @@ chatRouter.put('/conversations/:id/thread', async (c) => {
       return c.json({ error: 'thread must be an array.' }, 400);
     }
 
+    // Guard: only query MongoDB if the ID looks like a valid ObjectId
+    if (!mongoose.isValidObjectId(id)) {
+      return c.json({ error: 'Invalid conversation ID format.' }, 400);
+    }
+
     const conversation = await Conversation.findOneAndUpdate(
       { _id: id, userId: user.userId },
       { thread, updatedAt: new Date() },
@@ -86,6 +91,11 @@ chatRouter.get('/conversations/:id/thread', async (c) => {
   try {
     const user = (c as any).get('user');
     const { id } = c.req.param();
+
+    // Guard: only query MongoDB if the ID looks like a valid ObjectId
+    if (!mongoose.isValidObjectId(id)) {
+      return c.json({ thread: [] });
+    }
 
     const conversation = await Conversation.findOne({ _id: id, userId: user.userId });
     if (!conversation) {

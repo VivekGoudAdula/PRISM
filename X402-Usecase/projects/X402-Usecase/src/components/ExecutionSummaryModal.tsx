@@ -67,32 +67,32 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20"
       style={{ background: 'rgba(2,4,18,0.88)', backdropFilter: 'blur(10px)' }}
     >
       <div
-        className="w-full max-w-lg animate-scale-up rounded-3xl border border-indigo-500/20 shadow-2xl overflow-y-auto"
+        className="w-full max-w-lg animate-scale-up rounded-3xl border border-indigo-500/20 shadow-2xl flex flex-col"
         style={{
-          maxHeight: '92vh',
+          maxHeight: '78vh',
           background: 'linear-gradient(135deg, rgba(15,18,45,0.99) 0%, rgba(8,12,30,0.99) 100%)',
           boxShadow: '0 0 80px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.6)',
         }}
       >
-        {/* Header */}
-        <div className="px-7 pt-7 pb-4 border-b border-white/5">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center">
-              <FiZap className="text-indigo-400 text-base" />
+        {/* Header — fixed, never scrolls */}
+        <div className="px-6 pt-5 pb-4 border-b border-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
+              <FiZap className="text-indigo-400 text-sm" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-white tracking-tight">Execution Summary</h2>
+              <h2 className="text-sm font-extrabold text-white tracking-tight">Execution Summary</h2>
               <p className="text-xs text-slate-500">Review payment breakdown before approving</p>
             </div>
           </div>
         </div>
 
-        {/* Summary Table */}
-        <div className="px-7 py-5 flex flex-col gap-1">
+        {/* Scrollable body */}
+        <div className="px-6 py-4 flex flex-col gap-1 overflow-y-auto flex-1">
           {plan.category === 'code_review' && (
             <div className="mb-4 flex flex-col gap-2.5">
               {plan.capped && (
@@ -248,8 +248,8 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="px-7 pb-7 flex gap-3">
+        {/* Actions — fixed footer, never scrolls */}
+        <div className="px-6 py-4 border-t border-white/5 flex gap-3 shrink-0">
           <button
             className="flex-1 btn btn-ghost text-slate-400 hover:text-white border border-slate-800/60 rounded-xl text-sm font-bold"
             onClick={onCancel}

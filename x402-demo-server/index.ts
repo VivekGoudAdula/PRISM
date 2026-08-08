@@ -46,6 +46,7 @@ import chatRouter from './routes/chat';
 import waitlistRouter from './routes/waitlist';
 import { analyticsRouter, adminRouter } from './routes/analytics';
 import promptTutorRouter from './routes/promptTutor';
+import dataMapRouter from './routes/dataMap';
 
 // Load environment variables
 config();
@@ -199,6 +200,7 @@ app.route('/api/waitlist', waitlistRouter);
 app.route('/api/analytics', analyticsRouter);
 app.route('/api/admin', adminRouter);
 app.route('/api/prompt-tutor', promptTutorRouter);
+app.route('/api/data-map', dataMapRouter);
 
 /**
  * X402 Payment Middleware

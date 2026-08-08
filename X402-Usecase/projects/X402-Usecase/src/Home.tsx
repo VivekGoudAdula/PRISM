@@ -2,7 +2,7 @@
 import { useWallet } from '@txnlab/use-wallet-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign } from 'react-icons/fi'
+import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign, FiMap, FiPlus } from 'react-icons/fi'
 import ConnectWallet from './components/ConnectWallet'
 import PrismConsole from './components/PrismConsole'
 import Prism from './components/Prism'
@@ -60,6 +60,7 @@ const Home: React.FC<HomeProps> = () => {
   const isSignUp = pathname === '/signup'
 
   const [showProfileDropdown, setShowProfileDropdown] = useState<boolean>(false)
+  const [showWalletDropdown, setShowWalletDropdown] = useState<boolean>(false)
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false)
   const [tasks, setTasks] = useState<any[]>([])
   const [conversations, setConversations] = useState<any[]>([])
@@ -597,44 +598,35 @@ const Home: React.FC<HomeProps> = () => {
             <img src="/logo.png" alt="Prism Logo" className="h-14 w-auto object-contain" />
           </div>
 
-          <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="flex items-center gap-2 pointer-events-auto">
 
-            {viewState === 'app' && savingsSummary && (
+            {/* 1. New Chat — always first */}
+            {viewState === 'app' && userRole !== 'admin' && (
               <button
-                className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 ${isPulsing
-                  ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/40 border-emerald-400'
-                  : 'bg-slate-900/80 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-400'
-                  }`}
-                onClick={() => setShowSavingsModal(true)}
+                className="btn h-10 min-h-[40px] text-emerald-300 hover:text-white rounded-full border border-emerald-500/40 px-4 text-xs font-bold flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/22 transition-all"
+                onClick={() => window.dispatchEvent(new CustomEvent('prism_new_chat'))}
               >
-                <FiDollarSign className="text-emerald-400 text-sm" />
-                <span>View Savings (${displayedSavings.toFixed(2)} saved)</span>
+                <FiPlus className="text-sm text-emerald-400" />
+                <span>New Chat</span>
               </button>
             )}
 
-            {viewState === 'app' && (
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
-                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                  : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
-                  }`}>
-                  {(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet' ? 'Mainnet' : 'TestNet'}
-                </span>
-                <button
-                  className="btn btn-outline btn-primary h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold hover:scale-105 transition-transform"
-                  onClick={toggleWalletModal}
-                  data-test-id="connect-wallet"
-                >
-                  {activeAddress ? `Connected: ${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}` : 'Connect Wallet'}
-                </button>
-              </div>
-            )}
-
+            {/* 2. Data Maps */}
             {viewState === 'app' && userRole !== 'admin' && (
               <button
-                className="btn btn-ghost h-10 min-h-[40px] text-slate-300 hover:text-white rounded-full border border-slate-800/60 px-4 text-xs font-bold"
+                className="btn h-10 min-h-[40px] text-indigo-300 hover:text-white rounded-full border border-indigo-500/30 px-4 text-xs font-bold flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/22 transition-all"
+                onClick={() => window.dispatchEvent(new CustomEvent('prism_toggle_data_maps_view'))}
+              >
+                <FiMap className="text-sm text-indigo-400" />
+                <span>Data Maps</span>
+              </button>
+            )}
+
+            {/* 3. History */}
+            {viewState === 'app' && userRole !== 'admin' && (
+              <button
+                className="btn h-10 min-h-[40px] text-slate-300 hover:text-white rounded-full border border-slate-700/50 px-4 text-xs font-bold hover:bg-slate-800/40 transition-all"
                 onClick={() => {
-                  // Fetch both conversations and tasks for the history modal
                   api.get('/api/chat/conversations').then(({ data }) => setConversations(data)).catch(() => { });
                   api.get('/api/analytics/tasks').then(({ data }) => setTasks(data)).catch(() => { });
                   setHistoryTab('conversations');
@@ -646,6 +638,92 @@ const Home: React.FC<HomeProps> = () => {
               </button>
             )}
 
+            {/* 4. Savings pill */}
+            {viewState === 'app' && savingsSummary && (
+              <button
+                className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 ${isPulsing
+                  ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/40 border-emerald-400'
+                  : 'bg-slate-900/80 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-400'
+                  }`}
+                onClick={() => setShowSavingsModal(true)}
+              >
+                <FiDollarSign className="text-emerald-400 text-sm" />
+                <span>${displayedSavings.toFixed(2)} saved</span>
+              </button>
+            )}
+
+
+            {/* 6. Wallet button — red if disconnected, green address if connected */}
+            {viewState === 'app' && (
+              <div className="relative">
+                <button
+                  className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-bold flex items-center gap-1.5 border transition-all hover:scale-105 ${
+                    activeAddress
+                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 font-mono'
+                      : 'bg-rose-500/10 border-rose-500/40 text-rose-300 hover:bg-rose-500/20'
+                  }`}
+                  onClick={() => setShowWalletDropdown((p: boolean) => !p)}
+                  data-test-id="connect-wallet"
+                >
+                  {activeAddress
+                    ? `${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}`
+                    : 'Connect Wallet'
+                  }
+                </button>
+
+                {showWalletDropdown && (
+                  <div className="absolute right-0 mt-3 w-80 bg-slate-900/97 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl z-[60] flex flex-col overflow-hidden animate-fade-in">
+                    {/* Header */}
+                    <div className="px-5 py-4 border-b border-slate-800/70 flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${activeAddress ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-slate-800 border border-slate-700'}`}>
+                        <span className={`w-2.5 h-2.5 rounded-full ${activeAddress ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{activeAddress ? 'Wallet Connected' : 'No Wallet Connected'}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">Algorand · {(import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toUpperCase()}</p>
+                      </div>
+                    </div>
+
+                    {activeAddress && (
+                      <div className="px-5 py-4 flex flex-col gap-3 border-b border-slate-800/70">
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Wallet Address</p>
+                          <p className="text-xs font-mono text-slate-200 break-all leading-relaxed bg-slate-800/60 rounded-xl px-3 py-2.5">
+                            {activeAddress}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 font-medium">Short form</span>
+                          <span className="text-xs font-mono text-indigo-300 font-bold">
+                            {activeAddress.slice(0, 8)}…{activeAddress.slice(-6)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="px-5 py-3">
+                      {activeAddress ? (
+                        <button
+                          className="btn btn-sm w-full rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 font-bold text-xs"
+                          onClick={() => { toggleWalletModal(); setShowWalletDropdown(false); }}
+                        >
+                          Manage / Disconnect Wallet
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-sm w-full rounded-xl btn-primary font-bold text-xs"
+                          onClick={() => { toggleWalletModal(); setShowWalletDropdown(false); }}
+                        >
+                          Connect Wallet
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 7. Profile dropdown */}
             {viewState === 'app' && currentUser && (
               <div className="relative">
                 <button
@@ -686,6 +764,7 @@ const Home: React.FC<HomeProps> = () => {
               </div>
             )}
 
+            {/* 8. Logout shortcut */}
             {viewState === 'app' && currentUser && (
               <button
                 className="btn btn-circle h-10 w-10 min-h-[40px] min-w-[40px] btn-ghost text-rose-450 hover:text-rose-400 hover:bg-rose-950/20 flex items-center justify-center border border-rose-950/30"

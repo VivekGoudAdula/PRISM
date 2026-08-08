@@ -1,21 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import {
   planTask,
   executeTaskWithPayment,
   analyzePromptWithTutor,
+  fetchGeneratedDataMap,
   type ExecutionPlan,
   type AttachedFile,
   type ExecuteTaskResponse,
   type PromptAnalysisResult,
+  type DataMapResult,
 } from '../utils/prismApi';
 import { api } from '../utils/api';
-import { FiCheckCircle, FiPlus, FiSend, FiMessageSquare, FiDollarSign, FiLink } from 'react-icons/fi';
+import { FiCheckCircle, FiPlus, FiSend, FiMessageSquare, FiDollarSign, FiLink, FiMap } from 'react-icons/fi';
 import ExecutionSummaryModal from './ExecutionSummaryModal';
 import ExecutionProgress from './ExecutionProgress';
 import TokenAnalysisModal from './TokenAnalysisModal';
 import TokenSavingsDashboard from './TokenSavingsDashboard';
 import PromptTutorModal from './PromptTutorModal';
+import DataMapModal from './DataMapModal';
+import DataMapsView from './DataMapsView';
 
 export interface PrismConsoleProps {
   activeTab: 'terminal' | 'history' | 'chats';
@@ -32,14 +36,52 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 }) => {
   const { activeAddress, signTransactions } = useWallet();
 
+  // Navigation view mode ('console' vs 'datamaps')
+  const [viewMode, setViewMode] = useState<'console' | 'datamaps'>('console');
+
   // Input state
   const [taskDescription, setTaskDescription] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+
+  // Listen for navbar Data Maps toggle event
+  useEffect(() => {
+    const handleToggle = () => {
+      setViewMode((prev) => (prev === 'datamaps' ? 'console' : 'datamaps'));
+    };
+    window.addEventListener('prism_toggle_data_maps_view', handleToggle);
+    return () => window.removeEventListener('prism_toggle_data_maps_view', handleToggle);
+  }, []);
+
+  /** Reset all state and start a fresh chat session. */
+  const handleNewChat = useCallback(() => {
+    setTaskDescription('');
+    setAttachedFiles([]);
+    setPromptAnalysis(null);
+    setShowPromptTutorModal(false);
+    setDataMap(null);
+    setShowDataMapModal(false);
+    setExecutionPlan(null);
+    setTaskResult(null);
+    setError('');
+    setChatHistory([]);
+    setConversationId(null);  // null so saveThread creates a fresh conversation
+    isProcessingRef.current = false;
+    setViewMode('console');
+  }, []);
+
+  // Listen for navbar New Chat event
+  useEffect(() => {
+    window.addEventListener('prism_new_chat', handleNewChat);
+    return () => window.removeEventListener('prism_new_chat', handleNewChat);
+  }, [handleNewChat]);
+
 
   // Pipeline state
   const [isPlanning, setIsPlanning] = useState(false);
   const [promptAnalysis, setPromptAnalysis] = useState<PromptAnalysisResult | null>(null);
   const [showPromptTutorModal, setShowPromptTutorModal] = useState(false);
+  const [dataMap, setDataMap] = useState<DataMapResult | null>(null);
+  const [showDataMapModal, setShowDataMapModal] = useState(false);
   const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -269,7 +311,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       setShowSummaryModal(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning failed.';
-      setError(msg);
+      // Only push the error into chatHistory — do NOT also call setError() to avoid duplicate display
       const errItem = {
         id: `msg-plan-err-${Date.now()}`,
         prompt: promptToUse,
@@ -315,6 +357,29 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     } catch (err) {
       console.warn('Prompt Tutor analysis error (falling back to direct execution):', err);
       await runPlanTask(taskDescription, attachedFiles);
+    }
+  };
+
+  const handleOpenDataMap = async () => {
+    try {
+      let analysisToUse = promptAnalysis;
+      if (!analysisToUse) {
+        analysisToUse = await analyzePromptWithTutor(apiBaseUrl, taskDescription, attachedFiles);
+        setPromptAnalysis(analysisToUse);
+      }
+      const map = await fetchGeneratedDataMap(
+        apiBaseUrl,
+        analysisToUse,
+        taskDescription,
+        attachedFiles,
+        undefined,
+        undefined,
+        conversationId || undefined
+      );
+      setDataMap(map);
+      setShowDataMapModal(true);
+    } catch (err) {
+      console.warn('Data Map generation error (non-fatal):', err);
     }
   };
 
@@ -411,10 +476,9 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       if (onTaskComplete) onTaskComplete();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error.';
-      setError(msg);
       setPaymentStatus('');
       setExecProgress(null);
-
+      // Only push the error into chatHistory — do NOT also call setError() to avoid duplicate display
       const errItem2 = {
         id: `msg-err-${Date.now()}`,
         prompt: taskDescription,
@@ -778,6 +842,22 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
           onUseImproved={handleUseImprovedPrompt}
           onKeepOriginal={handleKeepOriginalPrompt}
           onClose={handleCancelPromptTutor}
+          onOpenDataMap={handleOpenDataMap}
+        />
+      )}
+
+      {showDataMapModal && dataMap && (
+        <DataMapModal
+          dataMap={dataMap}
+          onClose={() => setShowDataMapModal(false)}
+          onProceedToExecution={() => {
+            setShowDataMapModal(false);
+            if (promptAnalysis) {
+              handleUseImprovedPrompt(promptAnalysis.improvedPrompt || taskDescription);
+            } else {
+              runPlanTask(taskDescription, attachedFiles);
+            }
+          }}
         />
       )}
 
@@ -801,11 +881,20 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
       {/* TERMINAL TAB */}
       {activeTab === 'terminal' && (
-        <div
-          className={`w-full flex flex-col items-center relative ${
-            chatHistory.length > 0 ? 'justify-between min-h-screen pt-24 pb-36' : 'justify-center min-h-[calc(100vh-80px)]'
-          }`}
-        >
+        viewMode === 'datamaps' ? (
+          <DataMapsView
+            apiBaseUrl={apiBaseUrl}
+            onOpenDataMap={(selectedMap) => {
+              setDataMap(selectedMap);
+              setShowDataMapModal(true);
+            }}
+          />
+        ) : (
+          <div
+            className={`w-full flex flex-col items-center relative ${
+              chatHistory.length > 0 ? 'justify-between min-h-screen pt-24 pb-36' : 'justify-center min-h-[calc(100vh-80px)]'
+            }`}
+          >
           {chatHistory.length === 0 && !loading && !isPlanning && (
             <div className="w-full max-w-4xl animate-fade-in flex flex-col items-center justify-center gap-8 my-auto">
               <div className="text-center">
@@ -935,9 +1024,20 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
                               Execution Result Output
                             </h4>
                           </div>
-                          <span className="text-[10px] font-semibold text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-full border border-slate-800/60">
-                            {item.result.category}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenDataMap();
+                              }}
+                              className="btn btn-xs rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold flex items-center gap-1"
+                            >
+                              <FiMap className="text-xs" /> Data Map
+                            </button>
+                            <span className="text-[10px] font-semibold text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-full border border-slate-800/60">
+                              {item.result.category}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 text-[10px]">
@@ -1170,6 +1270,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
             </div>
           )}
         </div>
+        )
       )}
 
       {/* HISTORY TAB */}

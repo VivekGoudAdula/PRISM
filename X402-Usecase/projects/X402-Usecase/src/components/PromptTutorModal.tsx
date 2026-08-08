@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { PromptAnalysisResult } from '../utils/prismApi';
-import { FiZap, FiCheck, FiCopy, FiInfo, FiAlertTriangle, FiCheckCircle, FiX } from 'react-icons/fi';
+import { FiZap, FiCheck, FiCopy, FiInfo, FiAlertTriangle, FiCheckCircle, FiX, FiMap } from 'react-icons/fi';
 
 export interface PromptTutorModalProps {
   analysis: PromptAnalysisResult;
@@ -8,6 +8,7 @@ export interface PromptTutorModalProps {
   onUseImproved: (improvedPrompt: string) => void;
   onKeepOriginal: () => void;
   onClose: () => void;
+  onOpenDataMap?: () => void;
 }
 
 export const PromptTutorModal: React.FC<PromptTutorModalProps> = ({
@@ -16,6 +17,7 @@ export const PromptTutorModal: React.FC<PromptTutorModalProps> = ({
   onUseImproved,
   onKeepOriginal,
   onClose,
+  onOpenDataMap,
 }) => {
   const {
     score = 70,
@@ -58,10 +60,10 @@ export const PromptTutorModal: React.FC<PromptTutorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 animate-fade-in"
-      style={{ background: 'rgba(2, 4, 18, 0.85)', backdropFilter: 'blur(12px)' }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 animate-fade-in"
+      style={{ background: 'rgba(2, 4, 18, 0.88)', backdropFilter: 'blur(12px)' }}
     >
-      <div className="w-full max-w-5xl liquid-glass flex flex-col max-h-[85vh] animate-scale-up overflow-hidden text-slate-100 font-sans">
+      <div className="w-full max-w-5xl liquid-glass flex flex-col max-h-[90vh] h-auto animate-scale-up overflow-hidden text-slate-100 font-sans border border-indigo-500/25 rounded-3xl shadow-2xl">
         {/* Widescreen Apple Liquid Glass Header */}
         <div className="px-6 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
           <div className="flex items-center gap-3">
@@ -246,6 +248,16 @@ export const PromptTutorModal: React.FC<PromptTutorModalProps> = ({
           </button>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            {onOpenDataMap && (
+              <button
+                type="button"
+                onClick={onOpenDataMap}
+                className="flex-1 sm:flex-initial btn border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/15 hover:border-indigo-400 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <FiMap className="text-sm" />
+                Data Map
+              </button>
+            )}
             <button
               type="button"
               onClick={onKeepOriginal}

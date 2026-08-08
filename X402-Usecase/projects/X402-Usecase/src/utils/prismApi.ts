@@ -25,6 +25,49 @@ export interface PromptAnalysisResult {
   improvedPrompt: string;
   modelUsed?: string;
 }
+
+export interface DataMapNode {
+  id: string;
+  type: string;
+  label: string;
+  description?: string;
+  category?: string;
+  parentId?: string;
+  importance: number;
+  tokenEstimate: number;
+  relevanceScore: number;
+  includedInContext: boolean;
+  metadata?: any;
+}
+
+export interface DataMapEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: string;
+  weight: number;
+  metadata?: any;
+}
+
+export interface DataMapResult {
+  id?: string;
+  title?: string;
+  chatId?: string;
+  taskType: string;
+  rootNodeId: string;
+  nodes: DataMapNode[];
+  edges: DataMapEdge[];
+  metadata: {
+    nodeCount: number;
+    edgeCount: number;
+    relevancePercent: number;
+    estimatedContextTokens: number;
+    potentiallyIrrelevantTokens: number;
+    taskIntent: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
 export interface ProviderCandidate {
   endpoint_path: string;
   price: number;
@@ -468,4 +511,83 @@ export async function analyzePromptWithTutor(
 
   return await response.json();
 }
+
+// ─── Phase 0.5: Data Map (Interactive Semantic Graph) ───────────────────────
+
+export async function fetchGeneratedDataMap(
+  baseUrl: string,
+  promptAnalysis: PromptAnalysisResult,
+  originalPrompt: string,
+  files: AttachedFile[],
+  category?: string,
+  taskId?: string,
+  chatId?: string
+): Promise<DataMapResult> {
+  const url = `${baseUrl}/api/data-map/generate`;
+  const token = localStorage.getItem('prism_access_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      promptAnalysis,
+      originalPrompt,
+      files: files.map((f) => ({ filename: f.filename, content_base64: f.content_base64 || '' })),
+      category,
+      taskId,
+      chatId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error((errData as any).error || `Data Map generation failed: HTTP ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+export async function fetchUserDataMaps(baseUrl: string): Promise<DataMapResult[]> {
+  const url = `${baseUrl}/api/data-map/user`;
+  const token = localStorage.getItem('prism_access_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error('Failed to fetch user Data Maps');
+  return await response.json();
+}
+
+export async function fetchChatDataMap(baseUrl: string, chatId: string): Promise<DataMapResult> {
+  const url = `${baseUrl}/api/data-map/chat/${chatId}`;
+  const token = localStorage.getItem('prism_access_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error('Failed to fetch chat Data Map');
+  return await response.json();
+}
+
+export async function renameDataMap(baseUrl: string, mapId: string, title: string): Promise<DataMapResult> {
+  const url = `${baseUrl}/api/data-map/${mapId}/title`;
+  const token = localStorage.getItem('prism_access_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error('Failed to rename Data Map');
+  return await response.json();
+}
+
 

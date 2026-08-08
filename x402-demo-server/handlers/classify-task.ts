@@ -61,9 +61,18 @@ export async function handleClassifyTaskRequest(c: Context) {
       const hasGitHubUrl = lowerDesc.includes('github.com/');
       const hasCodeReviewIntent = lowerDesc.includes('review') || lowerDesc.includes('repo') || lowerDesc.includes('code');
 
-      if (!hasGitHubUrl && !hasCodeReviewIntent) {
-        // Any task-type keyword without files or github repo is unsupported (nothing to process).
-        console.log('[classify-task] Pre-check: no files, no prior result, no repo → unsupported');
+      // Known task keywords — let LLM classify even without files attached
+      const hasTaskKeyword =
+        lowerDesc.includes('resume') || lowerDesc.includes('candidate') || lowerDesc.includes('cv') ||
+        lowerDesc.includes('hiring') || lowerDesc.includes('screen') ||
+        lowerDesc.includes('contract') || lowerDesc.includes('agreement') || lowerDesc.includes('nda') ||
+        lowerDesc.includes('clause') || lowerDesc.includes('legal') ||
+        lowerDesc.includes('invoice') || lowerDesc.includes('receipt') || lowerDesc.includes('bill') ||
+        lowerDesc.includes('extract');
+
+      if (!hasGitHubUrl && !hasCodeReviewIntent && !hasTaskKeyword) {
+        // Truly uninterpretable — nothing to process.
+        console.log('[classify-task] Pre-check: no files, no prior result, no repo, no task keyword → unsupported');
         return c.json({ category: 'unsupported', raw_input: task_description });
       }
     }
@@ -183,9 +192,12 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
 
 /**
  * Fallback classification method if LLM API is not available.
+ * Checks for keyword signals across all supported categories.
  */
 function localClassify(description: string): string {
   const desc = description.toLowerCase().trim();
+
+  // Conversational greetings / small talk
   if (
     desc === 'hi' || desc === 'hello' || desc === 'hey' ||
     desc.includes('what can you do') ||
@@ -194,17 +206,43 @@ function localClassify(description: string): string {
   ) {
     return 'conversational';
   }
-  if (desc.includes('code') || desc.includes('repo') || desc.includes('github') || desc.includes('review')) {
+
+  // Code review — check before resume because "review" appears in both
+  if (desc.includes('github.com/') || desc.includes('code review') ||
+      (desc.includes('repo') && desc.includes('review'))) {
     return 'code_review';
   }
-  if (desc.includes('resume') || desc.includes('resum') || desc.includes('cv') || desc.includes('candidate') || desc.includes('hiring')) {
+
+  // Resume screening — broad set of keywords
+  if (
+    desc.includes('resume') || desc.includes('resum') || desc.includes('cv') ||
+    desc.includes('candidate') || desc.includes('hiring') ||
+    desc.includes('screen') || desc.includes('applicant') ||
+    desc.includes('job') || desc.includes('role') || desc.includes('developer') ||
+    desc.includes('engineer') || desc.includes('qualification') ||
+    desc.includes('recommendation') || desc.includes('backend') ||
+    desc.includes('frontend') || desc.includes('fullstack') || desc.includes('full-stack')
+  ) {
     return 'resume_screening';
   }
-  if (desc.includes('contract') || desc.includes('agreement') || desc.includes('nda') || desc.includes('clause') || desc.includes('legal')) {
+
+  // Contract / legal
+  if (
+    desc.includes('contract') || desc.includes('agreement') || desc.includes('nda') ||
+    desc.includes('clause') || desc.includes('legal') || desc.includes('termination') ||
+    desc.includes('liability') || desc.includes('indemnif')
+  ) {
     return 'contract_analysis';
   }
-  if (desc.includes('invoice') || desc.includes('receipt') || desc.includes('bill') || desc.includes('extract invoice')) {
+
+  // Invoice / billing
+  if (
+    desc.includes('invoice') || desc.includes('receipt') || desc.includes('bill') ||
+    desc.includes('extract invoice') || desc.includes('vendor') ||
+    desc.includes('line item') || desc.includes('payment due')
+  ) {
     return 'invoice_extraction';
   }
+
   return 'unsupported';
 }
