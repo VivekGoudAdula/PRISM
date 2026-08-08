@@ -86,6 +86,25 @@ export interface PaymentPreviewItem {
   label: string;
 }
 
+export interface PromptOptimizationResult {
+  originalPrompt: string;
+  optimizedPrompt: string;
+  originalInputTokens: number;
+  optimizedInputTokens: number;
+  tokensSaved: number;
+  reductionPercentage: number;
+  compressionRatio: number;
+  preservedEntities: string[];
+  preservedRelationships: string[];
+  preservedConstraints: string[];
+  removedRedundancies: string[];
+  removedIrrelevantContext: string[];
+  summarizedSections: string[];
+  optimizationApplied: boolean;
+  modelUsed: string;
+  measurementSource: 'provider_usage' | 'estimated' | 'hybrid';
+}
+
 export interface ExecutionPlan {
   planId: string;
   category: string;
@@ -99,6 +118,17 @@ export interface ExecutionPlan {
   estimatedTimeSeconds: number;
   estimatedAccuracy: number;
   candidates: ProviderCandidate[];
+  originalInputTokens?: number;
+  optimizedInputTokens?: number;
+  tokensSaved?: number;
+  reductionPercentage?: number;
+  cacheTokensSaved?: number;
+  optimizerTokensSaved?: number;
+  totalTokensSaved?: number;
+  optimizationApplied?: boolean;
+  optimizedPrompt?: string;
+  promptOptimizer?: PromptOptimizationResult;
+  semanticCache?: SemanticCacheData;
   capped?: boolean;
   total_files_found?: number;
   cap_message?: string;
@@ -131,6 +161,17 @@ export interface TokenAnalytics {
   cacheTokensSaved: number;
   measurementSource: 'provider_usage' | 'estimated' | 'hybrid';
   currency: string;
+  rawContextTokens?: number;
+  dataMapTokens?: number;
+  dataMapTokensSaved?: number;
+  cacheInputTokens?: number;
+  cachedContextTokens?: number;
+  cacheTokensAvoided?: number;
+  optimizerInputTokens?: number;
+  optimizedContextTokens?: number;
+  optimizerTokensSaved?: number;
+  finalProviderContextTokens?: number;
+  prismTotalTokensSaved?: number;
 }
 
 export interface SemanticCacheData {
@@ -170,6 +211,13 @@ export interface ExecuteTaskResponse {
   executionProgressLog?: ExecutionProgressEntry[];
   extracted_files?: Array<{ filename: string; method: string }>;
   tokenAnalytics?: TokenAnalytics;
+  promptOptimizer?: PromptOptimizationResult & {
+    enabled?: boolean;
+    applied?: boolean;
+    originalTokens?: number;
+    optimizedTokens?: number;
+    preservationValidated?: boolean;
+  };
   semanticCache?: SemanticCacheData;
   savings_this_request?: {
     raw_tokens: number;

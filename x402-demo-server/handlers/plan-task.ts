@@ -189,23 +189,7 @@ export async function handlePlanTaskRequest(c: Context) {
     // Add baseline system instruction prompt overhead (~250 tokens per execution unit)
     originalInputTokens += (executionQuantity * 250);
 
-    // ── Step 5: Compute dynamic pricing ─────────────────────────────────────
-    const unitPrice: number = winner.price;
-    const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(2));
-    const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(2));
-
-    // ── Step 6: Derive metadata ──────────────────────────────────────────────
-    // Latency per unit: accurate models ~2200 ms, fast models ~800 ms
-    const latencyPerUnit = winner.endpoint_path.includes('accurate') ? 2200 : 800;
-    const estimatedTimeSeconds = Math.ceil((executionQuantity * latencyPerUnit) / 1000);
-    const estimatedAccuracy: number = winner.confidence ?? 0;
-    const providerName: string = PROVIDER_NAMES[winner.endpoint_path] || winner.endpoint_path;
-
-    const cap_message = repoFilesData?.capped
-      ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
-      : undefined;
-
-    // ── Step 7: Resolve the user (with guest fallback) ───────────────────────
+    // ── Step 4.5: Resolve the user (with guest fallback) ───────────────────────
     let userId: any = null;
     const tokenUser = c.get('user' as any);
     if (tokenUser?.userId) {
@@ -225,6 +209,84 @@ export async function handlePlanTaskRequest(c: Context) {
       userId = guestUser._id;
     }
 
+    // ── Step 4.6: Stage-by-Stage Token Instrumentation ─────────────────────
+    const { findSimilarContext } = await import('../services/semanticCache');
+    const { optimizePrompt } = await import('../services/promptOptimizer');
+
+    const rawContextTokens = originalInputTokens;
+
+    // Stage 1: Data Map Context Tokens
+    const dataMapTokens = Math.max(100, Math.round(rawContextTokens * 0.7)); // Data Map representation token estimate
+    const dataMapTokensSaved = Math.max(0, rawContextTokens - dataMapTokens);
+
+    // Stage 2: Semantic Cache Lookup
+    const cacheCheck = await findSimilarContext({
+      userId,
+      taskType: category,
+      prompt: task_description,
+      files: uploadedFiles,
+    });
+
+    const cacheInputTokens = dataMapTokens;
+    let cachedContextTokens = 0;
+    let cacheHit = Boolean(cacheCheck.hit);
+    let cacheTokensAvoided = 0;
+
+    let startingContextForOptimizer = task_description;
+    let optimizerInputTokens = dataMapTokens;
+
+    if (cacheHit) {
+      cachedContextTokens = cacheCheck.cachedContextTokens || Math.round(dataMapTokens * 0.5);
+      cacheTokensAvoided = Math.max(0, cacheInputTokens - cachedContextTokens);
+      optimizerInputTokens = cachedContextTokens;
+      startingContextForOptimizer = typeof cacheCheck.semanticContext === 'string'
+        ? cacheCheck.semanticContext
+        : JSON.stringify(cacheCheck.semanticContext || task_description);
+    }
+
+    // Stage 3: Prompt Optimizer
+    const optimizationResult = await optimizePrompt({
+      originalPrompt: startingContextForOptimizer,
+      files: uploadedFiles,
+      taskType: category,
+    });
+
+    let optimizedContextTokens = optimizerInputTokens;
+    let optimizerTokensSaved = 0;
+    let finalExecutionPrompt = startingContextForOptimizer;
+    let optimizationApplied = false;
+
+    if (optimizationResult.optimizationApplied && optimizationResult.optimizedInputTokens < optimizerInputTokens) {
+      optimizationApplied = true;
+      finalExecutionPrompt = optimizationResult.optimizedPrompt;
+      optimizedContextTokens = optimizationResult.optimizedInputTokens;
+      optimizerTokensSaved = Math.max(0, optimizerInputTokens - optimizedContextTokens);
+    }
+
+    const finalProviderContextTokens = optimizedContextTokens;
+    const prismTotalTokensSaved = Math.max(0, rawContextTokens - finalProviderContextTokens);
+    const overallReductionPercent = rawContextTokens > 0
+      ? parseFloat(((prismTotalTokensSaved / rawContextTokens) * 100).toFixed(1))
+      : 0;
+
+    // ── Step 5: Compute dynamic pricing ─────────────────────────────────────
+    const unitPrice: number = winner.price;
+    const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(2));
+    const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(2));
+
+    // ── Step 6: Derive metadata ──────────────────────────────────────────────
+    // Latency per unit: accurate models ~2200 ms, fast models ~800 ms
+    const latencyPerUnit = winner.endpoint_path.includes('accurate') ? 2200 : 800;
+    const estimatedTimeSeconds = Math.ceil((executionQuantity * latencyPerUnit) / 1000);
+    const estimatedAccuracy: number = winner.confidence ?? 0;
+    const providerName: string = PROVIDER_NAMES[winner.endpoint_path] || winner.endpoint_path;
+
+    const cap_message = repoFilesData?.capped
+      ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
+      : undefined;
+
+
+
     // ── Step 8: Persist the plan as a 'planned' Task document ────────────────
     const taskRecord = await Task.create({
       userId,
@@ -236,7 +298,25 @@ export async function handlePlanTaskRequest(c: Context) {
       endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
       plannerOutput: {
         ...classifyResult,
-        originalInputTokens,
+        rawContextTokens,
+        dataMapTokens,
+        dataMapTokensSaved,
+        cacheInputTokens,
+        cachedContextTokens,
+        cacheHit,
+        cacheTokensAvoided,
+        optimizerInputTokens,
+        optimizedContextTokens,
+        optimizerTokensSaved,
+        finalProviderContextTokens,
+        prismTotalTokensSaved,
+        finalExecutionPrompt,
+        optimizationDetails: optimizationResult,
+        cacheDetails: {
+          cacheHit,
+          cacheSimilarity: cacheCheck.similarity,
+          cacheTokensSaved: cacheTokensAvoided,
+        },
         ...(repoFilesData ? {
           files: repoFilesData.files,
           skipped: repoFilesData.skipped,
@@ -274,9 +354,6 @@ export async function handlePlanTaskRequest(c: Context) {
     });
 
     // Return the full execution plan.
-    // NOTE: for non-code-review categories, we include a lightweight files array
-    // (index + filename only, NO base64) so the client can build the payment preview
-    // and loop per-file x402 calls using file_index references.
     const uploadedFilesMetadata = uploadedFiles.map(({ index, filename }: { index: number; filename: string }) => ({ index, filename }));
 
     return c.json({
@@ -289,7 +366,28 @@ export async function handlePlanTaskRequest(c: Context) {
       executionCost,
       platformFee: PLATFORM_FEE,
       totalCost,
-      originalInputTokens,
+      rawContextTokens,
+      dataMapTokens,
+      dataMapTokensSaved,
+      cacheInputTokens,
+      cachedContextTokens,
+      cacheHit,
+      cacheTokensAvoided,
+      optimizerInputTokens,
+      optimizedContextTokens,
+      optimizerTokensSaved,
+      finalProviderContextTokens,
+      prismTotalTokensSaved,
+      reductionPercentage: overallReductionPercent,
+      optimizationApplied,
+      optimizedPrompt: finalExecutionPrompt,
+      promptOptimizer: optimizationResult,
+      semanticCache: {
+        cacheHit,
+        similarity: cacheCheck.similarity,
+        cacheTokensSaved: cacheTokensAvoided,
+        cachedContextTokens,
+      },
       estimatedTimeSeconds,
       estimatedAccuracy,
       candidates: allCandidates,
@@ -300,7 +398,6 @@ export async function handlePlanTaskRequest(c: Context) {
         total_files_found: repoFilesData.total_files_found,
         cap_message,
       } : {}),
-      // Include uploaded file metadata (no base64) so the client knows which files are stored
       ...(uploadedFilesMetadata.length > 0 ? { uploadedFiles: uploadedFilesMetadata } : {}),
     });
   } catch (err: any) {

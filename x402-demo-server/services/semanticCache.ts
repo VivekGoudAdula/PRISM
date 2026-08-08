@@ -22,9 +22,11 @@ export function createContextFingerprint(prompt: string, files: any[] = []): str
   const normPrompt = normalizeQuery(prompt);
   const fileDigest = (files || [])
     .map((f) => {
-      const name = f.filename || f.path || f.file_path || '';
-      const text = f.text || f.content_base64 || f.raw_url || '';
-      return `${name}:${text.slice(0, 500)}`;
+      const name = f.filename || f.path || f.file_path || f.name || '';
+      const text = f.text || f.extracted_text || f.content_base64 || f.raw_url || f.content || '';
+      // Include deterministic hash of the actual file text content
+      const contentHash = crypto.createHash('md5').update(text).digest('hex');
+      return `${name}:${contentHash}`;
     })
     .sort()
     .join('|');
@@ -176,7 +178,7 @@ export async function findSimilarContext(options: CheckCacheOptions): Promise<Ca
 
   if (bestMatch && highestSim >= threshold) {
     // Update hit stats non-blocking
-    SemanticCache.findByIdAndUpdate(bestMatch._id, {
+    SemanticCache.findByIdAndUpdate((bestMatch as any)._id, {
       $inc: { hitCount: 1 },
       $set: { lastUsedAt: new Date() },
     }).catch(() => {});

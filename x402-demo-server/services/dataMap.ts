@@ -202,11 +202,13 @@ function generateResumeScreeningNodes(
   const pLower = prompt.toLowerCase();
   
   // Target Role
-  let roleTitle = 'Backend Engineer';
-  if (pLower.includes('full stack') || pLower.includes('fullstack')) roleTitle = 'Full Stack Engineer';
+  let roleTitle = 'Evaluated Candidate Role';
+  if (pLower.includes('marketing')) roleTitle = 'Marketing Specialist';
+  else if (pLower.includes('full stack') || pLower.includes('fullstack')) roleTitle = 'Full Stack Engineer';
   else if (pLower.includes('frontend') || pLower.includes('react')) roleTitle = 'Frontend Engineer';
   else if (pLower.includes('ai') || pLower.includes('machine learning') || pLower.includes('ml')) roleTitle = 'AI / ML Engineer';
-  else if (pLower.includes('senior')) roleTitle = 'Senior AI Engineer';
+  else if (pLower.includes('backend') || pLower.includes('node') || pLower.includes('python')) roleTitle = 'Backend Engineer';
+  else if (pLower.includes('senior')) roleTitle = 'Senior Engineer';
 
   const roleId = 'role-1';
   nodes.push({
@@ -239,10 +241,21 @@ function generateResumeScreeningNodes(
   });
   addEdge(roleId, reqContainerId, 'requires', 0.95);
 
-  // Individual Required Skills
-  const reqSkills = ['Python', 'Machine Learning', 'Docker', 'PostgreSQL', 'REST API', 'LLM Architectures'];
-  const reqSkillNodes: Array<{ id: string; name: string }> = [];
+  // Extract requirements dynamically from prompt or requiredInfo
+  let reqSkills: string[] = [];
+  if (requiredInfo && requiredInfo.length > 0) {
+    reqSkills = requiredInfo.slice(0, 6);
+  } else {
+    // Dynamic extraction from prompt text
+    const extractedPromptSkills = prompt.match(/\b(Marketing|SEO|Copywriting|Campaigns|Analytics|Python|Docker|React|TypeScript|Node|PostgreSQL|AWS|SQL|Communication|Leadership|Strategy)\b/gi) || [];
+    reqSkills = Array.from(new Set(extractedPromptSkills.map((s) => s.trim())));
+  }
 
+  if (reqSkills.length === 0) {
+    reqSkills = ['Role Competencies', 'Core Experience'];
+  }
+
+  const reqSkillNodes: Array<{ id: string; name: string }> = [];
   reqSkills.forEach((skill, idx) => {
     const sId = `req-skill-${idx + 1}`;
     reqSkillNodes.push({ id: sId, name: skill });
@@ -261,39 +274,55 @@ function generateResumeScreeningNodes(
     addEdge(reqContainerId, sId, 'requires_skill', 0.9);
   });
 
-  // Candidate Resumes (support 1, 2, 3 or more resumes individually)
-  const fileList = files.length > 0 ? files : [
-    { filename: 'Akshay_Sagar_Resume.pdf' },
-    { filename: 'Sarah_Chen_Resume.pdf' },
-    { filename: 'David_Miller_Resume.pdf' }
-  ];
+  // Candidate Resumes — strictly use provided files without hardcoded fallbacks
+  const currentFiles = (files || []).filter((f) => f && (f.filename || f.text));
 
-  fileList.forEach((file, idx) => {
-    const candidateName = file.filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+  if (currentFiles.length === 0) {
+    // If no files attached, generate single generic candidate node derived from prompt
+    const candId = 'cand-1';
+    nodes.push({
+      id: candId,
+      type: 'document',
+      label: 'Submitted Candidate Data',
+      description: 'Candidate text input from prompt',
+      category: 'candidate',
+      parentId: rootId,
+      importance: 9,
+      tokenEstimate: estimateTokens(prompt) + 100,
+      relevanceScore: 0.9,
+      includedInContext: true,
+    });
+    addEdge(roleId, candId, 'evaluates_candidate', 0.95);
+    return;
+  }
+
+  currentFiles.forEach((file, idx) => {
+    const cleanFilename = file.filename || `Candidate_${idx + 1}.pdf`;
+    const candidateName = cleanFilename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
     const candId = `cand-${idx + 1}`;
 
+    const textContent = file.text || '';
     nodes.push({
       id: candId,
       type: 'document',
       label: candidateName,
-      description: `Candidate Resume Source: ${file.filename}`,
+      description: `Candidate Resume Source: ${cleanFilename}`,
       category: 'candidate',
       parentId: rootId,
       importance: 9,
-      tokenEstimate: estimateTokens(file.text || file.filename || '') + 400,
+      tokenEstimate: estimateTokens(textContent || cleanFilename) + 200,
       relevanceScore: 0.92,
       includedInContext: true,
     });
-    // Connect candidate back to Target Role so graph branches cleanly
     addEdge(roleId, candId, 'evaluates_candidate', 0.95);
 
-    // Candidate Skills specific to each resume
-    const candidateSkillSets = [
-      ['Python', 'Machine Learning', 'Docker', 'PyTorch'],
-      ['Python', 'REST API', 'PostgreSQL', 'TypeScript'],
-      ['Machine Learning', 'Docker', 'LLM Architectures', 'C++']
-    ];
-    const mySkills = candidateSkillSets[idx % candidateSkillSets.length];
+    // Extract dynamic skills from candidate file text
+    const extractedSkills = textContent.match(/\b(Marketing|SEO|Copywriting|Social Media|Brand Strategy|Analytics|Campaigns|Content Creation|Python|Docker|React|SQL|Java|Management|Leadership|Sales)\b/gi) || [];
+    let mySkills = Array.from(new Set(extractedSkills.map((s) => s.trim()))).slice(0, 5);
+
+    if (mySkills.length === 0) {
+      mySkills = [`Candidate Skill (${candidateName.split(' ')[0]})`];
+    }
 
     mySkills.forEach((cSkill, sIdx) => {
       const csId = `cand-${idx + 1}-skill-${sIdx + 1}`;
@@ -311,49 +340,29 @@ function generateResumeScreeningNodes(
       });
       addEdge(candId, csId, 'has_skill', 0.85);
 
-      // Connect Candidate Skill -> Target Required Skill (MATCHED_BY)
       const matchedReq = reqSkillNodes.find((rs) => rs.name.toLowerCase() === cSkill.toLowerCase());
       if (matchedReq) {
         addEdge(csId, matchedReq.id, 'matched_by', 0.98);
       }
     });
 
-    // Candidate Experience
-    const expRoles = ['ML Engineer (4 Yrs)', 'Backend Developer (3 Yrs)', 'AI Researcher (5 Yrs)'];
+    // Dynamic Experience derived from file text
     const expId = `cand-${idx + 1}-exp-1`;
-    const expRole = expRoles[idx % expRoles.length];
+    const expLabel = `${candidateName} Experience`;
     nodes.push({
       id: expId,
       type: 'experience',
-      label: `${expRole} (${candidateName.split(' ')[0]})`,
-      description: `${candidateName}'s Experience: ${expRole}`,
+      label: expLabel,
+      description: `${candidateName}'s Documented Work History`,
       category: 'candidate_experience',
       parentId: candId,
       importance: 8,
-      tokenEstimate: 180,
-      relevanceScore: 0.92,
+      tokenEstimate: 140,
+      relevanceScore: 0.9,
       includedInContext: true,
     });
     addEdge(candId, expId, 'has_experience', 0.9);
     addEdge(expId, roleId, 'relevant_to_role', 0.88);
-
-    // Candidate Projects
-    const projTitles = ['Recommendation System', 'Payment Gateway API', 'LLM RAG Engine'];
-    const projId = `cand-${idx + 1}-proj-1`;
-    const projTitle = projTitles[idx % projTitles.length];
-    nodes.push({
-      id: projId,
-      type: 'project',
-      label: `${projTitle} (${candidateName.split(' ')[0]})`,
-      description: `${candidateName}'s Project: ${projTitle}`,
-      category: 'candidate_project',
-      parentId: candId,
-      importance: 7,
-      tokenEstimate: 150,
-      relevanceScore: 0.88,
-      includedInContext: true,
-    });
-    addEdge(candId, projId, 'built_project', 0.85);
   });
 }
 
@@ -450,7 +459,7 @@ function generateContractAnalysisNodes(
   requiredInfo: string[]
 ) {
   const contractId = 'contract-1';
-  const contractName = files[0]?.filename ? files[0].filename : 'Master Services Agreement.pdf';
+  const contractName = files[0]?.filename ? files[0].filename : 'Submitted Contract Document';
 
   nodes.push({
     id: contractId,
@@ -460,7 +469,7 @@ function generateContractAnalysisNodes(
     category: 'contract',
     parentId: rootId,
     importance: 10,
-    tokenEstimate: 650,
+    tokenEstimate: estimateTokens(files[0]?.text || prompt) + 300,
     relevanceScore: 1.0,
     includedInContext: true,
   });
@@ -551,7 +560,7 @@ function generateInvoiceExtractionNodes(
   requiredInfo: string[]
 ) {
   const invId = 'invoice-1';
-  const invName = files[0]?.filename ? files[0].filename : 'Invoice #INV-2026-88.pdf';
+  const invName = files[0]?.filename ? files[0].filename : 'Submitted Invoice Document';
 
   nodes.push({
     id: invId,

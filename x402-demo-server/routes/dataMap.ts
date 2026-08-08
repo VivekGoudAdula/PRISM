@@ -77,11 +77,16 @@ dataMapRouter.post('/generate', async (c) => {
       files,
     });
 
+    // Diagnostic logging
+    const fileSummary = (files || []).map((f: any) => f?.filename || 'unnamed').join(', ') || 'none';
+    console.log(`[DataMap] source files = ${fileSummary}`);
+    console.log(`[DataMap] sourceFingerprint = ${cacheCheck.sourceFingerprint}`);
+    console.log(`[DataMap] cache HIT/MISS = ${cacheCheck.hit ? 'HIT' : 'MISS'} (similarity: ${(cacheCheck.similarity * 100).toFixed(1)}%)`);
+
     let semanticContextToUse = generatedMap;
 
     if (cacheCheck.hit && cacheCheck.semanticContext) {
-      console.log(`✓ SEMANTIC CACHE HIT (${(cacheCheck.similarity * 100).toFixed(1)}% similarity) - Reusing cached semantic context`);
-      // Re-use cached nodes/edges for data graph while preserving generated metadata for prompt intent
+      console.log(`✓ SEMANTIC CACHE HIT - Reusing cached semantic context`);
       semanticContextToUse = {
         ...generatedMap,
         nodes: cacheCheck.semanticContext.nodes || generatedMap.nodes,
@@ -89,7 +94,6 @@ dataMapRouter.post('/generate', async (c) => {
       };
     } else {
       console.log(`⚡ SEMANTIC CACHE MISS - Saving newly generated Data Map representation`);
-      // Save semantic context asynchronously
       saveContext({
         userId,
         chatId,
@@ -99,6 +103,9 @@ dataMapRouter.post('/generate', async (c) => {
         semanticContext: generatedMap,
       }).catch(() => {});
     }
+
+    console.log(`[DataMap] nodes = ${semanticContextToUse.nodes?.length || 0}`);
+    console.log(`[DataMap] edges = ${semanticContextToUse.edges?.length || 0}`);
 
     // Build DB record
     const mapData: any = {

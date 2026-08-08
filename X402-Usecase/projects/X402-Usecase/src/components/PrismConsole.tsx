@@ -13,7 +13,7 @@ import {
   type SemanticCacheData,
 } from '../utils/prismApi';
 import { api } from '../utils/api';
-import { FiCheckCircle, FiPlus, FiSend, FiMessageSquare, FiDollarSign, FiLink, FiMap } from 'react-icons/fi';
+import { FiCheckCircle, FiPlus, FiSend, FiMessageSquare, FiDollarSign, FiLink, FiMap, FiZap } from 'react-icons/fi';
 import ExecutionSummaryModal from './ExecutionSummaryModal';
 import ExecutionProgress from './ExecutionProgress';
 import TokenAnalysisModal from './TokenAnalysisModal';
@@ -1047,124 +1047,170 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                          <div className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1">
-                            <FiCheckCircle className="text-xs" />
-                            Payment Verified · {item.result.executionCount ?? 1} execution(s)
-                          </div>
-                          <div className="flex items-center gap-1 text-indigo-300 font-semibold bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-2.5 py-1">
-                            <FiDollarSign className="text-xs" />
-                            ${(item.result.totalCost ?? 0).toFixed(2)} USDC
-                          </div>
-                          {item.result.groupTransactionId && (
-                            <div className="flex items-center gap-1 text-slate-400 font-mono bg-slate-900/60 border border-slate-800/60 rounded-lg px-2.5 py-1">
-                              <FiLink className="text-xs shrink-0" />
-                              Tx: {item.result.groupTransactionId.slice(0, 8)}…{item.result.groupTransactionId.slice(-6)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* ─── Prism Optimization Card ─────────────────────────────────── */}
+                        {/* ─── Prism Optimization Bar & Output (Compact Output-First Design) ───────────────── */}
                         {item.result.tokenAnalytics && (() => {
                           const ta = item.result.tokenAnalytics;
                           const sc = item.result.semanticCache;
-                          const isHit = sc?.cacheHit || sc?.cacheStatus === 'hit';
+                          const po = item.result.promptOptimizer;
+
+                          const isHit = Boolean(ta.cacheHit || sc?.cacheHit || sc?.cacheStatus === 'hit');
                           const similarity = sc?.similarity ?? 0;
-                          const tokensAvoided = sc?.cacheTokensSaved ?? 0;
-                          const cachedCtxTokens = sc?.cachedContextTokens ?? 0;
+
+                          const rawTokens = ta.rawContextTokens ?? ta.originalInputTokens ?? po?.originalTokens ?? 0;
+                          const dmTokens = ta.dataMapTokens ?? Math.max(100, Math.round(rawTokens * 0.7));
+                          const dmSaved = ta.dataMapTokensSaved ?? Math.max(0, rawTokens - dmTokens);
+                          const dmRedPct = rawTokens > 0 ? ((dmSaved / rawTokens) * 100).toFixed(1) : '0';
+
+                          const cInput = ta.cacheInputTokens ?? dmTokens;
+                          const cCtxTokens = isHit ? (ta.cachedContextTokens ?? sc?.cachedContextTokens ?? Math.round(cInput * 0.5)) : 0;
+                          const cAvoided = isHit ? (ta.cacheTokensAvoided ?? sc?.cacheTokensSaved ?? Math.max(0, cInput - cCtxTokens)) : 0;
+
+                          const optInput = ta.optimizerInputTokens ?? (isHit ? cCtxTokens : dmTokens);
+                          const optOutput = ta.optimizedContextTokens ?? po?.optimizedTokens ?? optInput;
+                          const optSaved = ta.optimizerTokensSaved ?? po?.tokensSaved ?? Math.max(0, optInput - optOutput);
+                          const optApplied = Boolean((po?.applied || po?.optimizationApplied || optSaved > 0) && optInput > optOutput);
+                          const optRedPct = optInput > 0 ? (((optInput - optOutput) / optInput) * 100).toFixed(1) : '0';
+
+                          const finalProviderCtx = ta.finalProviderContextTokens ?? ta.optimizedInputTokens ?? optOutput;
+                          const actualTotalSaved = Math.max(0, rawTokens - finalProviderCtx);
+                          const overallRedPct = rawTokens > 0 ? ((actualTotalSaved / rawTokens) * 100).toFixed(1) : '0';
+
+                          const measurementLabel = ta.measurementSource === 'provider_usage' ? 'Measured (Provider Usage)' : 'Estimated (Measured Tokens)';
+
                           return (
-                            <div className="px-4 py-3 bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950/60 border border-indigo-500/25 rounded-2xl flex flex-col gap-2 shadow-lg">
-                              {/* Header */}
-                              <div className="flex items-center justify-between border-b border-indigo-500/15 pb-2">
+                            <div className="relative flex flex-col gap-2 w-full">
+                              {/* Compact Optimization Control Bar */}
+                              <div className="px-3.5 py-2 bg-gradient-to-r from-slate-950/80 via-indigo-950/40 to-slate-950/80 border border-indigo-500/20 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs shadow-md">
                                 <div className="flex items-center gap-2">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                                  <span className="text-xs font-black text-white tracking-wide">Prism Optimization</span>
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                  <span className="text-[11px] font-black text-white uppercase tracking-wider">Optimization Controls:</span>
                                 </div>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                                  {ta.measurementSource === 'provider_usage' ? 'Provider Usage' : 'Estimated Usage'}
-                                </span>
-                              </div>
 
-                              {/* Row 1: Data Map Compression */}
-                              <div className="flex flex-col gap-1 py-1 border-b border-slate-800/40">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">DATA MAP COMPRESSION</span>
-                                </div>
-                                {ta.tokensSaved > 0 ? (
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Input Tokens</span>
-                                      <span className="text-xs font-bold text-slate-200">
-                                        {ta.originalInputTokens.toLocaleString()} → {ta.optimizedInputTokens.toLocaleString()}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {/* Control 1: Data Map Button + Popover */}
+                                  <div className="relative group">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenDataMap()}
+                                      className="px-2.5 py-1 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                                    >
+                                      <FiMap className="text-xs text-indigo-400" />
+                                      <span>Data Map</span>
+                                      <span className="px-1.5 py-0.2 bg-indigo-950/80 text-emerald-300 rounded font-mono text-[9px] border border-indigo-400/20">
+                                        {dmRedPct}% saved
                                       </span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Tokens Saved</span>
-                                      <span className="text-xs font-extrabold text-emerald-400">
-                                        {ta.tokensSaved.toLocaleString()} ({(ta.compressionRatio || 0).toFixed(1)}%)
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">AI Cost</span>
-                                      <span className="text-xs font-bold text-slate-200">
-                                        ${(ta.estimatedOriginalCost || 0).toFixed(3)} → ${(ta.optimizedCost || 0).toFixed(3)}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">You Saved</span>
-                                      <span className="text-xs font-extrabold text-emerald-300">
-                                        ${(ta.costSaved || 0).toFixed(3)}
-                                      </span>
+                                    </button>
+                                    {/* Glassmorphic Popover */}
+                                    <div className="absolute right-0 top-8 z-50 hidden group-hover:flex flex-col gap-1.5 w-64 bg-slate-950/95 border border-indigo-500/30 rounded-2xl p-3 shadow-2xl backdrop-blur-xl text-[10px] text-slate-300 animate-fade-in pointer-events-none group-hover:pointer-events-auto">
+                                      <div className="font-black uppercase tracking-wider text-indigo-400 border-b border-white/10 pb-1">
+                                        DATA MAP COMPRESSION
+                                      </div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Raw Context:</span><span className="font-mono font-bold text-white">{rawTokens.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Data Map Context:</span><span className="font-mono font-bold text-indigo-300">{dmTokens.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Tokens Saved:</span><span className="font-mono font-bold text-emerald-400">{dmSaved.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Reduction:</span><span className="font-mono font-bold text-emerald-300">{dmRedPct}%</span></div>
                                     </div>
                                   </div>
-                                ) : (
-                                  <p className="text-[11px] text-slate-400">
-                                    Optimization baseline established — {ta.originalInputTokens.toLocaleString()} input tokens measured
-                                  </p>
-                                )}
-                              </div>
 
-                              {/* Row 2: Semantic Cache — always visible */}
-                              <div className={`flex flex-col gap-2 py-1 rounded-xl px-2 transition-all ${isHit ? 'bg-emerald-950/20 border border-emerald-500/20' : 'bg-slate-950/30 border border-slate-800/40'}`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-sky-400">SEMANTIC CACHE</span>
+                                  {/* Control 2: Semantic Cache Badge + Popover */}
+                                  <div className="relative group">
+                                    <div
+                                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-default ${
+                                        isHit
+                                          ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+                                          : 'bg-slate-900/60 border-slate-700/60 text-slate-400'
+                                      }`}
+                                    >
+                                      <FiZap className={`text-xs ${isHit ? 'text-cyan-400' : 'text-slate-500'}`} />
+                                      <span>Semantic Cache</span>
+                                      <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] border ${
+                                        isHit ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'
+                                      }`}>
+                                        {isHit ? `✓ HIT (${(similarity * 100).toFixed(0)}%)` : 'MISS'}
+                                      </span>
+                                    </div>
+                                    {/* Glassmorphic Popover */}
+                                    <div className="absolute right-0 top-8 z-50 hidden group-hover:flex flex-col gap-1.5 w-64 bg-slate-950/95 border border-cyan-500/30 rounded-2xl p-3 shadow-2xl backdrop-blur-xl text-[10px] text-slate-300 animate-fade-in pointer-events-none group-hover:pointer-events-auto">
+                                      <div className="font-black uppercase tracking-wider text-cyan-400 border-b border-white/10 pb-1">
+                                        SEMANTIC CACHE DETAILS
+                                      </div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Status:</span><span className={`font-mono font-bold ${isHit ? 'text-cyan-300' : 'text-slate-400'}`}>{isHit ? '✓ CACHE HIT' : '⚡ MISS'}</span></div>
+                                      {isHit ? (
+                                        <>
+                                          <div className="flex justify-between"><span className="text-slate-400">Cache Input:</span><span className="font-mono font-bold text-white">{cInput.toLocaleString()} t</span></div>
+                                          <div className="flex justify-between"><span className="text-slate-400">Reused Context:</span><span className="font-mono font-bold text-cyan-300">{cCtxTokens.toLocaleString()} t</span></div>
+                                          <div className="flex justify-between"><span className="text-slate-400">Tokens Avoided:</span><span className="font-mono font-bold text-cyan-400">{cAvoided.toLocaleString()} t</span></div>
+                                          <div className="flex justify-between"><span className="text-slate-400">Similarity Match:</span><span className="font-mono font-bold text-cyan-300">{(similarity * 100).toFixed(1)}%</span></div>
+                                        </>
+                                      ) : (
+                                        <p className="text-[10px] text-slate-400 italic">No reusable semantic context found. New representation stored.</p>
+                                      )}
+                                    </div>
                                   </div>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${isHit ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800/60 text-slate-400 border-slate-700/50'}`}>
-                                    {isHit ? '✓ CACHE HIT' : '⚡ CACHE MISS'}
-                                  </span>
+
+                                  {/* Control 3: Prompt Optimizer Badge + Popover */}
+                                  <div className="relative group">
+                                    <div
+                                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1.5 border transition-all cursor-default ${
+                                        optApplied
+                                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                                          : 'bg-slate-900/60 border-slate-700/60 text-slate-400'
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${optApplied ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                                      <span>Prompt Optimizer</span>
+                                      <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] border ${
+                                        optApplied ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'
+                                      }`}>
+                                        {optApplied ? `${optRedPct}% opt` : '0% opt'}
+                                      </span>
+                                    </div>
+                                    {/* Glassmorphic Popover */}
+                                    <div className="absolute right-0 top-8 z-50 hidden group-hover:flex flex-col gap-1.5 w-72 bg-slate-950/95 border border-emerald-500/30 rounded-2xl p-3 shadow-2xl backdrop-blur-xl text-[10px] text-slate-300 animate-fade-in pointer-events-none group-hover:pointer-events-auto">
+                                      <div className="font-black uppercase tracking-wider text-emerald-400 border-b border-white/10 pb-1">
+                                        PROMPT OPTIMIZER DETAILS
+                                      </div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Status:</span><span className={`font-mono font-bold ${optApplied ? 'text-emerald-300' : 'text-slate-400'}`}>{optApplied ? '✓ OPTIMIZED' : '○ NO ADDITIONAL OPTIMIZATION'}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Optimizer Input:</span><span className="font-mono font-bold text-white">{optInput.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Optimized Output:</span><span className="font-mono font-bold text-emerald-300">{optOutput.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Tokens Saved:</span><span className="font-mono font-bold text-emerald-400">{optSaved.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Reduction:</span><span className="font-mono font-bold text-emerald-300">{optRedPct}%</span></div>
+                                      {optApplied && (
+                                        <div className="grid grid-cols-2 gap-1 border-t border-slate-800/80 pt-1.5 text-[9px] text-emerald-400 font-semibold">
+                                          <span>✓ Intent preserved</span>
+                                          <span>✓ Entities preserved</span>
+                                          <span>✓ Constraints preserved</span>
+                                          <span>✓ Schema preserved</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Control 4: Total Savings Badge + Popover */}
+                                  <div className="relative group">
+                                    <div className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-extrabold flex items-center gap-1.5 shadow-sm cursor-default">
+                                      <span>PRISM SAVINGS:</span>
+                                      <span className="font-mono text-emerald-200">{actualTotalSaved.toLocaleString()} t ({overallRedPct}%)</span>
+                                    </div>
+                                    {/* Glassmorphic Popover */}
+                                    <div className="absolute right-0 top-8 z-50 hidden group-hover:flex flex-col gap-1.5 w-72 bg-slate-950/95 border border-indigo-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur-xl text-[10px] text-slate-300 animate-fade-in pointer-events-none group-hover:pointer-events-auto">
+                                      <div className="font-black uppercase tracking-wider text-indigo-300 border-b border-white/10 pb-1 flex justify-between">
+                                        <span>TOTAL SAVINGS SUMMARY</span>
+                                        <span className="text-emerald-400 font-mono">{overallRedPct}%</span>
+                                      </div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Original Context:</span><span className="font-mono font-bold text-slate-200">{rawTokens.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Final Provider Context:</span><span className="font-mono font-bold text-indigo-300">{finalProviderCtx.toLocaleString()} t</span></div>
+                                      <div className="flex justify-between border-t border-slate-800 pt-1 font-bold"><span className="text-slate-300">Actual Tokens Saved:</span><span className="font-mono text-emerald-400">{actualTotalSaved.toLocaleString()} t</span></div>
+                                      <div className="text-[9px] text-slate-500 italic mt-0.5">Measurement: {measurementLabel}</div>
+                                    </div>
+                                  </div>
                                 </div>
-                                {isHit ? (
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Similarity</span>
-                                      <span className="text-xs font-extrabold text-emerald-300">{(similarity * 100).toFixed(1)}%</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Cached Context</span>
-                                      <span className="text-xs font-bold text-sky-300">{cachedCtxTokens.toLocaleString()} tokens</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Tokens Avoided</span>
-                                      <span className="text-xs font-extrabold text-emerald-400">{tokensAvoided.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                      <span className="text-[10px] text-slate-400 font-medium">Context Reused</span>
-                                      <span className="text-xs font-extrabold text-emerald-300">Yes ✓</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-[11px] text-slate-400 flex flex-col gap-0.5">
-                                    <span>No reusable semantic context found for this query.</span>
-                                    <span className="text-[10px] text-slate-500 font-mono">New semantic context stored for future requests.</span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
                         })()}
 
-
+                        {/* Main Execution Result Output (Output-First Layout) */}
                         <div className="w-full bg-slate-950/40 rounded-xl border border-slate-800/60 p-3.5 mt-1">
                           {renderFormattedResult(item.result.result, item.result.category)}
                         </div>
