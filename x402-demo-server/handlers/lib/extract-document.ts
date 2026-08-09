@@ -102,8 +102,10 @@ export async function extractText(
           }
 
           console.log(`OCR processing image ${i + 1}/${images.length} for ${filename}...`);
-          const result = await Tesseract.recognize(imageBuffer, 'eng');
+          const worker = await Tesseract.createWorker('eng');
+          const result = await worker.recognize(imageBuffer);
           ocrText += result.data.text + '\n';
+          await worker.terminate();
         }
 
         return { text: ocrText.trim(), method: 'ocr' };
