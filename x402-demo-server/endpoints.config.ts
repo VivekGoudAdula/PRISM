@@ -67,26 +67,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
   return {
     // ── Individual AI Endpoints (static, per-call pricing) ──────────────────
 
-    'GET /weather': {
-      accepts: [{
-        scheme: 'exact',
-        price: '$0.005',
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
-      }],
-      description: 'Fetches real-time weather data and forecast metrics per location query.',
-    },
-    'POST /weather': {
-      accepts: [{
-        scheme: 'exact',
-        price: '$0.005',
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
-      }],
-      description: 'Fetches real-time weather data and forecast metrics per location query.',
-    },
+
 
     'GET /resume-screen-fast': {
       accepts: [{

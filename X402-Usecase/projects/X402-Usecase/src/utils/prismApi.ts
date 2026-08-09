@@ -140,6 +140,10 @@ export interface ExecutionPlan {
   files?: any[];
   pages?: any[];
   paymentPreview?: PaymentPreviewItem[];
+  selectedProvider?: string;
+  routingReason?: string;
+  explorationUsed?: boolean;
+  eligibleProviders?: string[];
 }
 
 export interface ExecutionProgressEntry {

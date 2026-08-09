@@ -22,7 +22,6 @@ import { ALGORAND_TESTNET_CAIP2 } from '@x402/avm';
 import mongoose from 'mongoose';
 
 // Import handler functions
-import { handleWeatherRequest } from './handlers/weather';
 import { handleAnalyticsRequest, handleAnalyticsReportRequest } from './handlers/analytics';
 import {
   handleAIAnalysisRequest,
@@ -232,9 +231,6 @@ app.use(paymentMiddleware(paymentConfig as any, x402Server));
  * These handlers are only called AFTER payment is verified
  * by the x402 middleware
  */
-
-// Example 1: Weather Data - Pay $0.005
-app.on(['GET', 'POST'], '/weather', handleWeatherRequest);
 
 // 6 new payment-protected endpoints
 app.on(['GET', 'POST'], '/resume-screen-fast', async (c) => {

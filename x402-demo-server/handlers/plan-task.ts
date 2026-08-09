@@ -95,19 +95,16 @@ export async function handlePlanTaskRequest(c: Context) {
     }
 
     // ── Step 2: Discover and rank providers ──────────────────────────────────
-    const mockCtxSelect = {
-      req: { json: async () => ({ category }) },
-      json: (data: any) => data,
-    } as unknown as Context;
+    const { selectEndpointForTask } = await import('./select-endpoint');
+    const selectResult = await selectEndpointForTask(category, task_description);
 
-    const selectResult: any = await handleSelectEndpointRequest(mockCtxSelect);
-
-    if (!selectResult || selectResult.error || !selectResult.winner) {
-      return c.json({ error: 'Endpoint selection failed', details: selectResult }, 500);
+    if (!selectResult || !selectResult.winner) {
+      return c.json({ error: 'Endpoint selection failed' }, 500);
     }
 
     const winner = selectResult.winner;
     const allCandidates = selectResult.candidates || [];
+    const providerName = selectResult.selectedProvider || PROVIDER_NAMES[winner.endpoint_path] || winner.endpoint_path;
 
     // ── Step 3: Determine execution quantity & ingestion ─────────────────────
     let repoFilesData: { files: any[]; skipped: number; capped: boolean; total_files_found: number; owner?: string; repo?: string; branch?: string } | null = null;
@@ -422,6 +419,10 @@ export async function handlePlanTaskRequest(c: Context) {
       estimatedTimeSeconds,
       estimatedAccuracy,
       candidates: allCandidates,
+      selectedProvider: selectResult.selectedProvider,
+      routingReason: selectResult.routingReason,
+      explorationUsed: selectResult.explorationUsed,
+      eligibleProviders: selectResult.eligibleProviders,
       ...(repoFilesData ? {
         files: repoFilesData.files,
         skipped: repoFilesData.skipped,
