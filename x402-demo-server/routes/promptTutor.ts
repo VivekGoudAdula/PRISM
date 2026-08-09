@@ -43,11 +43,29 @@ promptTutorRouter.post('/analyze', async (c) => {
     const analysisResult = await analyzePromptWithLLM(originalPrompt, files, category);
 
     // Persist analysis record in MongoDB (avoiding duplicates if taskId provided)
-    let savedDoc = null;
-    if (taskId && mongoose.Types.ObjectId.isValid(taskId)) {
-      savedDoc = await PromptAnalysis.findOneAndUpdate(
-        { taskId: new mongoose.Types.ObjectId(taskId) },
-        {
+    let savedDoc: any = null;
+    try {
+      if (taskId && mongoose.Types.ObjectId.isValid(taskId)) {
+        savedDoc = await PromptAnalysis.findOneAndUpdate(
+          { taskId: new mongoose.Types.ObjectId(taskId) },
+          {
+            userId,
+            originalPrompt,
+            score: analysisResult.score,
+            intent: analysisResult.intent,
+            taskType: analysisResult.taskType,
+            issues: analysisResult.issues,
+            requiredInformation: analysisResult.requiredInformation,
+            irrelevantInformation: analysisResult.irrelevantInformation,
+            constraints: analysisResult.constraints,
+            suggestions: analysisResult.suggestions,
+            improvedPrompt: analysisResult.improvedPrompt,
+            modelUsed: analysisResult.modelUsed,
+          },
+          { upsert: true, returnDocument: 'after' }
+        );
+      } else {
+        savedDoc = await PromptAnalysis.create({
           userId,
           originalPrompt,
           score: analysisResult.score,
@@ -60,28 +78,14 @@ promptTutorRouter.post('/analyze', async (c) => {
           suggestions: analysisResult.suggestions,
           improvedPrompt: analysisResult.improvedPrompt,
           modelUsed: analysisResult.modelUsed,
-        },
-        { upsert: true, returnDocument: 'after' }
-      );
-    } else {
-      savedDoc = await PromptAnalysis.create({
-        userId,
-        originalPrompt,
-        score: analysisResult.score,
-        intent: analysisResult.intent,
-        taskType: analysisResult.taskType,
-        issues: analysisResult.issues,
-        requiredInformation: analysisResult.requiredInformation,
-        irrelevantInformation: analysisResult.irrelevantInformation,
-        constraints: analysisResult.constraints,
-        suggestions: analysisResult.suggestions,
-        improvedPrompt: analysisResult.improvedPrompt,
-        modelUsed: analysisResult.modelUsed,
-      });
+        });
+      }
+    } catch (dbErr) {
+      console.warn('MongoDB save error in /api/prompt-tutor/analyze (non-fatal):', dbErr);
     }
 
     return c.json({
-      id: savedDoc._id.toString(),
+      id: savedDoc?._id ? savedDoc._id.toString() : `temp-${Date.now()}`,
       ...analysisResult,
     });
   } catch (error: any) {

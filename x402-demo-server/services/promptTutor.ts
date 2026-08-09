@@ -152,17 +152,26 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
           if (response.ok) {
             const data = await response.json();
             const rawContent = data.choices?.[0]?.message?.content?.trim() || '';
-            const parsed = JSON.parse(rawContent);
+            const sanitizeStringArray = (val: any): string[] => {
+              if (!val) return [];
+              if (Array.isArray(val)) {
+                return val.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).filter(Boolean);
+              }
+              if (typeof val === 'string') {
+                return [val];
+              }
+              return [JSON.stringify(val)];
+            };
 
             analysis = {
               score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
               intent: parsed.intent || 'Task analysis',
               taskType: parsed.taskType || hintCategory || 'general_query',
-              issues: Array.isArray(parsed.issues) ? parsed.issues : [],
-              requiredInformation: Array.isArray(parsed.requiredInformation) ? parsed.requiredInformation : [],
-              irrelevantInformation: Array.isArray(parsed.irrelevantInformation) ? parsed.irrelevantInformation : [],
-              constraints: Array.isArray(parsed.constraints) ? parsed.constraints : [],
-              suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+              issues: sanitizeStringArray(parsed.issues),
+              requiredInformation: sanitizeStringArray(parsed.requiredInformation),
+              irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
+              constraints: sanitizeStringArray(parsed.constraints),
+              suggestions: sanitizeStringArray(parsed.suggestions),
               improvedPrompt: parsed.improvedPrompt || promptText,
               modelUsed: model,
               originalInputTokens: inputTokens,
