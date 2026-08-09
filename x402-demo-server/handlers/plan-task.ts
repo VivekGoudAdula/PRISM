@@ -303,7 +303,6 @@ export async function handlePlanTaskRequest(c: Context) {
     const latencyPerUnit = winner.endpoint_path.includes('accurate') ? 2200 : 800;
     const estimatedTimeSeconds = Math.ceil((executionQuantity * latencyPerUnit) / 1000);
     const estimatedAccuracy: number = winner.confidence ?? 0;
-    const providerName: string = PROVIDER_NAMES[winner.endpoint_path] || winner.endpoint_path;
 
     const cap_message = repoFilesData?.capped
       ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
