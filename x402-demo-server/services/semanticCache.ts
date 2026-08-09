@@ -115,7 +115,7 @@ export async function findSimilarContext(options: CheckCacheOptions): Promise<Ca
   const normQuery = normalizeQuery(options.prompt);
   const sourceFingerprint = createContextFingerprint(options.prompt, options.files);
 
-  // Exact fingerprint & user match first (instant hit)
+  // Require exact sourceFingerprint & prompt match to avoid returning cached full-site context on partial item runs
   const exactMatch = await SemanticCache.findOne({
     userId,
     taskType: options.taskType,
@@ -138,65 +138,9 @@ export async function findSimilarContext(options: CheckCacheOptions): Promise<Ca
     };
   }
 
-  // Semantic similarity lookup within user's entries of same taskType
-  const queryEmbedding = await generateEmbedding(normQuery);
-
-  const candidates = await SemanticCache.find({
-    userId,
-    taskType: options.taskType,
-  }).select('+embedding').sort({ lastUsedAt: -1 }).limit(30);
-
-  let bestMatch: ISemanticCache | null = null;
-  let highestSim = 0;
-
-  for (const candidate of candidates) {
-    let sim = 0;
-    if (candidate.embedding && candidate.embedding.length > 0) {
-      sim = calculateCosineSimilarity(queryEmbedding, candidate.embedding);
-    }
-    
-    // Word overlap / n-gram similarity backup if vector similarity is close or fallback
-    const cNorm = candidate.normalizedQuery;
-    if (cNorm === normQuery) {
-      sim = 1.0;
-    } else {
-      const setA = new Set(normQuery.split(/\s+/).filter((w) => w.length > 2));
-      const setB = new Set(cNorm.split(/\s+/).filter((w) => w.length > 2));
-      const intersection = [...setA].filter((x) => setB.has(x)).length;
-      const union = new Set([...setA, ...setB]).size;
-      const jaccard = union > 0 ? intersection / union : 0;
-      if (jaccard > 0.3) {
-        sim = Math.max(sim, parseFloat((0.85 + jaccard * 0.14).toFixed(4)));
-      }
-    }
-
-    if (sim > highestSim) {
-      highestSim = sim;
-      bestMatch = candidate;
-    }
-  }
-
-  if (bestMatch && highestSim >= threshold) {
-    // Update hit stats non-blocking
-    SemanticCache.findByIdAndUpdate((bestMatch as any)._id, {
-      $inc: { hitCount: 1 },
-      $set: { lastUsedAt: new Date() },
-    }).catch(() => {});
-
-    return {
-      hit: true,
-      similarity: parseFloat(highestSim.toFixed(4)),
-      cachedContextTokens: bestMatch.tokenEstimate,
-      cacheEntryId: (bestMatch as any)._id.toString(),
-      semanticContext: bestMatch.semanticContext,
-      sourceMapId: bestMatch.sourceMapId?.toString(),
-      sourceFingerprint,
-    };
-  }
-
   return {
     hit: false,
-    similarity: parseFloat(highestSim.toFixed(4)),
+    similarity: 0,
     cachedContextTokens: 0,
     sourceFingerprint,
   };

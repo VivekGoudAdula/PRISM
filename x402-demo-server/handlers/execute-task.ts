@@ -7,6 +7,8 @@ import { handleInvoiceExtractFastRequest } from './invoice-extract-fast';
 import { handleInvoiceExtractAccurateRequest } from './invoice-extract-accurate';
 import { handleCodeReviewFastRequest } from './code-review-fast';
 import { handleCodeReviewAccurateRequest } from './code-review-accurate';
+import { handleSeoAuditFastRequest } from './seo-audit-fast';
+import { handleSeoAuditAccurateRequest } from './seo-audit-accurate';
 import { verifyOutput } from './lib/verify-output';
 import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
@@ -19,7 +21,7 @@ import { recordExecutionMetrics, estimateTokens } from '../services/tokenAnalyti
 import mongoose from 'mongoose';
 
 /** Fixed platform fee added on top of execution cost, in USDC */
-const PLATFORM_FEE = 0.05;
+const PLATFORM_FEE = 0.0;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,45 @@ function aggregateResults(category: string, results: any[]): any {
       averageQualityScore: parseFloat(avgQualityScore.toFixed(3)),
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
       files: allFiles,
+    };
+  }
+
+  if (category === 'seo_audit') {
+    const allPages = results.map((r) => ({
+      page_url: r.page_url,
+      issues: r.issues ?? [],
+      seo_score: r.seo_score ?? 0,
+      confidence: r.confidence ?? 0,
+      latency_ms: r.latency_ms ?? 0,
+    }));
+    const totalPagesAudited = allPages.length;
+    const allIssues = results.flatMap((r) => r.issues ?? []);
+
+    const issuesByCategory = {
+      metadata: allIssues.filter((i) => i.category === 'metadata'),
+      heading: allIssues.filter((i) => i.category === 'heading'),
+      images: allIssues.filter((i) => i.category === 'images'),
+      links: allIssues.filter((i) => i.category === 'links'),
+      content: allIssues.filter((i) => i.category === 'content'),
+    };
+
+    const issuesBySeverity = {
+      low: allIssues.filter((i) => i.severity === 'low').length,
+      medium: allIssues.filter((i) => i.severity === 'medium').length,
+      high: allIssues.filter((i) => i.severity === 'high').length,
+    };
+
+    const overallSiteScore = results.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (results.length || 1);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
+
+    return {
+      totalPagesAudited,
+      totalIssues: allIssues.length,
+      overallSiteScore: parseFloat(overallSiteScore.toFixed(3)),
+      averageConfidence: parseFloat(avgConfidence.toFixed(3)),
+      issuesByCategory,
+      issuesBySeverity,
+      pages: allPages,
     };
   }
 
@@ -157,6 +198,8 @@ async function invokeProviderHandler(endpoint: string, bodyData: Record<string, 
     case '/invoice-extract-accurate': return handleInvoiceExtractAccurateRequest(ctx);
     case '/code-review-fast':      return handleCodeReviewFastRequest(ctx);
     case '/code-review-accurate':  return handleCodeReviewAccurateRequest(ctx);
+    case '/seo-audit-fast':        return handleSeoAuditFastRequest(ctx);
+    case '/seo-audit-accurate':    return handleSeoAuditAccurateRequest(ctx);
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }
@@ -248,8 +291,6 @@ export async function handleExecuteTaskRequest(c: Context) {
         body
       });
       taskRecord.status = 'failed';
-      await taskRecord.save();
-
       await AuditLog.create({
         userId: user._id,
         action: 'Task Failed',
@@ -263,55 +304,7 @@ export async function handleExecuteTaskRequest(c: Context) {
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
 
-    /**
-     * Server-side fallback execution path.
-     *
-     * Triggered when the client sent no results but the plan has stored files.
-     * Covers two patterns:
-     *  - code_review: files stored as {path, raw_url} (GitHub refs)
-     *  - resume / contract / invoice: files stored as {filename, content_base64} (uploads)
-     *
-     * In both cases we invoke the provider handler directly (no x402) so results
-     * can still be aggregated and saved — the x402 payments already happened per
-     * individual file call on the client side.
-     */
-    if (results.length === 0 && Array.isArray(taskRecord.plannerOutput?.files)) {
-      const storedFiles: any[] = taskRecord.plannerOutput.files;
-      const isCodeReview = category === 'code_review';
-      console.log(`Fallback: running ${storedFiles.length} stored files for '${category}' via ${winnerEndpoint}...`);
-
-      const executedResults: any[] = [];
-      const BATCH_SIZE = 5;
-
-      for (let i = 0; i < storedFiles.length; i += BATCH_SIZE) {
-        const chunk = storedFiles.slice(i, i + BATCH_SIZE);
-        const chunkResults = await Promise.all(
-          chunk.map((file) => {
-            const effectivePrompt = taskRecord.plannerOutput?.finalExecutionPrompt || taskRecord.prompt;
-            // Build the correct payload for each category type
-            const handlerBody = isCodeReview
-              ? { file_path: file.path, raw_url: file.raw_url, task_description: effectivePrompt }
-              : {
-                  task_description: effectivePrompt,
-                  files: [{ filename: file.filename, content_base64: file.content_base64 }],
-                };
-
-            return invokeProviderHandler(winnerEndpoint, handlerBody).catch((err) => {
-              const label = isCodeReview ? file.path : file.filename;
-              console.warn(`Fallback: file processing failed for ${label}:`, err?.message || err);
-              // Safe fallback so one failure does not abort the entire batch
-              return isCodeReview
-                ? { file_path: file.path, issues: [], overall_quality_score: 0.8, confidence: 0.7 }
-                : { candidates: [], confidence: 0 };
-            });
-          })
-        );
-        executedResults.push(...chunkResults);
-      }
-      results = executedResults;
-    }
-
-    const actualQuantity = results.length > 0 ? results.length : 1;
+    const actualQuantity = results.length;
 
     // ── Step 4: Aggregate results ────────────────────────────────────────────
     const combinedResult = aggregateResults(category, results);

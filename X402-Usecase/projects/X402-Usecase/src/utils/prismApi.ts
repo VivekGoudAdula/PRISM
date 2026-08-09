@@ -138,6 +138,7 @@ export interface ExecutionPlan {
   message?: string;
   uploadedFiles?: Array<{ index: number; filename: string }>;
   files?: any[];
+  pages?: any[];
   paymentPreview?: PaymentPreviewItem[];
 }
 
@@ -242,6 +243,7 @@ export function buildPaymentPreview(
   const items: PaymentPreviewItem[] = [];
 
   const repoFiles = (plan as any).files;
+  const sitePages = (plan as any).pages;
   if (plan.category === 'code_review' && Array.isArray(repoFiles) && repoFiles.length > 0) {
     repoFiles.forEach((f: any, i: number) => {
       items.push({
@@ -250,6 +252,16 @@ export function buildPaymentPreview(
         filename: f.path,
         amount: plan.unitPrice,
         label: `#${i + 1} — ${f.path}`,
+      });
+    });
+  } else if (plan.category === 'seo_audit' && Array.isArray(sitePages) && sitePages.length > 0) {
+    sitePages.forEach((p: any, i: number) => {
+      items.push({
+        type: 'execution',
+        index: i + 1,
+        filename: p.url,
+        amount: plan.unitPrice,
+        label: `#${i + 1} — ${p.url}`,
       });
     });
   } else {
@@ -267,11 +279,13 @@ export function buildPaymentPreview(
     }
   }
 
-  items.push({
-    type: 'platform_fee',
-    amount: plan.platformFee,
-    label: 'Platform Fee',
-  });
+  if (plan.platformFee > 0) {
+    items.push({
+      type: 'platform_fee',
+      amount: plan.platformFee,
+      label: 'Platform Fee',
+    });
+  }
 
   return items;
 }
@@ -403,9 +417,12 @@ export async function executeTaskWithPayment(
   const hasStoredFiles = isDocumentTask && uploadedFileMeta.length > 0;
 
   const plannedFiles = (plan as any).files || [];
+  const plannedPages = (plan as any).pages || [];
   let executionCount = plan.executionQuantity > 0 ? plan.executionQuantity : 1;
   if (plan.category === 'code_review' && plannedFiles.length > 0) {
     executionCount = Math.min(plan.executionQuantity, plannedFiles.length);
+  } else if (plan.category === 'seo_audit' && plannedPages.length > 0) {
+    executionCount = Math.min(plan.executionQuantity, plannedPages.length);
   } else if (hasStoredFiles) {
     executionCount = Math.min(plan.executionQuantity, uploadedFileMeta.length);
   } else if (files.length > 0) {
@@ -422,6 +439,7 @@ export async function executeTaskWithPayment(
     for (let i = 0; i < executionCount; i++) {
       const singleFile = files[i];
       const plannedFile = plannedFiles[i];
+      const plannedPage = plannedPages[i];
 
       if (onProgress) {
         onProgress(i + 1, 'payment');
@@ -433,6 +451,9 @@ export async function executeTaskWithPayment(
       if (plan.category === 'code_review' && plannedFile) {
         payload = { file_path: plannedFile.path, raw_url: plannedFile.raw_url };
         fileLabel = plannedFile.path;
+      } else if (plan.category === 'seo_audit' && plannedPage) {
+        payload = { page_url: plannedPage.url, task_description: taskDescription };
+        fileLabel = plannedPage.url;
       } else if (hasStoredFiles) {
         const fileMeta = uploadedFileMeta[i];
         const actualIndex = typeof fileMeta?.index === 'number' ? fileMeta.index : i;

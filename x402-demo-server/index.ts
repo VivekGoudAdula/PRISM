@@ -269,6 +269,14 @@ app.on(['GET', 'POST'], '/code-review-accurate', async (c) => {
   const { handleCodeReviewAccurateRequest } = await import('./handlers/code-review-accurate');
   return handleCodeReviewAccurateRequest(c);
 });
+app.on(['GET', 'POST'], '/seo-audit-fast', async (c) => {
+  const { handleSeoAuditFastRequest } = await import('./handlers/seo-audit-fast');
+  return handleSeoAuditFastRequest(c);
+});
+app.on(['GET', 'POST'], '/seo-audit-accurate', async (c) => {
+  const { handleSeoAuditAccurateRequest } = await import('./handlers/seo-audit-accurate');
+  return handleSeoAuditAccurateRequest(c);
+});
 
 app.on(['GET', 'POST'], '/run-task', requireAuth, async (c) => {
   const { handleRunTaskRequest } = await import('./handlers/run-task');

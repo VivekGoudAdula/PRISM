@@ -674,6 +674,92 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       }
     }
 
+    if (category === 'seo_audit' && result) {
+      const pages = (result.pages ?? (result.page_url ? [result] : [])).filter((p: any) => p && typeof p.page_url === 'string' && p.page_url.trim() !== '');
+      const totalPages = result.totalPagesAudited ?? pages.length;
+      const totalIssues = result.totalIssues ?? pages.reduce((sum: number, p: any) => sum + (p.issues?.length || 0), 0);
+      const severity = result.issuesBySeverity ?? {
+        low: pages.flatMap((p: any) => p.issues ?? []).filter((i: any) => i.severity === 'low').length,
+        medium: pages.flatMap((p: any) => p.issues ?? []).filter((i: any) => i.severity === 'medium').length,
+        high: pages.flatMap((p: any) => p.issues ?? []).filter((i: any) => i.severity === 'high').length,
+      };
+      const overallScore = Math.round((result.overallSiteScore ?? (result.seo_score ?? 0.8)) * 100);
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Audited Pages</span>
+              <span className="text-xl font-black text-white">{totalPages}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total SEO Issues</span>
+              <span className="text-xl font-black text-amber-400">{totalIssues}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Severity Breakdown</span>
+              <div className="flex gap-2 text-xs font-bold mt-1">
+                <span className="text-rose-400">{severity.high} High</span>
+                <span className="text-amber-400">{severity.medium} Med</span>
+                <span className="text-emerald-400">{severity.low} Low</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Overall Site Score</span>
+              <span className="text-xl font-black text-emerald-400">{overallScore}%</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full mt-1">
+            {pages.map((p: any, index: number) => {
+              const pageIssues = p.issues || [];
+              const scorePct = Math.round((p.seo_score ?? 0.8) * 100);
+              return (
+                <div key={index} className="collapse collapse-arrow bg-slate-900/40 border border-slate-800/80 rounded-2xl">
+                  <input type="checkbox" defaultChecked={index === 0} />
+                  <div className="collapse-title text-sm font-semibold flex items-center justify-between text-white pr-10">
+                    <div className="flex items-center gap-3 font-mono">
+                      <span className="text-indigo-400 font-bold">🌐 {p.page_url}</span>
+                      <span className="text-xs text-slate-400">({pageIssues.length} issue{pageIssues.length !== 1 ? 's' : ''})</span>
+                    </div>
+                    <span className="badge bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold px-2 py-0.5">
+                      SEO Score: {scorePct}%
+                    </span>
+                  </div>
+                  <div className="collapse-content text-slate-300 text-xs flex flex-col gap-3 pt-2">
+                    {pageIssues.length > 0 ? (
+                      pageIssues.map((issue: any, iIdx: number) => {
+                        let badgeColor = 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400';
+                        if (issue.severity === 'high') badgeColor = 'bg-rose-500/15 border-rose-500/25 text-rose-400';
+                        else if (issue.severity === 'medium') badgeColor = 'bg-amber-500/15 border-amber-500/25 text-amber-400';
+                        return (
+                          <div key={iIdx} className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/60 flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className={`badge ${badgeColor} border text-[10px] font-extrabold uppercase px-2 py-0.5`}>
+                                {issue.category || 'SEO'} · {issue.severity || 'low'}
+                              </span>
+                            </div>
+                            <p className="text-slate-200 font-medium text-xs leading-relaxed">{issue.description}</p>
+                            {issue.suggestion && (
+                              <div className="bg-indigo-950/30 border border-indigo-900/30 p-2.5 rounded-lg text-indigo-300 text-[11px] mt-1 font-mono">
+                                <strong>Suggestion:</strong> {issue.suggestion}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-500 text-xs py-1">No SEO issues detected for this webpage.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (category === 'code_review' && result) {
       const files = (result.files ?? (result.file_path ? [result] : [])).filter((f: any) => f && typeof f.file_path === 'string' && f.file_path.trim() !== '');
       const totalFiles = result.totalFilesReviewed ?? files.length;
@@ -981,6 +1067,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
               <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-3xl">
                 {[
+                  { label: '🔍 Audit Website', text: 'Audit our website https://example.com for SEO issues' },
                   { label: '📄 Screen Resumes', text: 'Screen these candidate resumes for a Senior Backend Developer role' },
                   { label: '📜 Analyze Contract', text: 'Review this NDA contract and flag any high risk termination clauses' },
                   { label: '🧾 Extract Invoice Data', text: 'Extract vendor name, line items, and total amount from this invoice' },

@@ -55,7 +55,7 @@ const PaymentsSchema = new Schema<IPayment>({
   unitPrice: { type: Number, default: 0 },
   executionQuantity: { type: Number, default: 1 },
   executionCost: { type: Number, default: 0 },
-  platformFee: { type: Number, default: 0.75 },
+  platformFee: { type: Number, default: 0 },
   totalAmount: { type: Number, default: 0 },
 
   // Legacy

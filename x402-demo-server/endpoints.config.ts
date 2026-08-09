@@ -256,6 +256,48 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       description: 'Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning.',
     },
 
+    'GET /seo-audit-fast': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.10',
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.',
+    },
+    'POST /seo-audit-fast': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.10',
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.',
+    },
+
+    'GET /seo-audit-accurate': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.25',
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.',
+    },
+    'POST /seo-audit-accurate': {
+      accepts: [{
+        scheme: 'exact',
+        price: '$0.25',
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: 'Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.',
+    },
+
     'GET /run-task': {
       accepts: [{
         scheme: 'exact',

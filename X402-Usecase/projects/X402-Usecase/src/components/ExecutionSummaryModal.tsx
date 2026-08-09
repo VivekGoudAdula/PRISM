@@ -14,6 +14,7 @@ const categoryLabel: Record<string, string> = {
   contract_analysis: 'Contract Analysis',
   invoice_extraction: 'Invoice Extraction',
   code_review: 'Code Review',
+  seo_audit: 'SEO Audit',
 };
 
 export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
@@ -23,7 +24,11 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
   onCancel,
 }) => {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
-    new Set(files.length > 0 ? files.map((_, i) => i) : Array.from({ length: plan.executionQuantity }, (_, i) => i))
+    new Set(
+      files.length > 0
+        ? files.map((_, i) => i)
+        : Array.from({ length: plan.executionQuantity }, (_, i) => i)
+    )
   );
 
   const toggleSelectFile = (idx: number) => {
@@ -38,10 +43,28 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
     });
   };
 
+  const totalExecutionItems = Math.max(
+    files.length,
+    plan.executionQuantity,
+    ((plan as any).pages || []).length,
+    ((plan as any).files || []).length
+  );
+
+  const isAllSelected = totalExecutionItems > 0 && selectedIndices.size === totalExecutionItems;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(Array.from({ length: totalExecutionItems }, (_, i) => i)));
+    }
+  };
+
   const selectedCount = selectedIndices.size;
   const executionCost = selectedCount * plan.unitPrice;
   const totalCost = selectedCount > 0 ? executionCost + plan.platformFee : 0;
   const accuracyPct = Math.round((plan.estimatedAccuracy ?? 0) * 100);
+
   const preview: PaymentPreviewItem[] = plan.paymentPreview ?? [];
 
   const handleConfirm = () => {
@@ -57,6 +80,9 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
         : undefined,
       files: (plan as any).files
         ? (plan as any).files.filter((_: any, idx: number) => selectedIndices.has(idx))
+        : undefined,
+      pages: (plan as any).pages
+        ? (plan as any).pages.filter((_: any, idx: number) => selectedIndices.has(idx))
         : undefined,
       paymentPreview: plan.paymentPreview
         ? plan.paymentPreview.filter((item) => {
@@ -96,6 +122,23 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
 
         {/* Scrollable body */}
         <div className="px-6 py-4 flex flex-col gap-1 overflow-y-auto flex-1">
+          {plan.category === 'seo_audit' && (
+            <div className="mb-4 flex flex-col gap-2.5">
+              <div className="rounded-2xl border border-indigo-500/40 bg-indigo-950/40 p-4 text-xs text-indigo-200 flex flex-col gap-1 shadow-inner">
+                <span className="font-extrabold text-sm text-white">Website SEO Audit Plan</span>
+                <p>
+                  This will audit <strong className="text-emerald-400 font-bold">{selectedCount} pages</strong> for{' '}
+                  <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)}{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
+                </p>
+                {(plan.skipped || 0) > 0 && (
+                  <span className="text-[11px] text-indigo-300/80 font-medium mt-1">
+                    ℹ️ Note: {plan.skipped} additional pages skipped due to page limit cap.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {plan.category === 'code_review' && (
             <div className="mb-4 flex flex-col gap-2.5">
               {plan.capped && (
@@ -118,7 +161,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                 <span className="font-extrabold text-sm text-white">GitHub Repository Review Plan</span>
                 <p>
                   This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for{' '}
-                  <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)} + ${plan.platformFee.toFixed(2)} platform fee). Continue?
+                  <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)}{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
                 </p>
                 {!plan.capped && (plan.skipped || 0) > 0 && (
                   <span className="text-[11px] text-indigo-300/80 font-medium mt-1">
@@ -163,11 +206,22 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
           {/* Payment Breakdown */}
           {preview.length > 0 && (
             <div className="mt-3 rounded-2xl border border-slate-700/40 bg-slate-950/50 overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-slate-800/60 flex items-center gap-2">
-                <FiDollarSign className="text-indigo-400 text-xs" />
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
-                  Payment Breakdown
-                </span>
+              <div className="px-4 py-2.5 border-b border-slate-800/60 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FiDollarSign className="text-indigo-400 text-xs" />
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                    Payment Breakdown
+                  </span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950"
+                  />
+                  <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
+                </label>
               </div>
               <div className="flex flex-col divide-y divide-slate-800/40 max-h-48 overflow-y-auto">
                 {preview.map((item, idx) => {

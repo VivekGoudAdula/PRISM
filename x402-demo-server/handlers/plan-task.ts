@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { handleClassifyTaskRequest } from './classify-task';
 import { handleSelectEndpointRequest } from './select-endpoint';
 import { fetchRepoFiles, extractGitHubUrl } from './lib/fetch-repo';
+import { fetchSitePages, extractWebsiteUrl } from './lib/fetch-website';
 import { Task } from '../models/Task';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
@@ -11,7 +12,7 @@ import { estimateTokens } from '../services/tokenAnalytics';
 config();
 
 /** Fixed platform fee added on top of execution cost, in USDC */
-const PLATFORM_FEE = 0.05;
+const PLATFORM_FEE = 0.0;
 
 /** Human-readable provider display names keyed by endpoint path */
 const PROVIDER_NAMES: Record<string, string> = {
@@ -23,6 +24,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   '/invoice-extract-accurate': 'InvoiceAI Accurate',
   '/code-review-fast': 'CodeAI Fast',
   '/code-review-accurate': 'CodeAI Accurate',
+  '/seo-audit-fast': 'SEOAudit Fast',
+  '/seo-audit-accurate': 'SEOAudit Accurate',
 };
 
 /**
@@ -106,8 +109,9 @@ export async function handlePlanTaskRequest(c: Context) {
     const winner = selectResult.winner;
     const allCandidates = selectResult.candidates || [];
 
-    // ── Step 3: Determine execution quantity & repo ingestion ───────────────
+    // ── Step 3: Determine execution quantity & ingestion ─────────────────────
     let repoFilesData: { files: any[]; skipped: number; capped: boolean; total_files_found: number; owner?: string; repo?: string; branch?: string } | null = null;
+    let sitePagesData: { pages: any[]; skipped: number } | null = null;
     let executionQuantity: number = 1;
 
     if (category === 'code_review') {
@@ -137,15 +141,34 @@ export async function handlePlanTaskRequest(c: Context) {
           message: userMessage,
         }, 400);
       }
+    } else if (category === 'seo_audit') {
+      const siteUrl = extractWebsiteUrl(task_description);
+      if (!siteUrl) {
+        return c.json({
+          category: 'seo_audit',
+          error: 'No valid website URL found in task description.',
+        }, 400);
+      }
+      try {
+        sitePagesData = await fetchSitePages(siteUrl);
+        executionQuantity = sitePagesData.pages.length;
+      } catch (err: any) {
+        console.error('Failed to fetch website pages:', err);
+        return c.json({
+          category: 'seo_audit',
+          error: `Failed to crawl website: ${err.message}`,
+          message: `Failed to crawl website: ${err.message}`,
+        }, 400);
+      }
     } else {
       // 1 execution unit = 1 file. If no files attached, treat as 1 unit.
       executionQuantity = files.length > 0 ? files.length : 1;
     }
 
-    // For non-code-review categories: extract actual document text and store uploaded file content
+    // For non-code-review and non-seo-audit categories: extract actual document text and store uploaded file content
     // so per-file x402 calls can use lightweight {file_index, plan_id} references.
     const uploadedFiles: Array<{ index: number; filename: string; content_base64: string; extracted_text: string }> = [];
-    if (category !== 'code_review' && files.length > 0) {
+    if (category !== 'code_review' && category !== 'seo_audit' && files.length > 0) {
       const { extractText } = await import('./lib/extract-document');
       for (let idx = 0; idx < files.length; idx++) {
         const f = files[idx];
@@ -175,6 +198,10 @@ export async function handlePlanTaskRequest(c: Context) {
     if (category === 'code_review' && repoFilesData?.files) {
       for (const f of repoFilesData.files) {
         originalInputTokens += estimateTokens(f.path) + estimateTokens(f.content || '');
+      }
+    } else if (category === 'seo_audit' && sitePagesData?.pages) {
+      for (const p of sitePagesData.pages) {
+        originalInputTokens += estimateTokens(p.url) + estimateTokens(p.title || '');
       }
     } else if (uploadedFiles.length > 0) {
       for (const f of uploadedFiles) {
@@ -324,6 +351,10 @@ export async function handlePlanTaskRequest(c: Context) {
           total_files_found: repoFilesData.total_files_found,
           cap_message,
         } : {}),
+        ...(sitePagesData ? {
+          pages: sitePagesData.pages,
+          skipped: sitePagesData.skipped,
+        } : {}),
         // Store uploaded file content for resume/contract/invoice so per-file x402 calls
         // can use lightweight references instead of re-sending large base64 payloads.
         ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}),
@@ -397,6 +428,10 @@ export async function handlePlanTaskRequest(c: Context) {
         capped: repoFilesData.capped,
         total_files_found: repoFilesData.total_files_found,
         cap_message,
+      } : {}),
+      ...(sitePagesData ? {
+        pages: sitePagesData.pages,
+        skipped: sitePagesData.skipped,
       } : {}),
       ...(uploadedFilesMetadata.length > 0 ? { uploadedFiles: uploadedFilesMetadata } : {}),
     });

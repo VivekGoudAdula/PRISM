@@ -146,6 +146,29 @@ export function verifyOutput(category: string, result: any): { passed: boolean; 
       return { passed: true, reason: 'Valid code review report generated with verified file issues and quality scores' };
     }
 
+    case 'seo_audit': {
+      const pages = result.pages ?? (result.page_url ? [result] : []);
+      if (!Array.isArray(pages) || pages.length === 0) {
+        return { passed: false, reason: 'Missing or empty SEO audit pages array' };
+      }
+
+      const validPages = pages.filter((p: any) => {
+        const hasUrl = typeof p.page_url === 'string' && p.page_url.trim().length > 0;
+        const hasIssuesArray = Array.isArray(p.issues);
+        const hasScore = typeof p.seo_score === 'number' || typeof result.overallSiteScore === 'number';
+        return hasUrl && hasIssuesArray && hasScore;
+      });
+
+      if (validPages.length === 0) {
+        return {
+          passed: false,
+          reason: 'Missing or malformed SEO audit issues array or seo_score'
+        };
+      }
+
+      return { passed: true, reason: 'Valid SEO audit report generated with verified page issues and scores' };
+    }
+
     default:
       return { passed: false, reason: `Unknown task category: ${category}` };
   }

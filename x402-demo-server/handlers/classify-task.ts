@@ -60,6 +60,8 @@ export async function handleClassifyTaskRequest(c: Context) {
 
       const hasGitHubUrl = lowerDesc.includes('github.com/');
       const hasCodeReviewIntent = lowerDesc.includes('review') || lowerDesc.includes('repo') || lowerDesc.includes('code');
+      const hasSiteUrl = lowerDesc.includes('http://') || lowerDesc.includes('https://') || lowerDesc.includes('www.');
+      const hasSeoIntent = lowerDesc.includes('seo') || lowerDesc.includes('audit') || lowerDesc.includes('site') || lowerDesc.includes('website');
 
       // Known task keywords — let LLM classify even without files attached
       const hasTaskKeyword =
@@ -68,7 +70,8 @@ export async function handleClassifyTaskRequest(c: Context) {
         lowerDesc.includes('contract') || lowerDesc.includes('agreement') || lowerDesc.includes('nda') ||
         lowerDesc.includes('clause') || lowerDesc.includes('legal') ||
         lowerDesc.includes('invoice') || lowerDesc.includes('receipt') || lowerDesc.includes('bill') ||
-        lowerDesc.includes('extract');
+        lowerDesc.includes('extract') ||
+        (hasSiteUrl || hasSeoIntent);
 
       if (!hasGitHubUrl && !hasCodeReviewIntent && !hasTaskKeyword) {
         // Truly uninterpretable — nothing to process.
@@ -110,7 +113,7 @@ export async function handleClassifyTaskRequest(c: Context) {
               messages: [
                 {
                   role: 'system',
-                  content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, conversational, or unsupported.
+                  content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
 
 Rules & Few-Shot Examples:
 - Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
@@ -126,6 +129,8 @@ Rules & Few-Shot Examples:
   Input: "contract" -> contract_analysis
   Input: "review this github repo" -> code_review
   Input: "code review https://github.com/owner/repo" -> code_review
+  Input: "audit our website" -> seo_audit
+  Input: "check our site for SEO issues" -> seo_audit
   Input: "screen candidates for frontend developer" -> resume_screening
   Input: "review NDA termination clause" -> contract_analysis
   Input: "extract line items from vendor bill" -> invoice_extraction
@@ -134,7 +139,7 @@ Rules & Few-Shot Examples:
   Input: "asdkfjasdf" -> unsupported
   Input: "123987!@#" -> unsupported
 
-Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, conversational, or unsupported.`,
+Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`,
                 },
                 {
                   role: 'user',
@@ -160,6 +165,8 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
               category = 'invoice_extraction';
             } else if (normalized.includes('code_review') || normalized.includes('code review') || normalized.includes('code')) {
               category = 'code_review';
+            } else if (normalized.includes('seo_audit') || normalized.includes('seo audit') || normalized.includes('seo')) {
+              category = 'seo_audit';
             } else {
               // Try local keyword fallback if LLM returned something unexpected
               category = localClassify(task_description);
@@ -190,6 +197,8 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
         category = 'invoice_extraction';
       } else if (lower.includes('code') || lower.includes('repo') || lower.includes('review')) {
         category = 'code_review';
+      } else if (lower.includes('seo') || lower.includes('audit') || lower.includes('website') || lower.includes('site')) {
+        category = 'seo_audit';
       } else {
         // Default document screening task when files are present
         category = 'resume_screening';
@@ -222,6 +231,17 @@ function localClassify(description: string): string {
     desc.includes('who are you')
   ) {
     return 'conversational';
+  }
+
+  // SEO Audit check
+  if (
+    desc.includes('seo') ||
+    desc.includes('audit our website') ||
+    desc.includes('check our site') ||
+    (desc.includes('website') && desc.includes('audit')) ||
+    (desc.includes('site') && desc.includes('seo'))
+  ) {
+    return 'seo_audit';
   }
 
   // Code review — check before resume because "review" appears in both

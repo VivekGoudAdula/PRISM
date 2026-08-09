@@ -59,7 +59,7 @@ const TaskSchema = new Schema<ITask>({
   unitPrice: { type: Number, default: 0 },
   executionQuantity: { type: Number, default: 1 },
   executionCost: { type: Number, default: 0 },
-  platformFee: { type: Number, default: 0.75 },
+  platformFee: { type: Number, default: 0 },
   totalCost: { type: Number, default: 0 },
   providerName: { type: String, default: '' },
   executionCount: { type: Number, default: 0 },

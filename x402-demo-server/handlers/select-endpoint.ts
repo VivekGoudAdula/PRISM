@@ -19,7 +19,7 @@ export async function handleSelectEndpointRequest(c: Context) {
     const body = await c.req.json().catch(() => ({}));
     const { category } = body;
 
-    const validCategories = ['resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review'];
+    const validCategories = ['resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review', 'seo_audit'];
     if (!category || !validCategories.includes(category)) {
       return c.json({ error: `Valid category is required: ${validCategories.join(', ')}` }, 400);
     }
@@ -30,6 +30,22 @@ export async function handleSelectEndpointRequest(c: Context) {
 
     // Define endpoint candidates and their metadata
     const candidatesMap: Record<string, [Bid, Bid]> = {
+      seo_audit: [
+        {
+          endpoint_path: '/seo-audit-fast',
+          price: 0.10,
+          confidence: 0.76,
+          latency_ms: 850,
+          reputation_score: getRep('/seo-audit-fast'),
+        },
+        {
+          endpoint_path: '/seo-audit-accurate',
+          price: 0.25,
+          confidence: 0.94,
+          latency_ms: 2300,
+          reputation_score: getRep('/seo-audit-accurate'),
+        },
+      ],
       code_review: [
         {
           endpoint_path: '/code-review-fast',
