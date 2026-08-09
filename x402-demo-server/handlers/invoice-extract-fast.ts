@@ -77,6 +77,7 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
                   },
                 ],
                 temperature: 0.1,
+                response_format: { type: 'json_object' },
               }),
             });
 
@@ -86,10 +87,8 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
               const data = await response.json();
               const content = data.choices?.[0]?.message?.content?.trim() || '';
               try {
-                let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON object found in response');
-                const parsed = JSON.parse(jsonMatch[0]);
+                const { parseRobustJson } = await import('./lib/parse-json-robust');
+                const parsed = parseRobustJson(content);
                 const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
                 fileItems = rawItems.map((item: any) => {
                   const unit_price = typeof item.unit_price === 'number' ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, '')) || 0;

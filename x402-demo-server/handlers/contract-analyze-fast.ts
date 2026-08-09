@@ -76,6 +76,7 @@ export async function handleContractAnalyzeFastRequest(c: Context) {
                   },
                 ],
                 temperature: 0.1,
+                response_format: { type: 'json_object' },
               }),
             });
 
@@ -85,10 +86,8 @@ export async function handleContractAnalyzeFastRequest(c: Context) {
               const data = await response.json();
               const content = data.choices?.[0]?.message?.content?.trim() || '';
               try {
-                let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON object found in response');
-                const parsed = JSON.parse(jsonMatch[0]);
+                const { parseRobustJson } = await import('./lib/parse-json-robust');
+                const parsed = parseRobustJson(content);
                 const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
                 fileClauses = rawClauses.map((clause: any) => {
                   const summary = clause.clause_summary || 'Risky clause identified';

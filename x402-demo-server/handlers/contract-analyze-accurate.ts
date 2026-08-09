@@ -68,7 +68,7 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
                 messages: [
                   {
                     role: 'system',
-                    content: 'Analyze the contract structured semantic map. Identify risk clauses, non-standard terms, or missing standard protections. Return ONLY a valid JSON object matching this schema: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.',
+                    content: 'Analyze the contract structured semantic map. Identify risk clauses, non-standard terms, or missing standard protections. Return ONLY a valid JSON object matching this schema: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.',
                   },
                   {
                     role: 'user',
@@ -76,6 +76,7 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
                   },
                 ],
                 temperature: 0.1,
+                response_format: { type: 'json_object' },
               }),
             });
 
@@ -85,10 +86,8 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
               const data = await response.json();
               const content = data.choices?.[0]?.message?.content?.trim() || '';
               try {
-                let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON object found in response');
-                const parsed = JSON.parse(jsonMatch[0]);
+                const { parseRobustJson } = await import('./lib/parse-json-robust');
+                const parsed = parseRobustJson(content);
                 const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
                 fileClauses = rawClauses.map((clause: any) => {
                   const summary = clause.clause_summary || 'Risky clause identified';

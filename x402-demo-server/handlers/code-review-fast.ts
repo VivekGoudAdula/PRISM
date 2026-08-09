@@ -54,14 +54,15 @@ export async function handleCodeReviewFastRequest(c: Context) {
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a fast code reviewer. Review the provided code file for potential bugs, security issues, syntax errors, and code quality problems. Return ONLY valid JSON matching this schema: { "file_path": string, "issues": [{ "line_estimate": number, "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "overall_quality_score": number }. overall_quality_score must be a float between 0.0 and 1.0 (where 1.0 is flawless). Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
+                  content: 'Fast single-file code review: Analyze source file. Return ONLY JSON: { "issues": [ { "line_estimate": number, "severity": "low" | "medium" | "high", "description": string, "suggestion": string } ], "overall_quality_score": number } where overall_quality_score is between 0 and 1.',
                 },
                 {
                   role: 'user',
-                  content: `File Path: ${file_path}\n\nCode Content:\n${codeContent}`,
+                  content: `Instructions: ${task_description || 'Analyze the provided code'}\n\nFile Path: ${file_path}\nFile Content:\n${file_content.slice(0, 12000)}`,
                 },
               ],
               temperature: 0.1,
+              response_format: { type: 'json_object' },
             }),
           });
 
@@ -71,10 +72,8 @@ export async function handleCodeReviewFastRequest(c: Context) {
             const data = await response.json();
             const content = data.choices?.[0]?.message?.content?.trim() || '';
             try {
-              let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-              const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-              if (!jsonMatch) throw new Error('No JSON object found in LLM response');
-              const parsed = JSON.parse(jsonMatch[0]);
+              const { parseRobustJson } = await import('./lib/parse-json-robust');
+              const parsed = parseRobustJson(content);
 
               issues = Array.isArray(parsed.issues) ? parsed.issues : [];
               if (typeof parsed.overall_quality_score === 'number') {
