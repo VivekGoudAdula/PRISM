@@ -112,6 +112,7 @@ Scoring rules:
 
 Do NOT invent fake requirements. Distinguish required missing info from optional recommendations.
 The improvedPrompt MUST preserve the user's exact original intent and MUST NOT introduce unsupported facts.
+CRITICAL REQUIREMENT: The improvedPrompt MUST preserve all repository links (e.g. GitHub URLs like https://github.com/...), URLs, target names, file names, or specific parameters present in the original prompt. NEVER omit or remove user-provided URLs!
 
 Return ONLY a valid, single JSON object with this exact structure and NO Markdown formatting or markdown wrappers:
 {
@@ -123,7 +124,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "irrelevantInformation": ["list of redundant/irrelevant parts, or empty"],
   "constraints": ["key constraints identified"],
   "suggestions": ["actionable recommendations to improve"],
-  "improvedPrompt": "full optimized prompt preserving intent"
+  "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
 
     const modelsToTry = ['llama-3.3-70b-versatile', 'llama3-70b-8192', 'llama-3.1-8b-instant'];
@@ -152,6 +153,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
           if (response.ok) {
             const data = await response.json();
             const rawContent = data.choices?.[0]?.message?.content?.trim() || '';
+            const parsed = JSON.parse(rawContent);
             const sanitizeStringArray = (val: any): string[] => {
               if (!val) return [];
               if (Array.isArray(val)) {
@@ -163,6 +165,16 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
               return [JSON.stringify(val)];
             };
 
+            let improvedPrompt = parsed.improvedPrompt || promptText;
+            const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
+            if (urlMatches) {
+              for (const url of urlMatches) {
+                if (!improvedPrompt.includes(url)) {
+                  improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
+                }
+              }
+            }
+
             analysis = {
               score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
               intent: parsed.intent || 'Task analysis',
@@ -172,7 +184,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
               irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
               constraints: sanitizeStringArray(parsed.constraints),
               suggestions: sanitizeStringArray(parsed.suggestions),
-              improvedPrompt: parsed.improvedPrompt || promptText,
+              improvedPrompt,
               modelUsed: model,
               originalInputTokens: inputTokens,
             };
@@ -219,7 +231,7 @@ function generateLocalFallbackAnalysis(
   } else if (p.includes('invoice') || p.includes('receipt') || p.includes('bill')) {
     taskType = 'invoice_extraction';
     intent = 'Invoice data & line item extraction';
-  } else if (p.includes('code') || p.includes('repo') || p.includes('github') || p.includes('review')) {
+  } else if (p.includes('code') || p.includes('repo') || p.includes('github') || p.includes('review') || p.includes('http')) {
     taskType = 'code_review';
     intent = 'Automated code review & security check';
   }
@@ -248,15 +260,18 @@ function generateLocalFallbackAnalysis(
   if (issues.length >= 2) score = 58;
   if (wordCount < 4 && !hasFiles) score = 40;
 
+  const urlMatches = prompt.match(/https?:\/\/[^\s]+/g);
+  const repoOrUrlStr = urlMatches ? urlMatches.join(' ') : prompt;
+
   let improvedPrompt = prompt;
   if (taskType === 'resume_screening') {
-    improvedPrompt = `Screen the uploaded resumes for the specified role. Evaluate candidates based on relevant technical skills, years of experience, programming ability, and key projects. Rank candidates and return candidate name, match score, strengths, missing skills, and recommendation.`;
+    improvedPrompt = `Screen the uploaded resumes for the specified role (${prompt}). Evaluate candidates based on relevant technical skills, years of experience, programming ability, and key projects. Rank candidates and return candidate name, match score, strengths, missing skills, and recommendation.`;
   } else if (taskType === 'code_review') {
-    improvedPrompt = `Perform a comprehensive code review on the repository/code. Evaluate code quality, detect potential bugs, check security vulnerabilities, and recommend actionable fixes with estimated line numbers.`;
+    improvedPrompt = `Perform a comprehensive code review on the repository ${repoOrUrlStr}. Evaluate code quality, detect potential bugs, check security vulnerabilities, and recommend actionable fixes with estimated line numbers.`;
   } else if (taskType === 'contract_analysis') {
-    improvedPrompt = `Analyze the uploaded legal contract. Extract key clauses, classify risk levels (High/Medium/Low), summarize key terms, and provide risk mitigation recommendations for flagged clauses.`;
+    improvedPrompt = `Analyze the uploaded legal contract (${prompt}). Extract key clauses, classify risk levels (High/Medium/Low), summarize key terms, and provide risk mitigation recommendations for flagged clauses.`;
   } else if (taskType === 'invoice_extraction') {
-    improvedPrompt = `Extract vendor information, invoice number, date, total amount, and itemized line items (description, quantity, unit price, total) from the uploaded invoice document.`;
+    improvedPrompt = `Extract vendor information, invoice number, date, total amount, and itemized line items (description, quantity, unit price, total) from the document (${prompt}).`;
   } else if (issues.length > 0) {
     improvedPrompt = `${prompt}. Please analyze thoroughly, structure the response clearly, and outline key findings, actionable takeaways, and recommendations.`;
   }
