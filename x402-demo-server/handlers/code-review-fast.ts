@@ -9,7 +9,7 @@ export async function handleCodeReviewFastRequest(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED - POST /code-review-fast handler executing');
     const body = await c.req.json().catch(() => ({}));
-    const { file_path, raw_url } = body;
+    const { file_path, raw_url, task_description } = body;
 
     if (!file_path || !raw_url) {
       return c.json({ error: 'file_path and raw_url are required parameters in the request body.' }, 400);
@@ -58,7 +58,7 @@ export async function handleCodeReviewFastRequest(c: Context) {
                 },
                 {
                   role: 'user',
-                  content: `Instructions: ${task_description || 'Analyze the provided code'}\n\nFile Path: ${file_path}\nFile Content:\n${file_content.slice(0, 12000)}`,
+                  content: `Instructions: ${task_description || 'Analyze the provided code'}\n\nFile Path: ${file_path}\nFile Content:\n${codeContent.slice(0, 12000)}`,
                 },
               ],
               temperature: 0.1,

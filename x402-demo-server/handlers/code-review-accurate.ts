@@ -9,7 +9,7 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED - POST /code-review-accurate handler executing');
     const body = await c.req.json().catch(() => ({}));
-    const { file_path, raw_url } = body;
+    const { file_path, raw_url, task_description } = body;
 
     if (!file_path || !raw_url) {
       return c.json({ error: 'file_path and raw_url are required parameters in the request body.' }, 400);
