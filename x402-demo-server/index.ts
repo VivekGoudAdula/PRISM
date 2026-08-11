@@ -34,7 +34,8 @@ import {
   handleCreatorEarningsRequest,
 } from './handlers/creator-content';
 
-import { bazaarResourceServerExtension } from '@x402/extensions/bazaar';
+import { bazaarResourceServerExtension } from '@x402-avm/extensions';
+import type { ResourceServerExtension } from '@x402/core/types';
 import createPaymentConfig, { EndpointConfig, NETWORK_CONFIG, NETWORK_MODE } from './endpoints.config';
 
 // Import Middlewares and Routers
@@ -148,7 +149,7 @@ console.log('█'.repeat(60) + '\n');
 // Initialize x402 Resource Server & Register Bazaar Discovery Extension
 const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const x402Server = new x402ResourceServer(facilitatorClient);
-x402Server.registerExtension(bazaarResourceServerExtension);
+x402Server.registerExtension(bazaarResourceServerExtension as unknown as ResourceServerExtension);
 
 // Register payment scheme for configured network (TestNet / MainNet)
 const avmServerScheme = new ExactAvmScheme();
@@ -172,7 +173,7 @@ app.use('*', async (c, next) => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE, HEAD',
     'Access-Control-Allow-Headers': '*', // Critical for x402
-    'Access-Control-Expose-Headers': '*', // Critical for x402
+    'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE, Payment-Required, Payment-Response, X-Payment-Response, *', // Critical for x402 & x402 Doctor
     'Access-Control-Max-Age': '86400',
   };
 
