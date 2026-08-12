@@ -64,7 +64,9 @@ export interface EndpointConfig {
  * @param avmAddress - The Algorand wallet address that receives payments
  */
 export function createPaymentConfig(avmAddress: string): EndpointConfig {
-  const resumeScreenFastDiscovery = declareDiscoveryExtension({
+  // ─── Resume Screen Fast ─────────────────────────────────────────────────
+  const resumeScreenFastGetDiscovery = declareDiscoveryExtension({
+    input: { resume_url: 'https://example.com/resume.pdf' },
     output: {
       example: {
         candidateName: 'Jane Doe',
@@ -75,7 +77,22 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const resumeScreenAccurateDiscovery = declareDiscoveryExtension({
+  const resumeScreenFastPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { resume_url: 'https://example.com/resume.pdf', job_description: 'Software Engineer' },
+    output: {
+      example: {
+        candidateName: 'Jane Doe',
+        matchScore: 88,
+        keySkills: ['TypeScript', 'Node.js', 'Algorand'],
+        verdict: 'Recommended for Interview',
+      },
+    },
+  });
+
+  // ─── Resume Screen Accurate ─────────────────────────────────────────────
+  const resumeScreenAccurateGetDiscovery = declareDiscoveryExtension({
+    input: { resume_url: 'https://example.com/resume.pdf' },
     output: {
       example: {
         candidateName: 'Jane Doe',
@@ -87,7 +104,23 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const contractAnalyzeFastDiscovery = declareDiscoveryExtension({
+  const resumeScreenAccuratePostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { resume_url: 'https://example.com/resume.pdf', job_description: 'Senior Full Stack Engineer' },
+    output: {
+      example: {
+        candidateName: 'Jane Doe',
+        matchScore: 94,
+        skillsBreakdown: { technical: 95, experience: 90, domainMatch: 97 },
+        reasoning: 'Strong candidate with deep blockchain and backend engineering experience.',
+        verdict: 'Strong Hire',
+      },
+    },
+  });
+
+  // ─── Contract Analyze Fast ──────────────────────────────────────────────
+  const contractAnalyzeFastGetDiscovery = declareDiscoveryExtension({
+    input: { raw_url: 'https://example.com/contract.pdf' },
     output: {
       example: {
         documentType: 'Non-Disclosure Agreement',
@@ -97,7 +130,21 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const contractAnalyzeAccurateDiscovery = declareDiscoveryExtension({
+  const contractAnalyzeFastPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { raw_url: 'https://example.com/contract.pdf', task_description: 'Analyze legal liabilities' },
+    output: {
+      example: {
+        documentType: 'Non-Disclosure Agreement',
+        riskScore: 'Low',
+        keyClauses: ['Confidentiality', 'Term: 2 Years', 'Governing Law: Delaware'],
+      },
+    },
+  });
+
+  // ─── Contract Analyze Accurate ──────────────────────────────────────────
+  const contractAnalyzeAccurateGetDiscovery = declareDiscoveryExtension({
+    input: { raw_url: 'https://example.com/contract.pdf' },
     output: {
       example: {
         documentType: 'Master Services Agreement',
@@ -110,7 +157,24 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const invoiceExtractFastDiscovery = declareDiscoveryExtension({
+  const contractAnalyzeAccuratePostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { raw_url: 'https://example.com/contract.pdf', task_description: 'Deep legal risk audit' },
+    output: {
+      example: {
+        documentType: 'Master Services Agreement',
+        overallRisk: 'Medium',
+        flaggedRisks: [
+          { clause: 'Indemnification', riskLevel: 'High', recommendation: 'Cap liability to 1x contract value' },
+        ],
+        complianceCheck: 'Passed',
+      },
+    },
+  });
+
+  // ─── Invoice Extract Fast ───────────────────────────────────────────────
+  const invoiceExtractFastGetDiscovery = declareDiscoveryExtension({
+    input: { raw_url: 'https://example.com/invoice.pdf' },
     output: {
       example: {
         vendorName: 'Acme Cloud Services',
@@ -122,7 +186,23 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const invoiceExtractAccurateDiscovery = declareDiscoveryExtension({
+  const invoiceExtractFastPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { raw_url: 'https://example.com/invoice.pdf' },
+    output: {
+      example: {
+        vendorName: 'Acme Cloud Services',
+        invoiceNumber: 'INV-2026-0042',
+        totalAmount: 1450.00,
+        currency: 'USD',
+        dueDate: '2026-09-01',
+      },
+    },
+  });
+
+  // ─── Invoice Extract Accurate ───────────────────────────────────────────
+  const invoiceExtractAccurateGetDiscovery = declareDiscoveryExtension({
+    input: { raw_url: 'https://example.com/invoice.pdf' },
     output: {
       example: {
         vendorName: 'Acme Cloud Services',
@@ -138,7 +218,27 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const codeReviewFastDiscovery = declareDiscoveryExtension({
+  const invoiceExtractAccuratePostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { raw_url: 'https://example.com/invoice.pdf' },
+    output: {
+      example: {
+        vendorName: 'Acme Cloud Services',
+        invoiceNumber: 'INV-2026-0042',
+        lineItems: [
+          { description: 'GPU Server Time', qty: 10, unitPrice: 120.00, total: 1200.00 },
+          { description: 'Storage S3', qty: 1, unitPrice: 250.00, total: 250.00 },
+        ],
+        subtotal: 1450.00,
+        tax: 116.00,
+        totalAmount: 1566.00,
+      },
+    },
+  });
+
+  // ─── Code Review Fast ───────────────────────────────────────────────────
+  const codeReviewFastGetDiscovery = declareDiscoveryExtension({
+    input: { file_path: 'src/index.ts', raw_url: 'https://raw.githubusercontent.com/example/repo/main/src/index.ts' },
     output: {
       example: {
         overallQuality: 'B+',
@@ -149,7 +249,22 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const codeReviewAccurateDiscovery = declareDiscoveryExtension({
+  const codeReviewFastPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { file_path: 'src/index.ts', raw_url: 'https://raw.githubusercontent.com/example/repo/main/src/index.ts', task_description: 'Analyze code quality' },
+    output: {
+      example: {
+        overallQuality: 'B+',
+        criticalIssues: 0,
+        warnings: 2,
+        summary: 'Clean code overall; minor optimization suggested in loop indexing.',
+      },
+    },
+  });
+
+  // ─── Code Review Accurate ───────────────────────────────────────────────
+  const codeReviewAccurateGetDiscovery = declareDiscoveryExtension({
+    input: { file_path: 'src/index.ts', raw_url: 'https://raw.githubusercontent.com/example/repo/main/src/index.ts' },
     output: {
       example: {
         overallQuality: 'A',
@@ -162,7 +277,24 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const seoAuditFastDiscovery = declareDiscoveryExtension({
+  const codeReviewAccuratePostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { file_path: 'src/index.ts', raw_url: 'https://raw.githubusercontent.com/example/repo/main/src/index.ts', task_description: 'Security audit and refactoring review' },
+    output: {
+      example: {
+        overallQuality: 'A',
+        securityScan: { vulnerabilities: 0, severity: 'None' },
+        refactoringSuggestions: [
+          { file: 'index.ts', line: 42, suggestion: 'Use memoized calculation to prevent redundant execution' },
+        ],
+        testCoverageEstimate: '85%',
+      },
+    },
+  });
+
+  // ─── SEO Audit Fast ─────────────────────────────────────────────────────
+  const seoAuditFastGetDiscovery = declareDiscoveryExtension({
+    input: { page_url: 'https://example.com' },
     output: {
       example: {
         targetUrl: 'https://example.com',
@@ -173,7 +305,22 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const seoAuditAccurateDiscovery = declareDiscoveryExtension({
+  const seoAuditFastPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { page_url: 'https://example.com' },
+    output: {
+      example: {
+        targetUrl: 'https://example.com',
+        score: 82,
+        metaTags: { title: 'Present', description: 'Present', ogTags: 'Missing' },
+        quickFixes: ['Add OpenGraph image tag', 'Fix missing alt text on 2 images'],
+      },
+    },
+  });
+
+  // ─── SEO Audit Accurate ─────────────────────────────────────────────────
+  const seoAuditAccurateGetDiscovery = declareDiscoveryExtension({
+    input: { page_url: 'https://example.com' },
     output: {
       example: {
         targetUrl: 'https://example.com',
@@ -186,7 +333,38 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
     },
   });
 
-  const runTaskDiscovery = declareDiscoveryExtension({
+  const seoAuditAccuratePostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { page_url: 'https://example.com' },
+    output: {
+      example: {
+        targetUrl: 'https://example.com',
+        overallSeoScore: 91,
+        performanceMetrics: { mobileReadability: 95, contentDepth: 'Comprehensive', keywordDensity: 'Optimal' },
+        actionableRecommendations: [
+          { priority: 'High', issue: 'Missing Canonical Tag', fix: 'Add rel=canonical tag in <head>' },
+        ],
+      },
+    },
+  });
+
+  // ─── Run Task ───────────────────────────────────────────────────────────
+  const runTaskGetDiscovery = declareDiscoveryExtension({
+    input: { task_id: 'task-9921' },
+    output: {
+      example: {
+        taskId: 'task-9921',
+        status: 'completed',
+        selectedEndpoint: '/code-review-accurate',
+        executionTimeMs: 1240,
+        result: { success: true },
+      },
+    },
+  });
+
+  const runTaskPostDiscovery = declareDiscoveryExtension({
+    bodyType: 'json',
+    input: { task_type: 'code_review', raw_url: 'https://example.com/code.ts' },
     output: {
       example: {
         taskId: 'task-9921',
@@ -211,7 +389,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking.',
       mimeType: 'application/json',
-      extensions: resumeScreenFastDiscovery,
+      extensions: resumeScreenFastGetDiscovery,
     },
     'POST /resume-screen-fast': {
       accepts: [{
@@ -223,7 +401,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking.',
       mimeType: 'application/json',
-      extensions: resumeScreenFastDiscovery,
+      extensions: resumeScreenFastPostDiscovery,
     },
 
     'GET /resume-screen-accurate': {
@@ -236,7 +414,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning.',
       mimeType: 'application/json',
-      extensions: resumeScreenAccurateDiscovery,
+      extensions: resumeScreenAccurateGetDiscovery,
     },
     'POST /resume-screen-accurate': {
       accepts: [{
@@ -248,7 +426,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning.',
       mimeType: 'application/json',
-      extensions: resumeScreenAccurateDiscovery,
+      extensions: resumeScreenAccuratePostDiscovery,
     },
 
     'GET /contract-analyze-fast': {
@@ -261,7 +439,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds.',
       mimeType: 'application/json',
-      extensions: contractAnalyzeFastDiscovery,
+      extensions: contractAnalyzeFastGetDiscovery,
     },
     'POST /contract-analyze-fast': {
       accepts: [{
@@ -273,7 +451,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds.',
       mimeType: 'application/json',
-      extensions: contractAnalyzeFastDiscovery,
+      extensions: contractAnalyzeFastPostDiscovery,
     },
 
     'GET /contract-analyze-accurate': {
@@ -286,7 +464,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning.',
       mimeType: 'application/json',
-      extensions: contractAnalyzeAccurateDiscovery,
+      extensions: contractAnalyzeAccurateGetDiscovery,
     },
     'POST /contract-analyze-accurate': {
       accepts: [{
@@ -298,7 +476,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning.',
       mimeType: 'application/json',
-      extensions: contractAnalyzeAccurateDiscovery,
+      extensions: contractAnalyzeAccuratePostDiscovery,
     },
 
     'GET /invoice-extract-fast': {
@@ -311,7 +489,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents.',
       mimeType: 'application/json',
-      extensions: invoiceExtractFastDiscovery,
+      extensions: invoiceExtractFastGetDiscovery,
     },
     'POST /invoice-extract-fast': {
       accepts: [{
@@ -323,7 +501,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents.',
       mimeType: 'application/json',
-      extensions: invoiceExtractFastDiscovery,
+      extensions: invoiceExtractFastPostDiscovery,
     },
 
     'GET /invoice-extract-accurate': {
@@ -336,7 +514,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices.',
       mimeType: 'application/json',
-      extensions: invoiceExtractAccurateDiscovery,
+      extensions: invoiceExtractAccurateGetDiscovery,
     },
     'POST /invoice-extract-accurate': {
       accepts: [{
@@ -348,7 +526,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices.',
       mimeType: 'application/json',
-      extensions: invoiceExtractAccurateDiscovery,
+      extensions: invoiceExtractAccuratePostDiscovery,
     },
 
     'GET /code-review-fast': {
@@ -361,7 +539,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Reviews a single code file for bugs, security issues, syntax errors, and code quality problems with fast LLM turnarounds.',
       mimeType: 'application/json',
-      extensions: codeReviewFastDiscovery,
+      extensions: codeReviewFastGetDiscovery,
     },
     'POST /code-review-fast': {
       accepts: [{
@@ -373,7 +551,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Reviews a single code file for bugs, security issues, syntax errors, and code quality problems with fast LLM turnarounds.',
       mimeType: 'application/json',
-      extensions: codeReviewFastDiscovery,
+      extensions: codeReviewFastPostDiscovery,
     },
 
     'GET /code-review-accurate': {
@@ -386,7 +564,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning.',
       mimeType: 'application/json',
-      extensions: codeReviewAccurateDiscovery,
+      extensions: codeReviewAccurateGetDiscovery,
     },
     'POST /code-review-accurate': {
       accepts: [{
@@ -398,7 +576,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning.',
       mimeType: 'application/json',
-      extensions: codeReviewAccurateDiscovery,
+      extensions: codeReviewAccuratePostDiscovery,
     },
 
     'GET /seo-audit-fast': {
@@ -411,7 +589,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.',
       mimeType: 'application/json',
-      extensions: seoAuditFastDiscovery,
+      extensions: seoAuditFastGetDiscovery,
     },
     'POST /seo-audit-fast': {
       accepts: [{
@@ -423,7 +601,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.',
       mimeType: 'application/json',
-      extensions: seoAuditFastDiscovery,
+      extensions: seoAuditFastPostDiscovery,
     },
 
     'GET /seo-audit-accurate': {
@@ -436,7 +614,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.',
       mimeType: 'application/json',
-      extensions: seoAuditAccurateDiscovery,
+      extensions: seoAuditAccurateGetDiscovery,
     },
     'POST /seo-audit-accurate': {
       accepts: [{
@@ -448,7 +626,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.',
       mimeType: 'application/json',
-      extensions: seoAuditAccurateDiscovery,
+      extensions: seoAuditAccuratePostDiscovery,
     },
 
     'GET /run-task': {
@@ -461,7 +639,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.',
       mimeType: 'application/json',
-      extensions: runTaskDiscovery,
+      extensions: runTaskGetDiscovery,
     },
     'POST /run-task': {
       accepts: [{
@@ -473,10 +651,9 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       }],
       description: 'Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.',
       mimeType: 'application/json',
-      extensions: runTaskDiscovery,
+      extensions: runTaskPostDiscovery,
     },
   };
 }
 
 export default createPaymentConfig;
-
