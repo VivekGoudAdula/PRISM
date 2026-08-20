@@ -40,7 +40,7 @@ export async function logSavings(filename: string, raw_tokens: number, map_token
 function getGroqKeys(): string[] {
   const keys: string[] = [];
   if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 20; i++) {
     const k = process.env[`GROQ_API_KEY_${i}`];
     if (k) keys.push(k);
   }
@@ -121,7 +121,7 @@ export async function buildSemanticMap(
   }
 
   const keys = getGroqKeys();
-  const modelsToTry = ['qwen/qwen3.6-27b', 'groq/compound-mini', 'groq/compound'];
+  const modelsToTry = ['llama-3.3-70b-versatile'];
   let extractedMap = defaultFallbackMap;
   let success = false;
 

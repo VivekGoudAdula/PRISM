@@ -73,7 +73,7 @@ export async function handleResumeScreenFastRequest(c: Context) {
                 'Authorization': `Bearer ${key}`,
               },
               body: JSON.stringify({
-                model: 'groq/compound-mini',
+                model: 'llama-3.3-70b-versatile',
                 messages: [
                   {
                     role: 'system',

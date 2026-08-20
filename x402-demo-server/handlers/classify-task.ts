@@ -85,7 +85,7 @@ export async function handleClassifyTaskRequest(c: Context) {
     const getGroqKeys = () => {
       const keys = [];
       if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
+      for (let i = 1; i <= 20; i++) {
         const k = process.env[`GROQ_API_KEY_${i}`];
         if (k) keys.push(k);
       }
@@ -97,7 +97,7 @@ export async function handleClassifyTaskRequest(c: Context) {
     let category = 'unsupported';
     let success = false;
 
-    const modelsToTry = ['qwen/qwen3.6-27b', 'groq/compound-mini', 'groq/compound'];
+    const modelsToTry = ['llama-3.3-70b-versatile'];
 
     if (keys.length > 0) {
       for (let index = 0; index < keys.length; index++) {

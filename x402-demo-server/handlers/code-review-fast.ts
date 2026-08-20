@@ -62,7 +62,7 @@ export async function handleCodeReviewFastRequest(c: Context) {
               'Authorization': `Bearer ${key}`,
             },
             body: JSON.stringify({
-              model: 'qwen/qwen3.6-27b',
+              model: 'llama-3.3-70b-versatile',
               messages: [
                 {
                   role: 'system',

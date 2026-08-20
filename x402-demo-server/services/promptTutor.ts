@@ -30,7 +30,7 @@ export interface PromptAnalysisResult {
 function getGroqKeys(): string[] {
   const keys: string[] = [];
   if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 20; i++) {
     const k = process.env[`GROQ_API_KEY_${i}`];
     if (k) keys.push(k);
   }
@@ -127,7 +127,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
 
-    const modelsToTry = ['qwen/qwen3.6-27b', 'groq/compound-mini', 'groq/compound', 'gemma2-9b-it'];
+    const modelsToTry = ['llama-3.3-70b-versatile'];
 
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const apiKey = keys[kIdx];
