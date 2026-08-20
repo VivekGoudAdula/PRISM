@@ -294,19 +294,132 @@ export async function handlePlanTaskRequest(c: Context) {
       ? parseFloat(((prismTotalTokensSaved / rawContextTokens) * 100).toFixed(1))
       : 0;
 
-    // ── Step 5: Compute dynamic pricing ─────────────────────────────────────
-    const baseEndpointPrice: number = winner.price;
-    const dynamicPrice = calculateDynamicPrice({
-      basePrice: baseEndpointPrice,
+    // ── Step 5: Compute per-item dynamic pricing & batch totals ─────────────
+    const { calculateCodeReviewBasePrice } = await import('./lib/code-review-pricing.js');
+    const { calculateDynamicPrice } = await import('./lib/dynamic-pricing.js');
+
+    const itemPrices: Array<{
+      index: number;
+      name: string;
+      complexityTier?: string;
+      lineCount?: number;
+      fileSizeBytes?: number;
+      inputTokens: number;
+      originalTokens: number;
+      finalTokens: number;
+      tokensSaved: number;
+      savingsRate: number;
+      basePrice: number;
+      optimizationDiscount: number;
+      finalPrice: number;
+    }> = [];
+
+    const overallSavingsRatio = rawContextTokens > 0 ? (finalProviderContextTokens / rawContextTokens) : 1;
+
+    let itemsSource: Array<any> = [];
+    if (category === 'code_review' && repoFilesData?.files) {
+      itemsSource = repoFilesData.files;
+    } else if (uploadedFiles.length > 0) {
+      itemsSource = uploadedFiles;
+    } else if (sitePagesData?.pages) {
+      itemsSource = sitePagesData.pages;
+    } else {
+      itemsSource = [{ filename: 'execution-1', text: task_description }];
+    }
+
+    let batchBaseTotal = 0;
+    let batchDiscountTotal = 0;
+    let batchFinalTotal = 0;
+
+    for (let idx = 0; idx < itemsSource.length; idx++) {
+      const item = itemsSource[idx];
+      let name = `Item ${idx + 1}`;
+      let textContent = '';
+      let lineCount = 0;
+      let fileSizeBytes = 0;
+
+      if (category === 'code_review') {
+        name = item.path || `file-${idx + 1}`;
+        textContent = item.content || '';
+        lineCount = textContent ? textContent.split('\n').length : 0;
+        fileSizeBytes = textContent ? Buffer.byteLength(textContent, 'utf8') : 0;
+      } else if (category === 'seo_audit') {
+        name = item.url || `page-${idx + 1}`;
+        textContent = item.title || '';
+      } else {
+        name = item.filename || `file-${idx + 1}`;
+        textContent = item.extracted_text || item.text || '';
+        lineCount = textContent ? textContent.split('\n').length : 1;
+        fileSizeBytes = textContent ? Buffer.byteLength(textContent, 'utf8') : 0;
+      }
+
+      const itemInputTokens = estimateTokens(name) + estimateTokens(textContent) + 250;
+      let itemBasePrice = winner.price;
+      let complexityTier: string | undefined = undefined;
+
+      if (category === 'code_review') {
+        const workload = calculateCodeReviewBasePrice({
+          inputTokens: itemInputTokens,
+          lineCount,
+          fileSizeBytes,
+        });
+        itemBasePrice = workload.basePrice;
+        complexityTier = workload.complexityTier;
+      }
+
+      const itemOriginalTokens = itemInputTokens;
+      const itemFinalTokens = Math.max(1, Math.round(itemOriginalTokens * overallSavingsRatio));
+
+      const itemDynamicPrice = calculateDynamicPrice({
+        basePrice: itemBasePrice,
+        originalTokens: itemOriginalTokens,
+        finalTokens: itemFinalTokens,
+        discountFactor: 0.50,
+        minPrice: 0.01,
+      });
+
+      batchBaseTotal += itemDynamicPrice.basePrice;
+      batchDiscountTotal += itemDynamicPrice.optimizationDiscount;
+      batchFinalTotal += itemDynamicPrice.finalPrice;
+
+      itemPrices.push({
+        index: idx,
+        name,
+        complexityTier,
+        lineCount,
+        fileSizeBytes,
+        inputTokens: itemInputTokens,
+        originalTokens: itemOriginalTokens,
+        finalTokens: itemFinalTokens,
+        tokensSaved: itemDynamicPrice.tokensSaved,
+        savingsRate: itemDynamicPrice.savingsRate,
+        basePrice: itemDynamicPrice.basePrice,
+        optimizationDiscount: itemDynamicPrice.optimizationDiscount,
+        finalPrice: itemDynamicPrice.finalPrice,
+      });
+    }
+
+    batchBaseTotal = parseFloat(batchBaseTotal.toFixed(4));
+    batchDiscountTotal = parseFloat(batchDiscountTotal.toFixed(4));
+    batchFinalTotal = parseFloat(batchFinalTotal.toFixed(4));
+
+    const unitPrice = parseFloat((batchFinalTotal / Math.max(1, executionQuantity)).toFixed(4));
+    const executionCost = batchFinalTotal;
+    const totalCost = parseFloat((executionCost + PLATFORM_FEE).toFixed(4));
+    const averageFinalPrice = unitPrice;
+
+    // Overall task dynamic price object for backward compatibility
+    const dynamicPrice = {
+      basePrice: batchBaseTotal,
       originalTokens: rawContextTokens,
       finalTokens: finalProviderContextTokens,
+      tokensSaved: prismTotalTokensSaved,
+      savingsRate: rawContextTokens > 0 ? parseFloat(((prismTotalTokensSaved / rawContextTokens)).toFixed(4)) : 0,
+      optimizationDiscount: batchDiscountTotal,
+      finalPrice: batchFinalTotal,
       discountFactor: 0.50,
       minPrice: 0.01,
-    });
-
-    const unitPrice: number = dynamicPrice.finalPrice;
-    const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(4));
-    const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(4));
+    };
 
     // ── Step 6: Derive metadata ──────────────────────────────────────────────
     // Latency per unit: accurate models ~2200 ms, fast models ~800 ms
@@ -326,9 +439,14 @@ export async function handlePlanTaskRequest(c: Context) {
       status: 'planned',
       selectedEndpoint: winner.endpoint_path,
       allCandidateEndpoints: allCandidates,
-      endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice} (base=$${baseEndpointPrice}, discount=$${dynamicPrice.optimizationDiscount})`,
+      endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice} (base=$${dynamicPrice.basePrice}, discount=$${dynamicPrice.optimizationDiscount})`,
       plannerOutput: {
         ...classifyResult,
+        itemPrices,
+        baseTotal: batchBaseTotal,
+        totalOptimizationDiscount: batchDiscountTotal,
+        finalTotal: batchFinalTotal,
+        averageFinalPrice,
         rawContextTokens,
         dataMapTokens,
         dataMapTokensSaved,
@@ -379,6 +497,11 @@ export async function handlePlanTaskRequest(c: Context) {
       platformFee: PLATFORM_FEE,
       totalCost,
       endpointCost: unitPrice,
+      itemPrices,
+      baseTotal: batchBaseTotal,
+      totalOptimizationDiscount: batchDiscountTotal,
+      finalTotal: batchFinalTotal,
+      averageFinalPrice,
     });
 
     await AuditLog.create({
@@ -396,6 +519,7 @@ export async function handlePlanTaskRequest(c: Context) {
         executionCost,
         platformFee: PLATFORM_FEE,
         totalCost,
+        itemPrices,
       },
       ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
     });
@@ -415,6 +539,11 @@ export async function handlePlanTaskRequest(c: Context) {
       discountFactor: dynamicPrice.discountFactor,
       finalPrice: dynamicPrice.finalPrice,
       dynamicPrice,
+      itemPrices,
+      baseTotal: batchBaseTotal,
+      totalOptimizationDiscount: batchDiscountTotal,
+      finalTotal: batchFinalTotal,
+      averageFinalPrice,
       executionQuantity,
       executionCost,
       platformFee: PLATFORM_FEE,

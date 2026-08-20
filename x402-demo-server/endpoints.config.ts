@@ -67,28 +67,50 @@ export function createDynamicPriceResolver(fallbackPrice: string): DynamicPrice 
   return async (context: any) => {
     try {
       let planId: string | undefined;
+      let fileIndex: number | undefined;
 
       if (context.adapter.getQueryParam) {
         const q = context.adapter.getQueryParam('planId') || context.adapter.getQueryParam('plan_id');
         if (typeof q === 'string') planId = q;
         else if (Array.isArray(q) && q.length > 0) planId = q[0];
+
+        const fi = context.adapter.getQueryParam('fileIndex') || context.adapter.getQueryParam('file_index') || context.adapter.getQueryParam('itemIndex') || context.adapter.getQueryParam('item_index');
+        if (fi !== undefined && fi !== null && !isNaN(Number(fi))) fileIndex = Number(fi);
       }
 
       if (!planId && context.adapter.getHeader) {
         planId = context.adapter.getHeader('x-plan-id') || context.adapter.getHeader('planid') || context.adapter.getHeader('plan_id');
       }
 
-      if (!planId && context.adapter.getBody) {
+      if (fileIndex === undefined && context.adapter.getHeader) {
+        const fi = context.adapter.getHeader('x-file-index') || context.adapter.getHeader('file-index') || context.adapter.getHeader('file_index');
+        if (fi !== undefined && fi !== null && !isNaN(Number(fi))) fileIndex = Number(fi);
+      }
+
+      if (context.adapter.getBody) {
         const body: any = context.adapter.getBody();
         if (body && typeof body === 'object') {
-          planId = body.planId || body.plan_id;
+          if (!planId) planId = body.planId || body.plan_id;
+          if (fileIndex === undefined) {
+            const fi = body.fileIndex ?? body.file_index ?? body.itemIndex ?? body.item_index;
+            if (fi !== undefined && fi !== null && !isNaN(Number(fi))) fileIndex = Number(fi);
+          }
         }
       }
 
       if (planId && mongoose.Types.ObjectId.isValid(planId)) {
-        const task = await Task.findById(planId).select('unitPrice totalCost executionCost').lean();
-        if (task && typeof task.unitPrice === 'number' && task.unitPrice > 0) {
-          return `$${task.unitPrice.toString()}`;
+        const task = await Task.findById(planId).select('unitPrice totalCost executionCost itemPrices plannerOutput').lean();
+        if (task) {
+          const itemPrices = (task as any).itemPrices || (task as any).plannerOutput?.itemPrices;
+          if (Array.isArray(itemPrices) && fileIndex !== undefined && fileIndex >= 0 && fileIndex < itemPrices.length) {
+            const itemPrice = itemPrices[fileIndex]?.finalPrice;
+            if (typeof itemPrice === 'number' && itemPrice > 0) {
+              return `$${itemPrice.toString()}`;
+            }
+          }
+          if (typeof task.unitPrice === 'number' && task.unitPrice > 0) {
+            return `$${task.unitPrice.toString()}`;
+          }
         }
       }
     } catch (err) {

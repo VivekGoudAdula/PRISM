@@ -488,6 +488,22 @@ export async function handleExecuteTaskRequest(c: Context) {
       ? poOutput.savingsRate
       : (originalTokens > 0 ? parseFloat((tokensSaved / originalTokens).toFixed(4)) : 0);
 
+    const realTaskSavingsUSD = (taskRecord as any).totalOptimizationDiscount ??
+      ((taskRecord as any).plannerOutput?.totalOptimizationDiscount ??
+      ((optimizationDiscount || 0) * actualQuantity));
+
+    if (realTaskSavingsUSD > 0 && tokenAnalytics?._id) {
+      try {
+        const { TokenUsage } = await import('../models/TokenUsage');
+        await TokenUsage.updateOne(
+          { _id: tokenAnalytics._id },
+          { $set: { costSaved: parseFloat(realTaskSavingsUSD.toFixed(4)) } }
+        );
+      } catch (tErr) {
+        console.error('Failed to update TokenUsage costSaved:', tErr);
+      }
+    }
+
     // Record PromptOptimization persistence entry
     try {
       const { PromptOptimization } = await import('../models/PromptOptimization');
@@ -521,7 +537,8 @@ export async function handleExecuteTaskRequest(c: Context) {
     // ── Step 11: Update user aggregate stats ─────────────────────────────────
     user.totalTasks = (user.totalTasks ?? 0) + 1;
     user.totalSpent = (user.totalSpent ?? 0) + finalTotalCost;
-    user.totalSaved = (user.totalSaved ?? 0) + tokenAnalytics.costSaved;
+    const addedSavings = realTaskSavingsUSD > 0 ? realTaskSavingsUSD : (tokenAnalytics.costSaved || 0);
+    user.totalSaved = parseFloat(((user.totalSaved ?? 0) + addedSavings).toFixed(4));
     const userEndpoints = await EndpointUsage.distinct('endpointName', { userId: user._id });
     user.totalEndpointsUsed = userEndpoints.length;
     await user.save();

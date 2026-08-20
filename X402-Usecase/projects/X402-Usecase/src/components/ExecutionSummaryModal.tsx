@@ -31,6 +31,8 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
     )
   );
 
+  const [showItemDetails, setShowItemDetails] = useState<boolean>(false);
+
   const toggleSelectFile = (idx: number) => {
     setSelectedIndices((prev) => {
       const next = new Set(prev);
@@ -96,13 +98,13 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-20"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 my-auto overflow-hidden"
       style={{ background: 'rgba(2,4,18,0.88)', backdropFilter: 'blur(10px)' }}
     >
       <div
         className="w-full max-w-lg animate-scale-up rounded-3xl border border-indigo-500/20 shadow-2xl flex flex-col"
         style={{
-          maxHeight: '78vh',
+          maxHeight: '88vh',
           background: 'linear-gradient(135deg, rgba(15,18,45,0.99) 0%, rgba(8,12,30,0.99) 100%)',
           boxShadow: '0 0 80px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.6)',
         }}
@@ -203,53 +205,102 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
             </div>
           ))}
 
-          {/* Dynamic Pricing Breakdown */}
+          {/* Dynamic Workload & Optimization Pricing Breakdown */}
           {(() => {
-            const baseUnitPrice = plan.basePrice ?? plan.dynamicPrice?.basePrice ?? plan.unitPrice;
-            const unitDiscount = plan.optimizationDiscount ?? plan.dynamicPrice?.optimizationDiscount ?? 0;
-            const savingsPct = plan.reductionPercentage ?? Math.round((plan.savingsRate ?? 0) * 100);
-            const totalDiscount = unitDiscount * selectedCount;
-            const totalBasePrice = baseUnitPrice * selectedCount;
+            const isCodeReview = plan.category === 'code_review';
+            const isResume = plan.category === 'resume_screening';
+
+            const titleText = isCodeReview
+              ? 'PRISM CODE REVIEW'
+              : isResume
+              ? 'PRISM OPTIMIZED RESUME EXECUTION'
+              : 'PRISM OPTIMIZED EXECUTION';
+
+            const baseTotal = plan.baseTotal ?? ((plan.basePrice ?? plan.unitPrice) * selectedCount);
+            const totalSavings = plan.totalOptimizationDiscount ?? ((plan.optimizationDiscount ?? 0) * selectedCount);
+            const finalTotal = totalCost;
+
+            const itemPrices = plan.itemPrices || [];
 
             return (
-              <div className="mt-3 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-4 flex flex-col gap-2.5 shadow-lg">
+              <div className="mt-3 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-4 flex flex-col gap-3 shadow-lg">
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <div className="flex items-center gap-2">
                     <FiZap className="text-emerald-400 text-xs" />
                     <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest">
-                      PRISM OPTIMIZED PRICE
+                      {titleText}
                     </span>
                   </div>
-                  <span className="text-[10px] text-emerald-400/90 font-medium">
-                    Price reduced by PRISM optimization
+                  <span className="text-[10px] text-emerald-400/90 font-medium italic">
+                    Workload &amp; optimization pricing
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1.5 text-xs">
                   <div className="flex items-center justify-between text-slate-400">
-                    <span>Base price</span>
-                    <span className="font-mono font-medium text-slate-300">${totalBasePrice.toFixed(4)}</span>
+                    <span>{selectedCount} {isCodeReview ? 'file' : isResume ? 'resume' : 'execution'}{selectedCount !== 1 ? 's' : ''}</span>
+                    <span className="font-mono text-slate-400 font-semibold">{selectedCount} x402 transactions</span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400">
-                    <span>Context saved</span>
-                    <span className="font-mono font-semibold text-emerald-400">{savingsPct}%</span>
+                    <span>Base workload cost</span>
+                    <span className="font-mono font-medium text-slate-300">${baseTotal.toFixed(4)}</span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400">
-                    <span>PRISM discount</span>
-                    <span className="font-mono font-semibold text-emerald-400">-${totalDiscount.toFixed(4)}</span>
+                    <span>PRISM optimization savings</span>
+                    <span className="font-mono font-semibold text-emerald-400">-${totalSavings.toFixed(4)}</span>
                   </div>
                   <div className="my-0.5 border-t border-slate-700/60" />
                   <div className="flex items-center justify-between font-extrabold text-sm text-white">
                     <span>You pay</span>
-                    <span className="font-mono text-emerald-300">${totalCost.toFixed(4)}</span>
+                    <span className="font-mono text-emerald-300">${finalTotal.toFixed(4)}</span>
                   </div>
                 </div>
 
-                {totalDiscount > 0 && (
-                  <div className="mt-0.5 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-extrabold shadow-sm">
-                    <span>✓ You saved ${totalDiscount.toFixed(4)}</span>
+                <div className="mt-1 flex items-center justify-between">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-extrabold shadow-sm">
+                    <span>✓ {selectedCount} x402 executions (Saved ${totalSavings.toFixed(4)})</span>
+                  </div>
+                  {itemPrices.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowItemDetails(!showItemDetails)}
+                      className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline transition-colors"
+                    >
+                      {showItemDetails ? 'Hide details' : 'Show execution breakdown'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Expandable Per-Execution Details List */}
+                {showItemDetails && itemPrices.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      <span>Individual Executions</span>
+                      <span>Final Price</span>
+                    </div>
+                    {itemPrices.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
+                        <div className="flex items-center gap-2 truncate max-w-[220px]">
+                          <span className="text-slate-500 font-mono text-[10px]">#{item.index + 1}</span>
+                          <span className="text-slate-200 font-medium truncate">{item.name}</span>
+                          {item.complexityTier && (
+                            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30 text-[9px] font-bold">
+                              {item.complexityTier}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="text-slate-500 line-through text-[10px]">${(item.basePrice || 0).toFixed(4)}</span>
+                          <span className="text-emerald-300 font-bold">${(item.finalPrice || 0).toFixed(4)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
+
+                <div className="text-[10px] text-slate-400 italic text-center border-t border-slate-800/60 pt-2">
+                  Your price is based on actual workload and PRISM optimization.
+                </div>
               </div>
             );
           })()}

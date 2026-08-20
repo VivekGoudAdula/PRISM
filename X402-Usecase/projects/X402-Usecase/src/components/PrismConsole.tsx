@@ -480,6 +480,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
       fetchTasks();
       if (onTaskComplete) onTaskComplete();
+      window.dispatchEvent(new CustomEvent('prism_task_completed'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error.';
       setPaymentStatus('');

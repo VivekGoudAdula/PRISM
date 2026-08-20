@@ -1,10 +1,13 @@
 import { Task } from '../../models/Task';
 
-/** A resolved file ready for text extraction or semantic mapping. */
+/** A resolved file ready for text extraction, code review, or semantic mapping. */
 export interface ResolvedFile {
   filename: string;
-  content_base64: string;
+  content_base64?: string;
   text?: string;
+  code_content?: string;
+  file_path?: string;
+  raw_url?: string;
   semantic_map?: any;
 }
 
@@ -12,17 +15,8 @@ export interface ResolvedFile {
  * Resolves file content and task description from a handler request body.
  *
  * Supports two modes:
- *
- *  1. **Inline mode** (old flow): `files[]` in the request body contains `content_base64`
- *     directly. Used for single-file calls or backward-compatible requests.
- *
- *  2. **Reference mode** (new flow): `file_index` + `plan_id` in the body reference a file
- *     that was stored server-side during `/plan-task`. The content is fetched from MongoDB.
- *     This keeps the x402 payment request payload tiny (< 100 bytes), so the middleware
- *     can verify the payment quickly and it registers correctly on the x402 leaderboard.
- *
- * @param body - Parsed request body from the Hono context
- * @returns Resolved list of files and the task description string
+ *  1. **Inline mode** (old flow): `files[]` or `{file_path, raw_url}` directly in body.
+ *  2. **Reference mode** (new flow): `file_index` + `plan_id` in body reference stored task data.
  */
 export async function resolveFiles(body: any): Promise<{
   files: ResolvedFile[];
@@ -38,15 +32,20 @@ export async function resolveFiles(body: any): Promise<{
     }
 
     const storedFiles: any[] = task.plannerOutput?.files || [];
-    const storedFile = storedFiles.find((f: any) => f.index === file_index);
+    const storedFile = storedFiles.find((f: any) => f.index === file_index) || storedFiles[file_index];
     if (!storedFile) {
       throw new Error(`File index ${file_index} not found in plan ${plan_id}`);
     }
 
     return {
       files: [{
-        filename: storedFile.filename,
+        filename: storedFile.filename || storedFile.path || `file-${file_index + 1}`,
         content_base64: storedFile.content_base64 || '',
+        text: storedFile.extracted_text || storedFile.text || storedFile.content || '',
+        code_content: storedFile.content || storedFile.extracted_text || '',
+        file_path: storedFile.path || storedFile.filename || '',
+        raw_url: storedFile.raw_url || storedFile.download_url || storedFile.url || '',
+        semantic_map: storedFile.semantic_map,
       }],
       taskDescription: task_description || task.prompt,
     };

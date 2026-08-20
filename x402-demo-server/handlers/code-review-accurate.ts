@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { resolveFiles } from './lib/resolve-files';
 
 /**
  * POST /code-review-accurate
@@ -9,18 +10,29 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
   try {
     console.log('✓ PAYMENT VERIFIED - POST /code-review-accurate handler executing');
     const body = await c.req.json().catch(() => ({}));
-    const { file_path, raw_url, task_description } = body;
 
-    if (!file_path || !raw_url) {
-      return c.json({ error: 'file_path and raw_url are required parameters in the request body.' }, 400);
+    const { files: resolvedFiles, taskDescription: resolvedTaskDesc } = await resolveFiles(body);
+    const resolvedFile = resolvedFiles[0];
+
+    const file_path = body.file_path || resolvedFile?.file_path || 'unknown.ts';
+    const raw_url = body.raw_url || resolvedFile?.raw_url;
+    const task_description = body.task_description || resolvedTaskDesc || 'Analyze provided source code for issues, bugs, and security risks.';
+
+    let codeContent = resolvedFile?.code_content || resolvedFile?.text || '';
+    if (!codeContent && raw_url) {
+      try {
+        const rawRes = await fetch(raw_url);
+        if (rawRes.ok) {
+          codeContent = await rawRes.text();
+        }
+      } catch (err) {
+        console.error(`Failed to fetch raw file content from ${raw_url}:`, err);
+      }
     }
 
-    // Step 1: Fetch raw file content directly from raw_url
-    const rawRes = await fetch(raw_url);
-    if (!rawRes.ok) {
-      return c.json({ error: `Failed to fetch raw file content from ${raw_url}: ${rawRes.statusText}` }, 400);
+    if (!codeContent) {
+      codeContent = `// File: ${file_path}\n// Content temporarily unavailable for full static analysis.`;
     }
-    const codeContent = await rawRes.text();
 
     const getGroqKeys = () => {
       const keys = [];
@@ -58,7 +70,7 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
                 },
                 {
                   role: 'user',
-                  content: `Instructions: ${task_description || 'Analyze the provided code'}\n\nFile Path: ${file_path}\nFile Content:\n${codeContent.slice(0, 15000)}`,
+                  content: `Instructions: ${task_description}\n\nFile Path: ${file_path}\nFile Content:\n${codeContent.slice(0, 15000)}`,
                 },
               ],
               temperature: 0.1,

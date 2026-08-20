@@ -117,6 +117,22 @@ export interface DynamicPriceResult {
   minPrice: number;
 }
 
+export interface ItemPriceInfo {
+  index: number;
+  name: string;
+  complexityTier?: string;
+  lineCount?: number;
+  fileSizeBytes?: number;
+  inputTokens: number;
+  originalTokens: number;
+  finalTokens: number;
+  tokensSaved: number;
+  savingsRate: number;
+  basePrice: number;
+  optimizationDiscount: number;
+  finalPrice: number;
+}
+
 export interface ExecutionPlan {
   planId: string;
   category: string;
@@ -129,6 +145,11 @@ export interface ExecutionPlan {
   discountFactor?: number;
   finalPrice?: number;
   dynamicPrice?: DynamicPriceResult;
+  itemPrices?: ItemPriceInfo[];
+  baseTotal?: number;
+  totalOptimizationDiscount?: number;
+  finalTotal?: number;
+  averageFinalPrice?: number;
   executionQuantity: number;
   executionCost: number;
   platformFee: number;
@@ -504,12 +525,13 @@ export async function executeTaskWithPayment(
               await new Promise((r) => setTimeout(r, 3500));
             }
             const fileFetchFn = await createX402Fetch(walletSigner);
-            const endpointUrl = `${baseUrl}${plan.endpointPath}${plan.endpointPath.includes('?') ? '&' : '?'}planId=${encodeURIComponent(plan.planId)}`;
+            const endpointUrl = `${baseUrl}${plan.endpointPath}${plan.endpointPath.includes('?') ? '&' : '?'}planId=${encodeURIComponent(plan.planId)}&fileIndex=${i}`;
             const res = await fileFetchFn(endpointUrl, {
               method: 'POST',
               headers: {
                 ...headers,
                 'x-plan-id': plan.planId,
+                'x-file-index': i.toString(),
               },
               body: JSON.stringify(payload),
             });

@@ -24,6 +24,12 @@ export interface ITask {
   providerName: string;
   /** Actual number of times the provider was invoked */
   executionCount: number;
+  /** Per-item pricing breakdown for batch executions */
+  itemPrices?: Array<any>;
+  baseTotal?: number;
+  totalOptimizationDiscount?: number;
+  finalTotal?: number;
+  averageFinalPrice?: number;
 
   // --- Transaction Fields ---
   groupTransactionId?: string;
@@ -63,6 +69,11 @@ const TaskSchema = new Schema<ITask>({
   totalCost: { type: Number, default: 0 },
   providerName: { type: String, default: '' },
   executionCount: { type: Number, default: 0 },
+  itemPrices: [{ type: Schema.Types.Mixed }],
+  baseTotal: { type: Number },
+  totalOptimizationDiscount: { type: Number },
+  finalTotal: { type: Number },
+  averageFinalPrice: { type: Number },
 
   // Transactions
   groupTransactionId: { type: String },

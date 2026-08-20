@@ -655,6 +655,13 @@ const Home: React.FC<HomeProps> = () => {
     if (viewState === 'app') {
       fetchSavingsSummary()
     }
+    const handleTaskDone = () => {
+      fetchSavingsSummary()
+    }
+    window.addEventListener('prism_task_completed', handleTaskDone)
+    return () => {
+      window.removeEventListener('prism_task_completed', handleTaskDone)
+    }
   }, [viewState])
 
   return (
