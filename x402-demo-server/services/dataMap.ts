@@ -327,13 +327,19 @@ function generateResumeScreeningNodes(
     addEdge(roleId, candId, 'evaluates_candidate', 0.95);
 
     // Isolated Candidate Skills
-    let candSkills: string[] = Array.isArray(semMap.skills) ? semMap.skills : [];
+    let candSkills: string[] = Array.isArray(semMap.skills) && semMap.skills.length > 0 ? semMap.skills : [];
     if (candSkills.length === 0 && textContent) {
-      const foundSkills = textContent.match(/\b(Python|Node|React|TypeScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|Leadership|Management|Marketing|SEO|Git|Kubernetes)\b/gi) || [];
-      candSkills = Array.from(new Set(foundSkills.map((s) => s.trim()))).slice(0, 5);
+      const foundSkills = textContent.match(/\b(Python|Node|React|TypeScript|JavaScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|C\#|HTML|CSS|Kubernetes|Linux|Git|CI\/CD|DevOps|Microservices|REST|GraphQL|MongoDB|Redis|Agile|Scrum|SEO|Marketing|Management|Leadership|Sales|Analytics|Copywriting|Design|System Architecture|Cloud|Security)\b/gi) || [];
+      candSkills = Array.from(new Set(foundSkills.map((s) => s.trim()))).slice(0, 6);
     }
+
+    if (candSkills.length === 0 && textContent) {
+      const capWords = textContent.match(/\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b/g) || [];
+      candSkills = Array.from(new Set(capWords.filter((w) => !w.includes('Curriculum') && !w.includes('Resume') && !w.includes('Profile')))).slice(0, 4);
+    }
+
     if (candSkills.length === 0) {
-      candSkills = [`${candidateName} Experience`];
+      candSkills = ['Technical Background', 'Core Competencies'];
     }
 
     let matchedSkillCount = 0;

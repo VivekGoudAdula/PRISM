@@ -60,10 +60,45 @@ dataMapRouter.post('/generate', async (c) => {
         });
       }
       userId = guestUser._id;
-    }
+    // Resolve extracted text and semantic map for attached files
+    const { extractText } = await import('../handlers/lib/extract-document');
+    const { buildSemanticMap } = await import('../handlers/lib/semantic-map');
+
+    const resolvedCategory = category || promptAnalysis.taskType || requestCategory;
+
+    const processedFiles = await Promise.all(
+      (files || []).map(async (file: any) => {
+        let text = file.text || file.extracted_text || file.content || '';
+        if (!text && file.content_base64 && file.filename) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            text = extResult.text || '';
+          } catch (err) {
+            console.error(`[DataMap] Text extraction failed for ${file.filename}:`, err);
+          }
+        }
+
+        let semanticMap = file.semantic_map;
+        if (!semanticMap && text && ['resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review'].includes(resolvedCategory)) {
+          try {
+            const semRes = await buildSemanticMap(resolvedCategory, text, file.filename || 'document');
+            semanticMap = semRes.map;
+          } catch (err) {
+            console.error(`[DataMap] Semantic map generation failed for ${file.filename}:`, err);
+          }
+        }
+
+        return {
+          ...file,
+          text,
+          extracted_text: text,
+          semantic_map: semanticMap,
+        };
+      })
+    );
 
     // Call Data Map generation service
-    const generatedMap = await generateDataMap(promptAnalysis, originalPrompt, files, category);
+    const generatedMap = await generateDataMap(promptAnalysis, originalPrompt, processedFiles, category);
 
     const generatedTitle = generateDataMapTitle(originalPrompt || promptAnalysis.intent, generatedMap.taskType);
 
