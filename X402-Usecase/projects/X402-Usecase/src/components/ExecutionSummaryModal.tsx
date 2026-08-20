@@ -203,6 +203,57 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
             </div>
           ))}
 
+          {/* Dynamic Pricing Breakdown */}
+          {(() => {
+            const baseUnitPrice = plan.basePrice ?? plan.dynamicPrice?.basePrice ?? plan.unitPrice;
+            const unitDiscount = plan.optimizationDiscount ?? plan.dynamicPrice?.optimizationDiscount ?? 0;
+            const savingsPct = plan.reductionPercentage ?? Math.round((plan.savingsRate ?? 0) * 100);
+            const totalDiscount = unitDiscount * selectedCount;
+            const totalBasePrice = baseUnitPrice * selectedCount;
+
+            return (
+              <div className="mt-3 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-4 flex flex-col gap-2.5 shadow-lg">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                  <div className="flex items-center gap-2">
+                    <FiZap className="text-emerald-400 text-xs" />
+                    <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest">
+                      PRISM OPTIMIZED PRICE
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400/90 font-medium">
+                    Price reduced by PRISM optimization
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Base price</span>
+                    <span className="font-mono font-medium text-slate-300">${totalBasePrice.toFixed(4)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Context saved</span>
+                    <span className="font-mono font-semibold text-emerald-400">{savingsPct}%</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>PRISM discount</span>
+                    <span className="font-mono font-semibold text-emerald-400">-${totalDiscount.toFixed(4)}</span>
+                  </div>
+                  <div className="my-0.5 border-t border-slate-700/60" />
+                  <div className="flex items-center justify-between font-extrabold text-sm text-white">
+                    <span>You pay</span>
+                    <span className="font-mono text-emerald-300">${totalCost.toFixed(4)}</span>
+                  </div>
+                </div>
+
+                {totalDiscount > 0 && (
+                  <div className="mt-0.5 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-extrabold shadow-sm">
+                    <span>✓ You saved ${totalDiscount.toFixed(4)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Payment Breakdown */}
           {preview.length > 0 && (
             <div className="mt-3 rounded-2xl border border-slate-700/40 bg-slate-950/50 overflow-hidden">
@@ -265,7 +316,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                           item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-300'
                         }`}
                       >
-                        ${item.amount.toFixed(2)}
+                        ${item.amount.toFixed(4)}
                       </span>
                     </div>
                   );
@@ -283,7 +334,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
               </span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-2xl font-black text-white">${totalCost.toFixed(2)}</span>
+              <span className="text-2xl font-black text-white">${totalCost.toFixed(4)}</span>
               <span className="text-[10px] text-indigo-400 font-semibold">USDC on Algorand</span>
             </div>
           </div>

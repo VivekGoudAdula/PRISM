@@ -213,6 +213,66 @@ analyticsRouter.get('/token-usage/summary', async (c) => {
 });
 
 /**
+ * USER DYNAMIC PRICING ANALYTICS
+ * GET /api/analytics/dynamic-pricing
+ */
+analyticsRouter.get('/dynamic-pricing', async (c) => {
+  try {
+    const userPayload = (c as any).get('user');
+    const userId = new mongoose.Types.ObjectId(userPayload.userId);
+
+    const completedTasks = await Task.find({ userId, status: 'completed' }).lean();
+
+    let totalContextProcessed = 0;
+    let totalContextRemovedReused = 0;
+    let totalMonetaryDiscountsReturnedUSD = 0;
+    let totalBaseEndpointRevenueUSD = 0;
+    let totalActualPaidVolumeUSD = 0;
+
+    for (const t of completedTasks) {
+      const po = t.plannerOutput || {};
+      const qty = t.executionQuantity || 1;
+      const rawTokens = po.rawContextTokens || po.originalInputTokens || 0;
+      const finalTokens = po.finalProviderContextTokens || po.optimizedInputTokens || rawTokens;
+      const tokensSaved = Math.max(0, rawTokens - finalTokens);
+
+      const basePrice = po.basePrice || po.dynamicPrice?.basePrice || t.unitPrice || 0;
+      const discount = po.optimizationDiscount || po.dynamicPrice?.optimizationDiscount || 0;
+      const paidUnitPrice = t.unitPrice || (basePrice - discount);
+
+      totalContextProcessed += rawTokens;
+      totalContextRemovedReused += tokensSaved;
+      totalMonetaryDiscountsReturnedUSD += (discount * qty);
+      totalBaseEndpointRevenueUSD += (basePrice * qty);
+      totalActualPaidVolumeUSD += (t.totalCost || (paidUnitPrice * qty));
+    }
+
+    const taskCount = completedTasks.length;
+    const avgOptimizationSavingsPercent = totalContextProcessed > 0
+      ? parseFloat(((totalContextRemovedReused / totalContextProcessed) * 100).toFixed(1))
+      : 0;
+    const avgMonetarySavingPerTaskUSD = taskCount > 0
+      ? parseFloat((totalMonetaryDiscountsReturnedUSD / taskCount).toFixed(4))
+      : 0;
+
+    return c.json({
+      totalContextProcessed,
+      totalContextRemovedReused,
+      totalMonetaryDiscountsReturnedUSD: parseFloat(totalMonetaryDiscountsReturnedUSD.toFixed(4)),
+      avgOptimizationSavingsPercent,
+      avgMonetarySavingPerTaskUSD,
+      totalUserSavingsUSD: parseFloat(totalMonetaryDiscountsReturnedUSD.toFixed(4)),
+      baseEndpointRevenueUSD: parseFloat(totalBaseEndpointRevenueUSD.toFixed(4)),
+      actualPaidVolumeUSD: parseFloat(totalActualPaidVolumeUSD.toFixed(4)),
+      totalCompletedTasks: taskCount,
+    });
+  } catch (error: any) {
+    console.error('Error in dynamic-pricing analytics route:', error);
+    return c.json({ error: 'Failed to fetch dynamic pricing analytics' }, 500);
+  }
+});
+
+/**
  * USER TOKEN USAGE HISTORY
  * GET /api/analytics/token-usage/history
  */

@@ -1503,7 +1503,16 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
                             : '~1,200 tokens'}
                         </span>
                       </td>
-                      <td className="font-bold text-emerald-400">${(task.totalCost ?? 0).toFixed(2)}</td>
+                      <td className="font-bold text-emerald-400">
+                        <div className="flex flex-col">
+                          <span>${(task.totalCost ?? 0).toFixed(4)}</span>
+                          {task.plannerOutput?.optimizationDiscount > 0 && (
+                            <span className="text-[9px] text-emerald-300 font-mono font-semibold">
+                              -${(task.plannerOutput.optimizationDiscount * (task.executionQuantity || 1)).toFixed(4)} PRISM discount
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td>
                         <span
                           className={`admin-badge ${

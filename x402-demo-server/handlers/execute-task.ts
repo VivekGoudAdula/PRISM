@@ -478,6 +478,16 @@ export async function handleExecuteTaskRequest(c: Context) {
       measurementSource,
     });
 
+    const basePrice = poOutput.basePrice || poOutput.dynamicPrice?.basePrice || unitPrice;
+    const optimizationDiscount = poOutput.optimizationDiscount || poOutput.dynamicPrice?.optimizationDiscount || 0;
+    const finalPrice = unitPrice;
+    const originalTokens = rawContextTokens;
+    const finalTokens = finalProviderContextTokens;
+    const tokensSaved = prismTotalTokensSaved;
+    const savingsRate = poOutput.savingsRate !== undefined
+      ? poOutput.savingsRate
+      : (originalTokens > 0 ? parseFloat((tokensSaved / originalTokens).toFixed(4)) : 0);
+
     // Record PromptOptimization persistence entry
     try {
       const { PromptOptimization } = await import('../models/PromptOptimization');
@@ -523,6 +533,9 @@ export async function handleExecuteTaskRequest(c: Context) {
         taskId: taskRecord._id,
         executionTime,
         executionCount: actualQuantity,
+        basePrice,
+        optimizationDiscount,
+        finalPrice,
         unitPrice,
         executionCost: finalExecutionCost,
         platformFee: 0,
@@ -532,6 +545,15 @@ export async function handleExecuteTaskRequest(c: Context) {
         verificationPassed: verification.passed,
         verificationReason: verification.reason,
         tokenAnalytics,
+        dynamicPricing: {
+          basePrice,
+          optimizationDiscount,
+          finalPrice,
+          originalTokens,
+          finalTokens,
+          tokensSaved,
+          savingsRate,
+        },
       },
       ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
     });
@@ -565,14 +587,24 @@ export async function handleExecuteTaskRequest(c: Context) {
     console.log(`optimizerInput=${optimizerInputTokens}`);
     console.log(`optimizerOutput=${optimizedContextTokens}`);
     console.log(`finalProvider=${finalProviderContextTokens}`);
-    console.log(`totalSaved=${prismTotalTokensSaved}\n`);
+    console.log(`totalSaved=${prismTotalTokensSaved}`);
+    console.log(`basePrice=$${basePrice}`);
+    console.log(`optimizationDiscount=$${optimizationDiscount}`);
+    console.log(`finalPrice=$${finalPrice}\n`);
 
     return c.json({
       planId,
       category,
       winner_endpoint: winnerEndpoint,
       providerName: taskRecord.providerName,
+      basePrice,
       unitPrice,
+      optimizationDiscount,
+      finalPrice,
+      originalTokens,
+      finalTokens,
+      tokensSaved,
+      savingsRate,
       executionQuantity: actualQuantity,
       executionCost: finalExecutionCost,
       platformFee: 0,
@@ -599,6 +631,13 @@ export async function handleExecuteTaskRequest(c: Context) {
         optimizerTokensSaved,
         finalProviderContextTokens,
         prismTotalTokensSaved,
+        basePrice,
+        optimizationDiscount,
+        finalPrice,
+        originalTokens,
+        finalTokens,
+        tokensSaved,
+        savingsRate,
       },
       promptOptimizer: promptOptimizerData,
       semanticCache: {

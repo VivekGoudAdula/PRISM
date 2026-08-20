@@ -8,6 +8,7 @@ import { Task } from '../models/Task';
 import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
 import { estimateTokens } from '../services/tokenAnalytics';
+import { calculateDynamicPrice } from '../services/pricing';
 
 config();
 
@@ -294,9 +295,18 @@ export async function handlePlanTaskRequest(c: Context) {
       : 0;
 
     // ── Step 5: Compute dynamic pricing ─────────────────────────────────────
-    const unitPrice: number = winner.price;
-    const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(2));
-    const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(2));
+    const baseEndpointPrice: number = winner.price;
+    const dynamicPrice = calculateDynamicPrice({
+      basePrice: baseEndpointPrice,
+      originalTokens: rawContextTokens,
+      finalTokens: finalProviderContextTokens,
+      discountFactor: 0.50,
+      minPrice: 0.01,
+    });
+
+    const unitPrice: number = dynamicPrice.finalPrice;
+    const executionCost: number = parseFloat((unitPrice * executionQuantity).toFixed(4));
+    const totalCost: number = parseFloat((executionCost + PLATFORM_FEE).toFixed(4));
 
     // ── Step 6: Derive metadata ──────────────────────────────────────────────
     // Latency per unit: accurate models ~2200 ms, fast models ~800 ms
@@ -308,8 +318,6 @@ export async function handlePlanTaskRequest(c: Context) {
       ? `This repo has ${repoFilesData.total_files_found} reviewable files. Reviewing the ${repoFilesData.files.length} highest-priority source files first (${repoFilesData.skipped} skipped).`
       : undefined;
 
-
-
     // ── Step 8: Persist the plan as a 'planned' Task document ────────────────
     const taskRecord = await Task.create({
       userId,
@@ -318,7 +326,7 @@ export async function handlePlanTaskRequest(c: Context) {
       status: 'planned',
       selectedEndpoint: winner.endpoint_path,
       allCandidateEndpoints: allCandidates,
-      endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice}`,
+      endpointChosenReason: `Score-based routing: confidence=${winner.confidence}, unitPrice=$${unitPrice} (base=$${baseEndpointPrice}, discount=$${dynamicPrice.optimizationDiscount})`,
       plannerOutput: {
         ...classifyResult,
         rawContextTokens,
@@ -335,6 +343,15 @@ export async function handlePlanTaskRequest(c: Context) {
         prismTotalTokensSaved,
         finalExecutionPrompt,
         optimizationDetails: optimizationResult,
+        dynamicPrice,
+        basePrice: dynamicPrice.basePrice,
+        optimizationDiscount: dynamicPrice.optimizationDiscount,
+        savingsRate: dynamicPrice.savingsRate,
+        discountFactor: dynamicPrice.discountFactor,
+        finalPrice: dynamicPrice.finalPrice,
+        tokensSaved: dynamicPrice.tokensSaved,
+        originalTokens: dynamicPrice.originalTokens,
+        finalTokens: dynamicPrice.finalTokens,
         cacheDetails: {
           cacheHit,
           cacheSimilarity: cacheCheck.similarity,
@@ -371,7 +388,10 @@ export async function handlePlanTaskRequest(c: Context) {
         taskId: taskRecord._id,
         category,
         providerName,
+        basePrice: dynamicPrice.basePrice,
         unitPrice,
+        optimizationDiscount: dynamicPrice.optimizationDiscount,
+        savingsRate: dynamicPrice.savingsRate,
         executionQuantity,
         executionCost,
         platformFee: PLATFORM_FEE,
@@ -388,7 +408,13 @@ export async function handlePlanTaskRequest(c: Context) {
       category,
       providerName,
       endpointPath: winner.endpoint_path,
+      basePrice: dynamicPrice.basePrice,
       unitPrice,
+      optimizationDiscount: dynamicPrice.optimizationDiscount,
+      savingsRate: dynamicPrice.savingsRate,
+      discountFactor: dynamicPrice.discountFactor,
+      finalPrice: dynamicPrice.finalPrice,
+      dynamicPrice,
       executionQuantity,
       executionCost,
       platformFee: PLATFORM_FEE,

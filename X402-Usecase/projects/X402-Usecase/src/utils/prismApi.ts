@@ -105,12 +105,30 @@ export interface PromptOptimizationResult {
   measurementSource: 'provider_usage' | 'estimated' | 'hybrid';
 }
 
+export interface DynamicPriceResult {
+  basePrice: number;
+  originalTokens: number;
+  finalTokens: number;
+  tokensSaved: number;
+  savingsRate: number;
+  optimizationDiscount: number;
+  finalPrice: number;
+  discountFactor: number;
+  minPrice: number;
+}
+
 export interface ExecutionPlan {
   planId: string;
   category: string;
   providerName: string;
   endpointPath: string;
+  basePrice?: number;
   unitPrice: number;
+  optimizationDiscount?: number;
+  savingsRate?: number;
+  discountFactor?: number;
+  finalPrice?: number;
+  dynamicPrice?: DynamicPriceResult;
   executionQuantity: number;
   executionCost: number;
   platformFee: number;
@@ -486,9 +504,13 @@ export async function executeTaskWithPayment(
               await new Promise((r) => setTimeout(r, 3500));
             }
             const fileFetchFn = await createX402Fetch(walletSigner);
-            const res = await fileFetchFn(`${baseUrl}${plan.endpointPath}`, {
+            const endpointUrl = `${baseUrl}${plan.endpointPath}${plan.endpointPath.includes('?') ? '&' : '?'}planId=${encodeURIComponent(plan.planId)}`;
+            const res = await fileFetchFn(endpointUrl, {
               method: 'POST',
-              headers,
+              headers: {
+                ...headers,
+                'x-plan-id': plan.planId,
+              },
               body: JSON.stringify(payload),
             });
 
