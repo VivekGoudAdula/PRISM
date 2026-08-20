@@ -227,11 +227,11 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
       const repoInfo: any = await repoInfoRes.json().catch(() => ({}));
       branch = repoInfo.default_branch || 'main';
     }
-
-    const branchKey = `${partialKey}@${branch}`;
-    const cachedWithBranch = getCached(branchKey);
-    if (cachedWithBranch) return cachedWithBranch;
   }
+
+  const branchKey = `${partialKey}@${branch}`;
+  const cachedWithBranch = getCached(branchKey);
+  if (cachedWithBranch) return cachedWithBranch;
 
   // ── Step 2: Fetch the recursive file tree ────────────────────────────────
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
