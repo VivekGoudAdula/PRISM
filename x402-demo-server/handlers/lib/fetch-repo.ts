@@ -310,7 +310,6 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   const result: FetchRepoFilesResult = { files, skipped, capped, total_files_found, owner, repo, branch };
 
   // ── Cache under both partial and full branch keys ─────────────────────────
-  const branchKey = `${partialKey}@${branch}`;
   setCached(branchKey, result);
   setCached(partialKey, result);  // Also cache under partial key for fast lookup next time
 

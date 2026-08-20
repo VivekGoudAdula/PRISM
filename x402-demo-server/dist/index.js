@@ -91909,10 +91909,10 @@ async function fetchRepoFiles(repoUrl) {
       const repoInfo = await repoInfoRes.json().catch(() => ({}));
       branch = repoInfo.default_branch || "main";
     }
-    const branchKey2 = `${partialKey}@${branch}`;
-    const cachedWithBranch = getCached(branchKey2);
-    if (cachedWithBranch) return cachedWithBranch;
   }
+  const branchKey = `${partialKey}@${branch}`;
+  const cachedWithBranch = getCached(branchKey);
+  if (cachedWithBranch) return cachedWithBranch;
   const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   let treeRes = null;
   try {
@@ -91969,7 +91969,6 @@ async function fetchRepoFiles(repoUrl) {
   const skipped = Math.max(0, total_files_found - MAX_FILES);
   const capped = total_files_found > MAX_FILES;
   const result = { files, skipped, capped, total_files_found, owner, repo, branch };
-  const branchKey = `${partialKey}@${branch}`;
   setCached(branchKey, result);
   setCached(partialKey, result);
   return result;
