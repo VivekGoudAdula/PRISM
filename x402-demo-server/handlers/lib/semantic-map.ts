@@ -121,7 +121,7 @@ export async function buildSemanticMap(
   }
 
   const keys = getGroqKeys();
-  const modelsToTry = ['llama-3.3-70b-versatile'];
+  const modelsToTry = ['llama-3.3-70b-versatile', 'gemma2-9b-it', 'qwen-2.5-coder-32b', 'deepseek-r1-distill-llama-70b'];
   let extractedMap = defaultFallbackMap;
   let success = false;
 

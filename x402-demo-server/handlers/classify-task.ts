@@ -250,7 +250,7 @@ function localClassify(description: string): string {
 
   // Code review — check before resume because "review" appears in both
   if (desc.includes('github.com/') || desc.includes('code review') ||
-      (desc.includes('repo') && desc.includes('review'))) {
+    (desc.includes('repo') && desc.includes('review'))) {
     return 'code_review';
   }
 
