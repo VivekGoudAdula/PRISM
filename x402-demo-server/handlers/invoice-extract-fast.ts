@@ -65,7 +65,7 @@ export async function handleInvoiceExtractFastRequest(c: Context) {
                 'Authorization': `Bearer ${key}`,
               },
               body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
+                model: 'groq/compound-mini',
                 messages: [
                   {
                     role: 'system',

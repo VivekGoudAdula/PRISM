@@ -65,7 +65,7 @@ export async function handleInvoiceExtractAccurateRequest(c: Context) {
                 'Authorization': `Bearer ${key}`,
               },
               body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'groq/compound',
                 messages: [
                   {
                     role: 'system',

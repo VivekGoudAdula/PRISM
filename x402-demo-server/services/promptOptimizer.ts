@@ -328,57 +328,62 @@ Return ONLY a JSON object with this exact structure:
   "summarizedSections": ["summary descriptions of condensed sections"]
 }`;
 
+      const modelsToTry = ['qwen/qwen3.6-27b', 'groq/compound-mini', 'groq/compound'];
+
       for (const apiKey of keys) {
-        try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: 'llama-3.3-70b-versatile',
-              messages: [
-                { role: 'system', content: systemInstruction },
-                { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
-              ],
-              temperature: 0.1,
-              response_format: { type: 'json_object' },
-            }),
-          });
+        for (const model of modelsToTry) {
+          try {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  { role: 'system', content: systemInstruction },
+                  { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
+                ],
+                temperature: 0.1,
+                response_format: { type: 'json_object' },
+              }),
+            });
 
-          if (response.ok) {
-            const data = await response.json();
-            const parsed = JSON.parse(data.choices?.[0]?.message?.content?.trim() || '{}');
-            if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
-              const candidateText = parsed.optimizedContext.trim();
+            if (response.ok) {
+              const data = await response.json();
+              const parsed = JSON.parse(data.choices?.[0]?.message?.content?.trim() || '{}');
+              if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
+                const candidateText = parsed.optimizedContext.trim();
 
-              // Semantic preservation check
-              const validation = validateSemanticPreservation(
-                fullOriginalContext,
-                candidateText,
-                input.requiredEntities,
-                input.constraints
-              );
+                // Semantic preservation check
+                const validation = validateSemanticPreservation(
+                  fullOriginalContext,
+                  candidateText,
+                  input.requiredEntities,
+                  input.constraints
+                );
 
-              if (validation.isValid) {
-                currentContext = candidateText;
-                modelUsed = 'llama-3.3-70b-versatile + deterministic';
-                if (Array.isArray(parsed.removedRedundancies)) {
-                  removedRedundancies.push(...parsed.removedRedundancies);
+                if (validation.isValid) {
+                  currentContext = candidateText;
+                  modelUsed = `${model} + deterministic`;
+                  if (Array.isArray(parsed.removedRedundancies)) {
+                    removedRedundancies.push(...parsed.removedRedundancies);
+                  }
+                  if (Array.isArray(parsed.summarizedSections)) {
+                    summarizedSections.push(...parsed.summarizedSections);
+                  }
+                  break;
+                } else {
+                  console.warn('⚠️ Semantic preservation validation failed. Discarding LLM optimization fallback to original context.', validation);
                 }
-                if (Array.isArray(parsed.summarizedSections)) {
-                  summarizedSections.push(...parsed.summarizedSections);
-                }
-                break;
-              } else {
-                console.warn('⚠️ Semantic preservation validation failed. Discarding LLM optimization fallback to original context.', validation);
               }
             }
+          } catch (err) {
+            // Continue to next model/key
           }
-        } catch (err) {
-          // Continue to next key or fallback
         }
+        if (modelUsed.includes('+')) break;
       }
     }
   }

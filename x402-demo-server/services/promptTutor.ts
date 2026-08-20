@@ -127,7 +127,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
 
-    const modelsToTry = ['llama-3.3-70b-versatile', 'llama3-70b-8192', 'llama-3.1-8b-instant'];
+    const modelsToTry = ['qwen/qwen3.6-27b', 'groq/compound-mini', 'groq/compound', 'gemma2-9b-it'];
 
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const apiKey = keys[kIdx];
