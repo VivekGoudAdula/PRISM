@@ -187,9 +187,8 @@ authRouter.post('/refresh', async (c) => {
       { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
 
-    // Refresh last activity
-    session.lastActivity = new Date();
-    await session.save();
+    // Refresh last activity safely
+    await UserSession.updateOne({ _id: session._id }, { lastActivity: new Date() }).catch(() => {});
 
     return c.json({ accessToken });
   } catch (error: any) {
