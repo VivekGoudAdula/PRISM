@@ -287,23 +287,27 @@ export function buildPaymentPreview(
 
   const repoFiles = (plan as any).files;
   const sitePages = (plan as any).pages;
+  const itemPrices = (plan as any).itemPrices || [];
+
   if (plan.category === 'code_review' && Array.isArray(repoFiles) && repoFiles.length > 0) {
     repoFiles.forEach((f: any, i: number) => {
+      const itemPrice = itemPrices[i]?.finalPrice ?? Math.max(0.01, plan.unitPrice - (plan.optimizationDiscount || 0));
       items.push({
         type: 'execution',
         index: i + 1,
         filename: f.path,
-        amount: plan.unitPrice,
+        amount: itemPrice,
         label: `#${i + 1} — ${f.path}`,
       });
     });
   } else if (plan.category === 'seo_audit' && Array.isArray(sitePages) && sitePages.length > 0) {
     sitePages.forEach((p: any, i: number) => {
+      const itemPrice = itemPrices[i]?.finalPrice ?? Math.max(0.01, plan.unitPrice - (plan.optimizationDiscount || 0));
       items.push({
         type: 'execution',
         index: i + 1,
         filename: p.url,
-        amount: plan.unitPrice,
+        amount: itemPrice,
         label: `#${i + 1} — ${p.url}`,
       });
     });
@@ -312,11 +316,12 @@ export function buildPaymentPreview(
 
     for (let i = 0; i < fileCount; i++) {
       const filename = files[i]?.filename;
+      const itemPrice = itemPrices[i]?.finalPrice ?? Math.max(0.01, plan.unitPrice - (plan.optimizationDiscount || 0));
       items.push({
         type: 'execution',
         index: i + 1,
         filename,
-        amount: plan.unitPrice,
+        amount: itemPrice,
         label: filename ? `#${i + 1} — ${filename}` : `Execution #${i + 1}`,
       });
     }

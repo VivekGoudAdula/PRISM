@@ -52,11 +52,16 @@ const getNodeIcon = (type: string) => {
   switch (type.toLowerCase()) {
     case 'root':
       return <FiZap className="text-amber-400 text-xs" />;
+    case 'repository':
     case 'project':
+    case 'website':
       return <FiLayers className="text-indigo-400 text-xs" />;
     case 'document':
+    case 'contract':
+    case 'invoice':
       return <FiFileText className="text-sky-400 text-xs" />;
     case 'folder':
+    case 'directory':
       return <FiFolder className="text-purple-400 text-xs" />;
     case 'file':
     case 'function':
@@ -66,11 +71,24 @@ const getNodeIcon = (type: string) => {
       return <FiDatabase className="text-cyan-400 text-xs" />;
     case 'skill':
     case 'experience':
+    case 'party':
+    case 'vendor':
+    case 'customer':
       return <FiBriefcase className="text-teal-400 text-xs" />;
     case 'requirement':
+    case 'line_item':
       return <FiCheckCircle className="text-emerald-400 text-xs" />;
+    case 'vulnerability':
+    case 'issue':
+    case 'risk':
     case 'constraint':
       return <FiAlertTriangle className="text-rose-400 text-xs" />;
+    case 'clause':
+    case 'page':
+      return <FiFileText className="text-amber-400 text-xs" />;
+    case 'finding':
+    case 'analysis':
+      return <FiActivity className="text-emerald-400 text-xs" />;
     case 'api':
       return <FiCpu className="text-violet-400 text-xs" />;
     default:
@@ -89,23 +107,26 @@ const CustomDataMapNode: React.FC<NodeProps> = ({ data, selected }) => {
   let borderColor = '#334155';
   let badgeBg = 'bg-slate-800/80 text-slate-300 border-slate-700';
 
-  if (nodeData.type === 'root') {
+  const tLower = (nodeData.type || '').toLowerCase();
+  const cLower = (nodeData.category || '').toLowerCase();
+
+  if (tLower === 'root') {
     bgGradient = 'linear-gradient(135deg, rgba(30,27,75,0.98), rgba(15,23,42,0.98))';
     borderColor = '#6366f1';
     badgeBg = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
-  } else if (nodeData.category === 'candidate' || nodeData.type === 'document') {
+  } else if (cLower === 'candidate' || tLower === 'document' || tLower === 'repository' || tLower === 'website') {
     bgGradient = 'linear-gradient(135deg, rgba(12,74,110,0.95), rgba(2,6,23,0.98))';
     borderColor = '#38bdf8';
     badgeBg = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
-  } else if (nodeData.type === 'requirement') {
+  } else if (tLower === 'requirement' || tLower === 'line_item' || tLower === 'analysis') {
     bgGradient = 'linear-gradient(135deg, rgba(6,78,59,0.95), rgba(2,6,23,0.98))';
     borderColor = '#10b981';
     badgeBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-  } else if (nodeData.type === 'constraint') {
+  } else if (tLower === 'vulnerability' || tLower === 'issue' || tLower === 'risk' || tLower === 'constraint') {
     bgGradient = 'linear-gradient(135deg, rgba(136,19,55,0.95), rgba(2,6,23,0.98))';
     borderColor = '#f43f5e';
     badgeBg = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
-  } else if (nodeData.type === 'skill') {
+  } else if (tLower === 'skill' || tLower === 'experience' || tLower === 'clause' || tLower === 'page') {
     bgGradient = 'linear-gradient(135deg, rgba(17,94,89,0.95), rgba(2,6,23,0.98))';
     borderColor = '#14b8a6';
     badgeBg = 'bg-teal-500/20 text-teal-300 border-teal-500/40';

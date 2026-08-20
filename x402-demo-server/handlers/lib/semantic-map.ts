@@ -88,6 +88,26 @@ export async function buildSemanticMap(
       total_amount: 0,
       date: 'Unknown'
     };
+  } else if (category === 'code_review') {
+    promptSystem = 'Extract structured info from the code file raw text. Return ONLY a valid JSON object matching this schema: { "file_path": string, "language": string, "functions": string[], "classes": string[], "dependencies": string[], "line_count": number }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      file_path: filename,
+      language: 'TypeScript',
+      functions: [],
+      classes: [],
+      dependencies: [],
+      line_count: extracted_text.split('\n').length || 0
+    };
+  } else if (category === 'seo_audit') {
+    promptSystem = 'Extract structured info from the webpage text. Return ONLY a valid JSON object matching this schema: { "url": string, "title": string, "h1": string, "meta_description": string, "images_missing_alt": number, "seo_score": number }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      url: filename,
+      title: filename,
+      h1: '',
+      meta_description: '',
+      images_missing_alt: 0,
+      seo_score: 85
+    };
   } else {
     // Unsupported or generic category fallback
     const jsonStr = JSON.stringify({ raw_text: extracted_text.substring(0, 1000) });

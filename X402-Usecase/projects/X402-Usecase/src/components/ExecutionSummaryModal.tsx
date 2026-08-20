@@ -31,8 +31,6 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
     )
   );
 
-  const [showItemDetails, setShowItemDetails] = useState<boolean>(false);
-
   const toggleSelectFile = (idx: number) => {
     setSelectedIndices((prev) => {
       const next = new Set(prev);
@@ -205,7 +203,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
             </div>
           ))}
 
-          {/* Dynamic Workload & Optimization Pricing Breakdown */}
+          {/* Dynamic Workload & Optimization Pricing Summary */}
           {(() => {
             const isCodeReview = plan.category === 'code_review';
             const isResume = plan.category === 'resume_screening';
@@ -220,10 +218,8 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
             const totalSavings = plan.totalOptimizationDiscount ?? ((plan.optimizationDiscount ?? 0) * selectedCount);
             const finalTotal = totalCost;
 
-            const itemPrices = plan.itemPrices || [];
-
             return (
-              <div className="mt-3 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-4 flex flex-col gap-3 shadow-lg">
+              <div className="mt-2 rounded-2xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-3.5 flex flex-col gap-2 shadow-lg">
                 <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
                   <div className="flex items-center gap-2">
                     <FiZap className="text-emerald-400 text-xs" />
@@ -236,11 +232,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-1.5 text-xs">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>{selectedCount} {isCodeReview ? 'file' : isResume ? 'resume' : 'execution'}{selectedCount !== 1 ? 's' : ''}</span>
-                    <span className="font-mono text-slate-400 font-semibold">{selectedCount} x402 transactions</span>
-                  </div>
+                <div className="flex flex-col gap-1 text-xs">
                   <div className="flex items-center justify-between text-slate-400">
                     <span>Base workload cost</span>
                     <span className="font-mono font-medium text-slate-300">${baseTotal.toFixed(4)}</span>
@@ -255,67 +247,21 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                     <span className="font-mono text-emerald-300">${finalTotal.toFixed(4)}</span>
                   </div>
                 </div>
-
-                <div className="mt-1 flex items-center justify-between">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-extrabold shadow-sm">
-                    <span>✓ {selectedCount} x402 executions (Saved ${totalSavings.toFixed(4)})</span>
-                  </div>
-                  {itemPrices.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowItemDetails(!showItemDetails)}
-                      className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline transition-colors"
-                    >
-                      {showItemDetails ? 'Hide details' : 'Show execution breakdown'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Expandable Per-Execution Details List */}
-                {showItemDetails && itemPrices.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
-                    <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                      <span>Individual Executions</span>
-                      <span>Final Price</span>
-                    </div>
-                    {itemPrices.map((item: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between text-[11px] py-1 px-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60">
-                        <div className="flex items-center gap-2 truncate max-w-[220px]">
-                          <span className="text-slate-500 font-mono text-[10px]">#{item.index + 1}</span>
-                          <span className="text-slate-200 font-medium truncate">{item.name}</span>
-                          {item.complexityTier && (
-                            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30 text-[9px] font-bold">
-                              {item.complexityTier}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 font-mono">
-                          <span className="text-slate-500 line-through text-[10px]">${(item.basePrice || 0).toFixed(4)}</span>
-                          <span className="text-emerald-300 font-bold">${(item.finalPrice || 0).toFixed(4)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="text-[10px] text-slate-400 italic text-center border-t border-slate-800/60 pt-2">
-                  Your price is based on actual workload and PRISM optimization.
-                </div>
               </div>
             );
           })()}
 
-          {/* Payment Breakdown */}
+          {/* Payment Breakdown Box — Always Visible with Checkboxes */}
           {preview.length > 0 && (
-            <div className="mt-3 rounded-2xl border border-slate-700/40 bg-slate-950/50 overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-slate-800/60 flex items-center justify-between">
+            <div className="mt-2 rounded-2xl border border-slate-700/50 bg-slate-950/80 overflow-hidden shadow-xl">
+              <div className="px-4 py-2 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40">
                 <div className="flex items-center gap-2">
                   <FiDollarSign className="text-indigo-400 text-xs" />
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
-                    Payment Breakdown
+                  <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                    PAYMENT BREAKDOWN
                   </span>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-colors">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-indigo-300 hover:text-indigo-200 transition-colors">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -325,7 +271,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                   <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
                 </label>
               </div>
-              <div className="flex flex-col divide-y divide-slate-800/40 max-h-48 overflow-y-auto">
+              <div className="flex flex-col divide-y divide-slate-800/40 max-h-56 overflow-y-auto">
                 {preview.map((item, idx) => {
                   const isChecked =
                     item.type === 'execution'
@@ -346,7 +292,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => item.index !== undefined && toggleSelectFile(item.index - 1)}
-                            className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950"
+                            className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950 cursor-pointer"
                           />
                         ) : (
                           <span className="w-5 h-5 rounded bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-[9px] font-black text-violet-400">
@@ -358,13 +304,13 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                             {item.index}
                           </span>
                         )}
-                        <span className="text-xs text-slate-300 font-medium truncate max-w-[200px]">
+                        <span className="text-xs text-slate-200 font-semibold truncate max-w-[240px]">
                           {item.label}
                         </span>
                       </div>
                       <span
-                        className={`text-xs font-bold ${
-                          item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-300'
+                        className={`text-xs font-mono font-bold ${
+                          item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-400'
                         }`}
                       >
                         ${item.amount.toFixed(4)}

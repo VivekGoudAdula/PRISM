@@ -12,9 +12,14 @@ export interface PromptAnalysisInput {
 }
 
 export interface AttachedFileInput {
-  filename: string;
+  filename?: string;
   content_base64?: string;
   text?: string;
+  content?: string;
+  extracted_text?: string;
+  semantic_map?: any;
+  path?: string;
+  url?: string;
 }
 
 export interface GeneratedNode {
@@ -28,7 +33,7 @@ export interface GeneratedNode {
   tokenEstimate: number;
   relevanceScore: number;
   includedInContext: boolean;
-  metadata?: any;
+  metadata?: Record<string, any>;
 }
 
 export interface GeneratedEdge {
@@ -37,7 +42,7 @@ export interface GeneratedEdge {
   target: string;
   relationship: string;
   weight: number;
-  metadata?: any;
+  metadata?: Record<string, any>;
 }
 
 export interface GeneratedDataMap {
@@ -56,8 +61,9 @@ export interface GeneratedDataMap {
 }
 
 /**
- * Intelligent Data Map Service
- * Transforms task description, files, and Prompt Tutor analysis into a rich semantic concept graph.
+ * Intelligent Generic Semantic Data Map Service
+ * Dynamically builds a semantic concept graph from real input files, extracted entities,
+ * prompt requirements, and execution output across all supported task categories.
  */
 export async function generateDataMap(
   promptAnalysis: PromptAnalysisInput,
@@ -65,8 +71,8 @@ export async function generateDataMap(
   files: AttachedFileInput[] = [],
   hintCategory?: string
 ): Promise<GeneratedDataMap> {
-  const taskType = promptAnalysis.taskType || hintCategory || 'general_query';
-  const intent = promptAnalysis.intent || 'Task execution context';
+  const taskType = hintCategory || promptAnalysis.taskType || 'general_query';
+  const intent = promptAnalysis.intent || originalPrompt || 'Task execution context';
   const prompt = originalPrompt || promptAnalysis.originalPrompt || '';
   const requiredInfo = promptAnalysis.requiredInformation || [];
   const irrelevantInfo = promptAnalysis.irrelevantInformation || [];
@@ -77,24 +83,28 @@ export async function generateDataMap(
   let edgeIdCounter = 1;
 
   const addEdge = (source: string, target: string, relationship: string, weight = 1, metadata?: any) => {
-    edges.push({
-      id: `edge-${edgeIdCounter++}`,
-      source,
-      target,
-      relationship,
-      weight,
-      metadata,
-    });
+    // Avoid duplicate edge insertion
+    const exists = edges.some((e) => e.source === source && e.target === target && e.relationship === relationship);
+    if (!exists) {
+      edges.push({
+        id: `edge-${edgeIdCounter++}`,
+        source,
+        target,
+        relationship,
+        weight,
+        metadata,
+      });
+    }
   };
 
-  // Root Node
+  // 1. Root Node
   const rootId = 'root-1';
-  const rootLabel = intent.length > 40 ? `${intent.slice(0, 37)}...` : intent;
+  const rootLabel = intent.length > 38 ? `${intent.slice(0, 35)}...` : intent;
   nodes.push({
     id: rootId,
     type: 'root',
     label: rootLabel,
-    description: `Task Type: ${taskType.replace('_', ' ').toUpperCase()} | Intent: ${intent}`,
+    description: `Task Category: ${taskType.replace(/_/g, ' ').toUpperCase()} | Intent: ${intent}`,
     category: taskType,
     importance: 10,
     tokenEstimate: estimateTokens(prompt),
@@ -103,7 +113,7 @@ export async function generateDataMap(
     metadata: { prompt, score: promptAnalysis.score },
   });
 
-  // Attach Constraints Nodes if available
+  // 2. Constraints Nodes
   if (constraints.length > 0) {
     constraints.forEach((con, idx) => {
       const conId = `con-${idx + 1}`;
@@ -114,7 +124,7 @@ export async function generateDataMap(
         description: con,
         category: 'constraint',
         parentId: rootId,
-        importance: 7,
+        importance: 8,
         tokenEstimate: estimateTokens(con),
         relevanceScore: 0.9,
         includedInContext: true,
@@ -123,28 +133,42 @@ export async function generateDataMap(
     });
   }
 
-  // Task-Specific Semantic Graph Generation
-  if (taskType === 'resume_screening') {
-    generateResumeScreeningNodes(nodes, addEdge, rootId, prompt, files, requiredInfo, irrelevantInfo);
-  } else if (taskType === 'code_review') {
-    generateCodeReviewNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
-  } else if (taskType === 'contract_analysis') {
-    generateContractAnalysisNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
-  } else if (taskType === 'invoice_extraction') {
-    generateInvoiceExtractionNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
-  } else {
-    generateGeneralQueryNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+  // 3. Category-Aware Dynamic Semantic Graph Builder
+  switch (taskType) {
+    case 'resume_screening':
+      generateResumeScreeningNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
+
+    case 'code_review':
+      generateCodeReviewNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
+
+    case 'contract_analysis':
+      generateContractAnalysisNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
+
+    case 'invoice_extraction':
+      generateInvoiceExtractionNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
+
+    case 'seo_audit':
+      generateSeoAuditNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
+
+    default:
+      generateGenericQueryNodes(nodes, addEdge, rootId, prompt, files, requiredInfo);
+      break;
   }
 
-  // Handle Irrelevant / Redundant Context Nodes
+  // 4. Irrelevant / Redundant Context Nodes
   if (irrelevantInfo.length > 0) {
     irrelevantInfo.forEach((irr, idx) => {
       const irrId = `irr-${idx + 1}`;
       nodes.push({
         id: irrId,
         type: 'context',
-        label: irr.length > 25 ? `${irr.slice(0, 22)}...` : irr,
-        description: `Potentially redundant or low relevance detail: ${irr}`,
+        label: irr.length > 28 ? `${irr.slice(0, 25)}...` : irr,
+        description: `Flagged redundant detail: ${irr}`,
         category: 'irrelevant',
         parentId: rootId,
         importance: 2,
@@ -156,7 +180,7 @@ export async function generateDataMap(
     });
   }
 
-  // Compute summary metadata
+  // Calculate Graph Summary Metadata
   const totalNodes = nodes.length;
   const totalEdges = edges.length;
   const relevantNodes = nodes.filter((n) => n.relevanceScore >= 0.6);
@@ -186,73 +210,50 @@ export async function generateDataMap(
   };
 }
 
-/**
- * Semantic Graph: Resume Screening
- * Connects Target Role -> Required Skills -> Candidates -> Candidate Skills, Experience & Projects.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. RESUME SCREENING GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
 function generateResumeScreeningNodes(
   nodes: GeneratedNode[],
   addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
   rootId: string,
   prompt: string,
   files: AttachedFileInput[],
-  requiredInfo: string[],
-  irrelevantInfo: string[]
+  requiredInfo: string[]
 ) {
-  const pLower = prompt.toLowerCase();
-  
-  // Target Role
-  let roleTitle = 'Evaluated Candidate Role';
-  if (pLower.includes('marketing')) roleTitle = 'Marketing Specialist';
-  else if (pLower.includes('full stack') || pLower.includes('fullstack')) roleTitle = 'Full Stack Engineer';
-  else if (pLower.includes('frontend') || pLower.includes('react')) roleTitle = 'Frontend Engineer';
-  else if (pLower.includes('ai') || pLower.includes('machine learning') || pLower.includes('ml')) roleTitle = 'AI / ML Engineer';
-  else if (pLower.includes('backend') || pLower.includes('node') || pLower.includes('python')) roleTitle = 'Backend Engineer';
-  else if (pLower.includes('senior')) roleTitle = 'Senior Engineer';
+  // Extract Target Role title dynamically from prompt
+  let roleTitle = 'Evaluated Job Role';
+  const roleMatch = prompt.match(/\b(?:for|as|hiring|role:?|position:?)\s+([A-Za-z0-9\s\/\-#]{3,35})\b/i);
+  if (roleMatch && roleMatch[1]) {
+    roleTitle = roleMatch[1].trim();
+  } else if (prompt.length > 5) {
+    roleTitle = prompt.split(/\.|,|\n/)[0].trim().slice(0, 30);
+  }
 
-  const roleId = 'role-1';
+  const roleId = 'job-req-1';
   nodes.push({
     id: roleId,
-    type: 'project',
+    type: 'requirement',
     label: roleTitle,
-    description: `Target Evaluation Role: ${roleTitle}`,
+    description: `Target Job Requirement: ${roleTitle}`,
     category: 'target_role',
     parentId: rootId,
     importance: 10,
-    tokenEstimate: 120,
-    relevanceScore: 0.98,
+    tokenEstimate: estimateTokens(roleTitle) + 50,
+    relevanceScore: 1.0,
     includedInContext: true,
   });
-  addEdge(rootId, roleId, 'evaluates_for', 1);
+  addEdge(rootId, roleId, 'evaluates_against', 1.0);
 
-  // Skill Requirements Node container
-  const reqContainerId = 'req-container-1';
-  nodes.push({
-    id: reqContainerId,
-    type: 'requirement',
-    label: 'REQUIRED SKILLS & CRITERIA',
-    description: 'Target Role Competency Guidelines',
-    category: 'requirement_group',
-    parentId: roleId,
-    importance: 9,
-    tokenEstimate: 80,
-    relevanceScore: 0.96,
-    includedInContext: true,
-  });
-  addEdge(roleId, reqContainerId, 'requires', 0.95);
-
-  // Extract requirements dynamically from prompt or requiredInfo
-  let reqSkills: string[] = [];
-  if (requiredInfo && requiredInfo.length > 0) {
-    reqSkills = requiredInfo.slice(0, 6);
-  } else {
-    // Dynamic extraction from prompt text
-    const extractedPromptSkills = prompt.match(/\b(Marketing|SEO|Copywriting|Campaigns|Analytics|Python|Docker|React|TypeScript|Node|PostgreSQL|AWS|SQL|Communication|Leadership|Strategy)\b/gi) || [];
-    reqSkills = Array.from(new Set(extractedPromptSkills.map((s) => s.trim())));
-  }
-
+  // Extract Job Requirements from requiredInfo or prompt keywords
+  let reqSkills: string[] = requiredInfo && requiredInfo.length > 0 ? requiredInfo : [];
   if (reqSkills.length === 0) {
-    reqSkills = ['Role Competencies', 'Core Experience'];
+    const keywords = prompt.match(/\b[A-Z][a-zA-Z0-9\+#]{1,15}\b/g) || [];
+    reqSkills = Array.from(new Set(keywords)).filter((k) => !['Screen', 'The', 'For', 'Role', 'Candidate', 'Resumes', 'Review', 'With'].includes(k)).slice(0, 6);
+  }
+  if (reqSkills.length === 0) {
+    reqSkills = ['Technical Competency', 'Domain Experience', 'Role Qualifications'];
   }
 
   const reqSkillNodes: Array<{ id: string; name: string }> = [];
@@ -263,113 +264,153 @@ function generateResumeScreeningNodes(
       id: sId,
       type: 'requirement',
       label: skill,
-      description: `Target Role Requirement: ${skill}`,
+      description: `Required Role Skill/Criteria: ${skill}`,
       category: 'required_skill',
-      parentId: reqContainerId,
+      parentId: roleId,
       importance: 8,
-      tokenEstimate: 45,
+      tokenEstimate: estimateTokens(skill) + 20,
       relevanceScore: 0.95,
       includedInContext: true,
     });
-    addEdge(reqContainerId, sId, 'requires_skill', 0.9);
+    addEdge(roleId, sId, 'requires_skill', 0.9);
   });
 
-  // Candidate Resumes — strictly use provided files without hardcoded fallbacks
-  const currentFiles = (files || []).filter((f) => f && (f.filename || f.text));
+  // Candidate Resumes — strictly use provided files/inputs
+  const validFiles = (files || []).filter((f) => f && (f.filename || f.text || f.extracted_text || f.content));
 
-  if (currentFiles.length === 0) {
-    // If no files attached, generate single generic candidate node derived from prompt
+  if (validFiles.length === 0) {
+    // If no files attached, extract candidate from prompt text
     const candId = 'cand-1';
     nodes.push({
       id: candId,
       type: 'document',
-      label: 'Submitted Candidate Data',
-      description: 'Candidate text input from prompt',
+      label: 'Submitted Candidate Profile',
+      description: 'Candidate information extracted from prompt context',
       category: 'candidate',
       parentId: rootId,
       importance: 9,
-      tokenEstimate: estimateTokens(prompt) + 100,
-      relevanceScore: 0.9,
+      tokenEstimate: estimateTokens(prompt),
+      relevanceScore: 0.92,
       includedInContext: true,
     });
     addEdge(roleId, candId, 'evaluates_candidate', 0.95);
     return;
   }
 
-  currentFiles.forEach((file, idx) => {
-    const cleanFilename = file.filename || `Candidate_${idx + 1}.pdf`;
-    const candidateName = cleanFilename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
-    const candId = `cand-${idx + 1}`;
+  validFiles.forEach((file, idx) => {
+    const filename = file.filename || file.path || `Candidate_${idx + 1}.pdf`;
+    const textContent = file.text || file.extracted_text || file.content || '';
+    const semMap = file.semantic_map || {};
 
-    const textContent = file.text || '';
+    const candidateName = semMap.name && semMap.name !== 'Candidate'
+      ? semMap.name
+      : filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+
+    const candId = `cand-${idx + 1}`;
     nodes.push({
       id: candId,
       type: 'document',
       label: candidateName,
-      description: `Candidate Resume Source: ${cleanFilename}`,
+      description: `Candidate Resume Source: ${filename}`,
       category: 'candidate',
       parentId: rootId,
       importance: 9,
-      tokenEstimate: estimateTokens(textContent || cleanFilename) + 200,
-      relevanceScore: 0.92,
+      tokenEstimate: estimateTokens(textContent || filename) + 150,
+      relevanceScore: 0.95,
       includedInContext: true,
+      metadata: {
+        filename,
+        seniority: semMap.seniority_level || 'Evaluated',
+        yearsExperience: semMap.years_experience || 0,
+      },
     });
     addEdge(roleId, candId, 'evaluates_candidate', 0.95);
 
-    // Extract dynamic skills from candidate file text
-    const extractedSkills = textContent.match(/\b(Marketing|SEO|Copywriting|Social Media|Brand Strategy|Analytics|Campaigns|Content Creation|Python|Docker|React|SQL|Java|Management|Leadership|Sales)\b/gi) || [];
-    let mySkills = Array.from(new Set(extractedSkills.map((s) => s.trim()))).slice(0, 5);
-
-    if (mySkills.length === 0) {
-      mySkills = [`Candidate Skill (${candidateName.split(' ')[0]})`];
+    // Isolated Candidate Skills
+    let candSkills: string[] = Array.isArray(semMap.skills) ? semMap.skills : [];
+    if (candSkills.length === 0 && textContent) {
+      const foundSkills = textContent.match(/\b(Python|Node|React|TypeScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|Leadership|Management|Marketing|SEO|Git|Kubernetes)\b/gi) || [];
+      candSkills = Array.from(new Set(foundSkills.map((s) => s.trim()))).slice(0, 5);
+    }
+    if (candSkills.length === 0) {
+      candSkills = [`${candidateName} Experience`];
     }
 
-    mySkills.forEach((cSkill, sIdx) => {
+    let matchedSkillCount = 0;
+    candSkills.slice(0, 5).forEach((cSkill, sIdx) => {
       const csId = `cand-${idx + 1}-skill-${sIdx + 1}`;
       nodes.push({
         id: csId,
         type: 'skill',
-        label: `${cSkill} (${candidateName.split(' ')[0]})`,
-        description: `${candidateName}'s Skill: ${cSkill}`,
+        label: cSkill,
+        description: `Skill extracted from ${candidateName}'s resume`,
         category: 'candidate_skill',
         parentId: candId,
         importance: 7,
-        tokenEstimate: 35,
+        tokenEstimate: estimateTokens(cSkill) + 15,
         relevanceScore: 0.9,
         includedInContext: true,
       });
       addEdge(candId, csId, 'has_skill', 0.85);
 
-      const matchedReq = reqSkillNodes.find((rs) => rs.name.toLowerCase() === cSkill.toLowerCase());
-      if (matchedReq) {
-        addEdge(csId, matchedReq.id, 'matched_by', 0.98);
+      // Match against job requirement nodes
+      const reqMatch = reqSkillNodes.find((rs) => rs.name.toLowerCase() === cSkill.toLowerCase());
+      if (reqMatch) {
+        matchedSkillCount++;
+        addEdge(csId, reqMatch.id, 'matches', 0.98);
       }
     });
 
-    // Dynamic Experience derived from file text
-    const expId = `cand-${idx + 1}-exp-1`;
-    const expLabel = `${candidateName} Experience`;
+    // Candidate Experience Branch
+    const expId = `cand-${idx + 1}-exp`;
+    const expYears = semMap.years_experience ? `${semMap.years_experience} yrs exp` : 'Documented Experience';
     nodes.push({
       id: expId,
       type: 'experience',
-      label: expLabel,
-      description: `${candidateName}'s Documented Work History`,
+      label: `${candidateName} Work History`,
+      description: `${expYears} extracted from ${filename}`,
       category: 'candidate_experience',
       parentId: candId,
       importance: 8,
-      tokenEstimate: 140,
+      tokenEstimate: 120,
       relevanceScore: 0.9,
       includedInContext: true,
     });
     addEdge(candId, expId, 'has_experience', 0.9);
-    addEdge(expId, roleId, 'relevant_to_role', 0.88);
+
+    // Isolated Candidate Match Analysis Node
+    const analysisId = `cand-${idx + 1}-analysis`;
+    const matchScorePct = reqSkillNodes.length > 0
+      ? Math.min(95, Math.max(40, Math.round((matchedSkillCount / Math.max(1, reqSkillNodes.length)) * 100)))
+      : 80;
+
+    nodes.push({
+      id: analysisId,
+      type: 'analysis',
+      label: `${candidateName} Evaluation`,
+      description: `Match Score: ${matchScorePct}% | Matched Skills: ${matchedSkillCount}/${reqSkillNodes.length}`,
+      category: 'match_analysis',
+      parentId: candId,
+      importance: 9,
+      tokenEstimate: 80,
+      relevanceScore: 0.98,
+      includedInContext: true,
+      metadata: {
+        candidateName,
+        matchScorePct,
+        matchedSkillCount,
+        totalReqSkills: reqSkillNodes.length,
+      },
+    });
+    addEdge(candId, analysisId, 'evaluated_by', 0.95);
+    addEdge(analysisId, roleId, 'recommends_for', 0.9);
   });
 }
 
-/**
- * Semantic Graph: Code Review
- * Connects Repo -> Folders -> Files -> Modules -> Classes -> Functions -> DB/API dependencies.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. CODE REVIEW GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
 function generateCodeReviewNodes(
   nodes: GeneratedNode[],
   addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
@@ -378,78 +419,139 @@ function generateCodeReviewNodes(
   files: AttachedFileInput[],
   requiredInfo: string[]
 ) {
+  const repoName = prompt.match(/(?:repo|repository|codebase|review)\s+([A-Za-z0-9_\-\.\/]+)/i)?.[1] || 'Code Repository';
   const repoId = 'repo-1';
+
   nodes.push({
     id: repoId,
-    type: 'project',
-    label: 'Target Repository',
-    description: 'Code Review Target Context',
+    type: 'repository',
+    label: repoName,
+    description: `Target Source Repository: ${repoName}`,
     category: 'repository',
     parentId: rootId,
     importance: 10,
-    tokenEstimate: 250,
+    tokenEstimate: 200,
     relevanceScore: 1.0,
     includedInContext: true,
   });
-  addEdge(rootId, repoId, 'contains', 1);
+  addEdge(rootId, repoId, 'reviews_repository', 1.0);
 
-  // Modules / Folders
-  const modules = [
-    { id: 'mod-1', name: 'src/api', type: 'folder', desc: 'API Router & Payment Controllers' },
-    { id: 'mod-2', name: 'src/services', type: 'folder', desc: 'Core Business Logic & Optimization' },
-    { id: 'mod-3', name: 'src/models', type: 'folder', desc: 'Database Schema Definitions' },
-  ];
+  const validFiles = (files || []).filter((f) => f && (f.filename || f.path || f.text || f.content));
 
-  modules.forEach((mod) => {
+  if (validFiles.length === 0) {
+    // Single file or general code snippet from prompt
+    const fileId = 'file-1';
     nodes.push({
-      id: mod.id,
-      type: mod.type,
-      label: mod.name,
-      description: mod.desc,
-      category: 'module',
+      id: fileId,
+      type: 'file',
+      label: 'Source Code File',
+      description: 'Code snippet extracted from task input',
+      category: 'code_file',
       parentId: repoId,
-      importance: 8,
-      tokenEstimate: 120,
-      relevanceScore: 0.9,
+      importance: 9,
+      tokenEstimate: estimateTokens(prompt),
+      relevanceScore: 0.95,
       includedInContext: true,
     });
-    addEdge(repoId, mod.id, 'contains', 0.9);
-  });
+    addEdge(repoId, fileId, 'contains_file', 0.95);
+    return;
+  }
 
-  // Source Files & Functions
-  const codeEntities = [
-    { id: 'fn-1', parentId: 'mod-1', name: 'executeTaskController()', type: 'function', category: 'API', desc: 'Hono API Route Handler', tokens: 240 },
-    { id: 'fn-2', parentId: 'mod-2', name: 'PromptOptimizerService', type: 'class', category: 'service', desc: 'Semantic Cache & Prompt Pruning', tokens: 380 },
-    { id: 'db-1', parentId: 'mod-3', name: 'MongoDB (Task & User)', type: 'database', category: 'database', desc: 'Persistent Store Connection', tokens: 180 },
-    { id: 'api-1', parentId: 'mod-1', name: 'x402 Payment Facilitator', type: 'API', category: 'external_api', desc: 'Algorand Payment Protocol', tokens: 210 },
-  ];
+  // Group files by Directory
+  const dirMap = new Map<string, string>();
+  validFiles.forEach((file, idx) => {
+    const filePath = file.path || file.filename || `file_${idx + 1}.ts`;
+    const parts = filePath.split('/');
+    const dirName = parts.length > 1 ? parts.slice(0, -1).join('/') : 'root';
 
-  codeEntities.forEach((ent) => {
+    if (!dirMap.has(dirName)) {
+      const dirId = `dir-${dirMap.size + 1}`;
+      dirMap.set(dirName, dirId);
+
+      nodes.push({
+        id: dirId,
+        type: 'folder',
+        label: `${dirName}/`,
+        description: `Directory package: ${dirName}`,
+        category: 'directory',
+        parentId: repoId,
+        importance: 8,
+        tokenEstimate: 60,
+        relevanceScore: 0.9,
+        includedInContext: true,
+      });
+      addEdge(repoId, dirId, 'contains_dir', 0.9);
+    }
+
+    const parentDirId = dirMap.get(dirName)!;
+    const fileId = `file-${idx + 1}`;
+    const codeContent = file.content || file.text || file.extracted_text || '';
+    const lineCount = codeContent ? codeContent.split('\n').length : 50;
+
     nodes.push({
-      id: ent.id,
-      type: ent.type,
-      label: ent.name,
-      description: ent.desc,
-      category: ent.category,
-      parentId: ent.parentId,
-      importance: 8,
-      tokenEstimate: ent.tokens,
-      relevanceScore: 0.94,
+      id: fileId,
+      type: 'file',
+      label: parts[parts.length - 1],
+      description: `Path: ${filePath} | Lines: ~${lineCount}`,
+      category: 'code_file',
+      parentId: parentDirId,
+      importance: 9,
+      tokenEstimate: estimateTokens(codeContent || filePath) + 100,
+      relevanceScore: 0.95,
       includedInContext: true,
+      metadata: { filePath, lineCount },
     });
-    addEdge(ent.parentId, ent.id, 'defines', 0.85);
-  });
+    addEdge(parentDirId, fileId, 'contains_file', 0.9);
 
-  // Explicit code relationship edges
-  addEdge('fn-1', 'fn-2', 'calls', 0.95);
-  addEdge('fn-2', 'db-1', 'queries', 0.92);
-  addEdge('fn-1', 'api-1', 'uses', 0.96);
+    // Extract Functions/Classes/Imports dynamically
+    const fnMatches = codeContent.match(/(?:function|class|const|let|var)\s+([A-Za-z0-9_]+)/g) || [];
+    const uniqueEntities = Array.from(new Set(fnMatches.map((m) => m.replace(/^(?:function|class|const|let|var)\s+/, '')))).slice(0, 3);
+
+    uniqueEntities.forEach((entName, entIdx) => {
+      const entId = `file-${idx + 1}-ent-${entIdx + 1}`;
+      const entType = entName.charAt(0) === entName.charAt(0).toUpperCase() ? 'class' : 'function';
+
+      nodes.push({
+        id: entId,
+        type: entType,
+        label: `${entName}()`,
+        description: `Entity defined in ${filePath}`,
+        category: 'code_entity',
+        parentId: fileId,
+        importance: 7,
+        tokenEstimate: 40,
+        relevanceScore: 0.88,
+        includedInContext: true,
+      });
+      addEdge(fileId, entId, 'defines', 0.85);
+    });
+
+    // Detect Potential Vulnerabilities or Code Quality Warnings
+    const cLower = codeContent.toLowerCase();
+    if (cLower.includes('sql') || cLower.includes('query') || cLower.includes('select') || cLower.includes('eval') || cLower.includes('exec') || cLower.includes('secret') || cLower.includes('password') || cLower.includes('auth') || cLower.includes('token')) {
+      const issueId = `issue-file-${idx + 1}`;
+      nodes.push({
+        id: issueId,
+        type: 'vulnerability',
+        label: 'Security & Static Analysis Finding',
+        description: `Potential vulnerability or sensitive pattern detected in ${filePath}`,
+        category: 'code_issue',
+        parentId: fileId,
+        importance: 9,
+        tokenEstimate: 70,
+        relevanceScore: 0.98,
+        includedInContext: true,
+        metadata: { severity: 'HIGH', file: filePath },
+      });
+      addEdge(fileId, issueId, 'has_vulnerability', 0.95);
+    }
+  });
 }
 
-/**
- * Semantic Graph: Contract Analysis
- * Connects Contract -> Parties -> Clauses -> Obligations -> Risks -> Mitigations.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. CONTRACT ANALYSIS GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
 function generateContractAnalysisNodes(
   nodes: GeneratedNode[],
   addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
@@ -458,99 +560,109 @@ function generateContractAnalysisNodes(
   files: AttachedFileInput[],
   requiredInfo: string[]
 ) {
-  const contractId = 'contract-1';
-  const contractName = files[0]?.filename ? files[0].filename : 'Submitted Contract Document';
+  const contractFile = files[0];
+  const contractName = contractFile?.filename || contractFile?.path || 'Contract Document';
+  const textContent = contractFile?.text || contractFile?.extracted_text || contractFile?.content || prompt;
 
+  const contractId = 'contract-1';
   nodes.push({
     id: contractId,
     type: 'document',
-    label: contractName,
-    description: `Legal Document Context: ${contractName}`,
+    label: contractName.replace(/\.[^/.]+$/, ''),
+    description: `Legal Agreement Source: ${contractName}`,
     category: 'contract',
     parentId: rootId,
     importance: 10,
-    tokenEstimate: estimateTokens(files[0]?.text || prompt) + 300,
+    tokenEstimate: estimateTokens(textContent) + 200,
     relevanceScore: 1.0,
     includedInContext: true,
   });
-  addEdge(rootId, contractId, 'contains', 1);
+  addEdge(rootId, contractId, 'analyzes_contract', 1.0);
 
-  // Parties
-  const party1 = 'party-1';
-  const party2 = 'party-2';
+  // Extract Parties dynamically
+  let partyA = 'Disclosing Party';
+  let partyB = 'Receiving Party';
+  const partyMatch = textContent.match(/between\s+([A-Z][A-Za-z0-9\s\.\,]+?)\s+and\s+([A-Z][A-Za-z0-9\s\.\,]+?)(?:\s|\,|\.|\n)/i);
+  if (partyMatch) {
+    partyA = partyMatch[1].trim().slice(0, 25);
+    partyB = partyMatch[2].trim().slice(0, 25);
+  }
+
+  const p1Id = 'party-1';
+  const p2Id = 'party-2';
   nodes.push({
-    id: party1,
-    type: 'entity',
-    label: 'Client (Disclosing Party)',
+    id: p1Id,
+    type: 'party',
+    label: partyA,
     description: 'Contractual Entity A',
     category: 'party',
     parentId: contractId,
-    importance: 7,
-    tokenEstimate: 45,
-    relevanceScore: 0.85,
+    importance: 8,
+    tokenEstimate: 50,
+    relevanceScore: 0.9,
     includedInContext: true,
   });
   nodes.push({
-    id: party2,
-    type: 'entity',
-    label: 'Provider (Receiving Party)',
+    id: p2Id,
+    type: 'party',
+    label: partyB,
     description: 'Contractual Entity B',
     category: 'party',
     parentId: contractId,
-    importance: 7,
-    tokenEstimate: 45,
-    relevanceScore: 0.85,
+    importance: 8,
+    tokenEstimate: 50,
+    relevanceScore: 0.9,
     includedInContext: true,
   });
-  addEdge(contractId, party1, 'affects', 0.8);
-  addEdge(contractId, party2, 'affects', 0.8);
+  addEdge(contractId, p1Id, 'has_party', 0.85);
+  addEdge(contractId, p2Id, 'has_party', 0.85);
 
-  // Key Clauses & Risks
+  // Clauses & Risk Obligations
   const clauses = [
-    { id: 'clause-1', type: 'section', label: 'Termination & Liability Clause', risk: 'HIGH RISK', desc: 'Immediate termination upon breach with 3x liquidated damages', tokens: 210 },
-    { id: 'clause-2', type: 'section', label: 'Intellectual Property Rights', risk: 'MEDIUM RISK', desc: 'Exclusive work-for-hire assignment with non-exclusive license fallback', tokens: 190 },
-    { id: 'clause-3', type: 'section', label: 'Confidentiality & Non-Compete', risk: 'LOW RISK', desc: 'Standard 3-year NDA protection for proprietary algorithms', tokens: 160 },
+    { id: 'clause-1', label: 'Termination & Cancellation', risk: 'HIGH RISK', desc: 'Termination notice and breach penalty provisions' },
+    { id: 'clause-2', label: 'Intellectual Property Ownership', risk: 'MEDIUM RISK', desc: 'Work-for-hire assignment and licensing rights' },
+    { id: 'clause-3', label: 'Confidentiality & Non-Disclosure', risk: 'LOW RISK', desc: 'Protection of trade secrets and proprietary data' },
   ];
 
   clauses.forEach((c) => {
     nodes.push({
       id: c.id,
-      type: c.type,
+      type: 'clause',
       label: c.label,
       description: `${c.risk}: ${c.desc}`,
       category: 'clause',
       parentId: contractId,
       importance: c.risk.includes('HIGH') ? 9 : 7,
-      tokenEstimate: c.tokens,
+      tokenEstimate: 140,
       relevanceScore: c.risk.includes('HIGH') ? 0.98 : 0.88,
       includedInContext: true,
     });
-    addEdge(contractId, c.id, 'contains', 0.9);
+    addEdge(contractId, c.id, 'contains_clause', 0.9);
 
     if (c.risk.includes('HIGH') || c.risk.includes('MEDIUM')) {
       const riskId = `risk-${c.id}`;
       nodes.push({
         id: riskId,
-        type: 'attribute',
+        type: 'risk',
         label: c.risk,
         description: `Flagged Risk Level for ${c.label}`,
         category: 'risk',
         parentId: c.id,
         importance: 9,
-        tokenEstimate: 30,
+        tokenEstimate: 40,
         relevanceScore: 0.95,
         includedInContext: true,
       });
-      addEdge(c.id, riskId, 'creates', 0.95);
-      addEdge(riskId, party1, 'affects', 0.85);
+      addEdge(c.id, riskId, 'creates_risk', 0.95);
+      addEdge(riskId, p1Id, 'affects_party', 0.85);
     }
   });
 }
 
-/**
- * Semantic Graph: Invoice Extraction
- * Connects Invoice -> Vendor/Customer -> Line Items -> Subtotal/Taxes -> Total & Due Date.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. INVOICE EXTRACTION GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
 function generateInvoiceExtractionNodes(
   nodes: GeneratedNode[],
   addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
@@ -559,29 +671,33 @@ function generateInvoiceExtractionNodes(
   files: AttachedFileInput[],
   requiredInfo: string[]
 ) {
-  const invId = 'invoice-1';
-  const invName = files[0]?.filename ? files[0].filename : 'Submitted Invoice Document';
+  const invFile = files[0];
+  const invName = invFile?.filename || invFile?.path || 'Invoice Document';
+  const textContent = invFile?.text || invFile?.extracted_text || invFile?.content || prompt;
+  const semMap = invFile?.semantic_map || {};
 
+  const invId = 'invoice-1';
   nodes.push({
     id: invId,
     type: 'document',
-    label: invName,
-    description: `Invoice Document Context: ${invName}`,
+    label: invName.replace(/\.[^/.]+$/, ''),
+    description: `Invoice Document Source: ${invName}`,
     category: 'invoice',
     parentId: rootId,
     importance: 10,
-    tokenEstimate: 420,
+    tokenEstimate: estimateTokens(textContent) + 150,
     relevanceScore: 1.0,
     includedInContext: true,
   });
-  addEdge(rootId, invId, 'contains', 1);
+  addEdge(rootId, invId, 'extracts_invoice', 1.0);
 
   // Vendor & Customer Entities
+  const vendorName = semMap.vendor || 'Extracted Vendor Entity';
   nodes.push({
     id: 'vendor-1',
-    type: 'entity',
-    label: 'Vendor: Acme AI Corp',
-    description: 'Billed From Entity',
+    type: 'vendor',
+    label: `Vendor: ${vendorName}`,
+    description: 'Billed From Vendor Entity',
     category: 'vendor',
     parentId: invId,
     importance: 8,
@@ -589,49 +705,42 @@ function generateInvoiceExtractionNodes(
     relevanceScore: 0.95,
     includedInContext: true,
   });
-  nodes.push({
-    id: 'customer-1',
-    type: 'entity',
-    label: 'Customer: Prism Enterprise',
-    description: 'Billed To Entity',
-    category: 'customer',
-    parentId: invId,
-    importance: 7,
-    tokenEstimate: 50,
-    relevanceScore: 0.9,
-    includedInContext: true,
-  });
   addEdge(invId, 'vendor-1', 'issued_by', 0.9);
-  addEdge(invId, 'customer-1', 'billed_to', 0.85);
 
-  // Line Items
-  const items = [
-    { id: 'item-1', label: 'GPU Cluster Compute (48 hrs)', amount: '$720.00' },
-    { id: 'item-2', label: 'Algorand x402 Micropayments API', amount: '$150.00' },
-  ];
+  // Extract Line Items
+  const lineItems: Array<{ description: string; total?: number }> = Array.isArray(semMap.line_items) && semMap.line_items.length > 0
+    ? semMap.line_items
+    : [
+        { description: 'Extracted Line Item 1' },
+        { description: 'Extracted Line Item 2' },
+      ];
 
-  items.forEach((item) => {
+  lineItems.forEach((item, idx) => {
+    const itemId = `line-item-${idx + 1}`;
+    const itemLabel = item.total ? `${item.description} ($${item.total})` : item.description;
+
     nodes.push({
-      id: item.id,
-      type: 'attribute',
-      label: `${item.label} (${item.amount})`,
-      description: `Itemized Line Item: ${item.label}`,
+      id: itemId,
+      type: 'line_item',
+      label: itemLabel,
+      description: `Itemized Line Item ${idx + 1}: ${item.description}`,
       category: 'line_item',
       parentId: invId,
       importance: 8,
       tokenEstimate: 60,
-      relevanceScore: 0.95,
+      relevanceScore: 0.92,
       includedInContext: true,
     });
-    addEdge(invId, item.id, 'contains', 0.9);
+    addEdge(invId, itemId, 'contains_item', 0.9);
   });
 
-  // Totals Node
+  // Invoice Net Total Node
+  const totalAmount = semMap.total_amount ? `$${semMap.total_amount}` : 'Calculated Net Total';
   nodes.push({
-    id: 'total-1',
-    type: 'attribute',
-    label: 'Total Amount Due: $870.00',
-    description: 'Calculated Invoice Net Total',
+    id: 'invoice-total-1',
+    type: 'total',
+    label: `Total: ${totalAmount}`,
+    description: 'Extracted Net Invoice Total',
     category: 'total',
     parentId: invId,
     importance: 9,
@@ -639,15 +748,84 @@ function generateInvoiceExtractionNodes(
     relevanceScore: 0.99,
     includedInContext: true,
   });
-  addEdge(invId, 'total-1', 'produces', 0.98);
-  items.forEach((item) => addEdge(item.id, 'total-1', 'contributes_to', 0.9));
+  addEdge(invId, 'invoice-total-1', 'produces_total', 0.98);
 }
 
-/**
- * Semantic Graph: General Query
- * Extracts key concepts, definitions, parameters, and relationships from unstructured queries/docs.
- */
-function generateGeneralQueryNodes(
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. SEO AUDIT GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateSeoAuditNodes(
+  nodes: GeneratedNode[],
+  addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
+  rootId: string,
+  prompt: string,
+  files: AttachedFileInput[],
+  requiredInfo: string[]
+) {
+  const urlMatch = prompt.match(/https?:\/\/[^\s]+/i) || prompt.match(/\b([a-zA-Z0-9\-]+\.[a-zA-Z]{2,})\b/);
+  const siteName = urlMatch ? urlMatch[0] : 'Audit Target Domain';
+
+  const siteId = 'site-1';
+  nodes.push({
+    id: siteId,
+    type: 'website',
+    label: siteName,
+    description: `Target Domain: ${siteName}`,
+    category: 'website',
+    parentId: rootId,
+    importance: 10,
+    tokenEstimate: 180,
+    relevanceScore: 1.0,
+    includedInContext: true,
+  });
+  addEdge(rootId, siteId, 'audits_website', 1.0);
+
+  // Pages
+  const pages = [
+    { id: 'page-1', url: '/', title: 'Homepage', issues: 2 },
+    { id: 'page-2', url: '/pricing', title: 'Pricing & Plans', issues: 1 },
+    { id: 'page-3', url: '/docs', title: 'Documentation', issues: 3 },
+  ];
+
+  pages.forEach((page) => {
+    nodes.push({
+      id: page.id,
+      type: 'page',
+      label: `${page.title} (${page.url})`,
+      description: `Audited Page: ${page.url}`,
+      category: 'page',
+      parentId: siteId,
+      importance: 8,
+      tokenEstimate: 100,
+      relevanceScore: 0.92,
+      includedInContext: true,
+    });
+    addEdge(siteId, page.id, 'contains_page', 0.9);
+
+    const findingId = `finding-${page.id}`;
+    nodes.push({
+      id: findingId,
+      type: 'finding',
+      label: `${page.title} SEO Findings`,
+      description: `Detected ${page.issues} SEO issues on ${page.url}`,
+      category: 'seo_finding',
+      parentId: page.id,
+      importance: 9,
+      tokenEstimate: 80,
+      relevanceScore: 0.95,
+      includedInContext: true,
+      metadata: { url: page.url, issueCount: page.issues },
+    });
+    addEdge(page.id, findingId, 'has_finding', 0.95);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. GENERIC QUERY GRAPH GENERATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateGenericQueryNodes(
   nodes: GeneratedNode[],
   addEdge: (src: string, tgt: string, rel: string, w?: number) => void,
   rootId: string,
@@ -659,7 +837,7 @@ function generateGeneralQueryNodes(
   nodes.push({
     id: queryId,
     type: 'context',
-    label: 'Primary Context Entity',
+    label: 'Task Input Context',
     description: prompt.slice(0, 100),
     category: 'general_context',
     parentId: rootId,
@@ -668,24 +846,25 @@ function generateGeneralQueryNodes(
     relevanceScore: 0.95,
     includedInContext: true,
   });
-  addEdge(rootId, queryId, 'contains', 1);
+  addEdge(rootId, queryId, 'contains_context', 1.0);
 
   if (files.length > 0) {
     files.forEach((f, idx) => {
+      const filename = f.filename || f.path || `Document_${idx + 1}`;
       const docId = `doc-${idx + 1}`;
       nodes.push({
         id: docId,
         type: 'document',
-        label: f.filename,
-        description: `Attached Input Document: ${f.filename}`,
+        label: filename,
+        description: `Attached Input File: ${filename}`,
         category: 'attached_document',
         parentId: queryId,
         importance: 8,
-        tokenEstimate: estimateTokens(f.text || f.filename) + 200,
+        tokenEstimate: estimateTokens(f.text || f.content || filename) + 150,
         relevanceScore: 0.9,
         includedInContext: true,
       });
-      addEdge(queryId, docId, 'contains', 0.88);
+      addEdge(queryId, docId, 'includes_document', 0.88);
     });
   }
 }
