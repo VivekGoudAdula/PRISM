@@ -1,5 +1,5 @@
 /**
- * X402 Hackathon Starter Kit - Main Server
+ * X402 Hackathon Starter Kit - Main Server (PRISM Backend AI Engine v1.0.2 - Render Deployment)
  *
  * This server demonstrates how to build payment-protected API endpoints
  * using the x402 protocol on Algorand TestNet.
