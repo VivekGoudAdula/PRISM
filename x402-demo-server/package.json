@@ -2,9 +2,10 @@
   "name": "x402-demo-server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "NODE_OPTIONS='--max-old-space-size=450' tsx index.ts",
+    "build": "esbuild index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:pdf-parse --external:pdf.js-extract --external:tesseract.js --external:mammoth --external:mongoose --external:algosdk",
+    "start": "node dist/index.js",
     "dev": "tsx watch index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,6 +17,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.8.0",
     "@types/pdf-parse": "^1.1.5",
+    "esbuild": "^0.25.0",
     "tsx": "^4.22.0",
     "typescript": "^6.0.3"
   },

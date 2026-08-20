@@ -60,6 +60,7 @@ dataMapRouter.post('/generate', async (c) => {
         });
       }
       userId = guestUser._id;
+    }
     // Resolve extracted text and semantic map for attached files
     const { extractText } = await import('../handlers/lib/extract-document');
     const { buildSemanticMap } = await import('../handlers/lib/semantic-map');
