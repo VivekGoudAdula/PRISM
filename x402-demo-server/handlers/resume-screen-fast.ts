@@ -34,9 +34,9 @@ export async function handleResumeScreenFastRequest(c: Context) {
     let totalLlmLatency = 0;
 
     for (const file of files) {
+      let extracted_text = file.text || file.extracted_text || '';
       let semantic_map = file.semantic_map;
       if (!semantic_map) {
-        let extracted_text = file.text || '';
         if (!extracted_text && file.content_base64) {
           try {
             const extResult = await extractText(file.filename, file.content_base64);

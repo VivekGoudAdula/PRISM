@@ -34,9 +34,9 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
     let totalLlmLatency = 0;
 
     for (const file of files) {
+      let extracted_text = file.text || file.extracted_text || '';
       let semantic_map = file.semantic_map;
       if (!semantic_map) {
-        let extracted_text = file.text || '';
         if (!extracted_text && file.content_base64) {
           try {
             const extResult = await extractText(file.filename, file.content_base64);
@@ -61,62 +61,68 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
       };
 
       let success = false;
+      const modelsToTry = ['llama-3.3-70b-versatile', 'gemma2-9b-it', 'qwen-2.5-coder-32b', 'deepseek-r1-distill-llama-70b'];
+
       if (keys.length > 0) {
         for (let i = 0; i < keys.length; i++) {
           const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${key}`,
-              },
-              body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score, especially when match_score is low or skills detail is missing. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
-                  },
-                  {
-                    role: 'user',
-                    content: `Target role: ${task_description}\n\nCandidate Semantic Map JSON:\n${JSON.stringify(semantic_map, null, 2)}`,
-                  },
-                ],
-                temperature: 0.1,
-              }),
-            });
+          for (const model of modelsToTry) {
+            try {
+              const llmStart = Date.now();
+              const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${key}`,
+                },
+                body: JSON.stringify({
+                  model,
+                  messages: [
+                    {
+                      role: 'system',
+                      content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score, especially when match_score is low or skills detail is missing. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
+                    },
+                    {
+                      role: 'user',
+                      content: `Target role: ${task_description}\n\nCandidate Semantic Map JSON:\n${JSON.stringify(semantic_map, null, 2)}`,
+                    },
+                  ],
+                  temperature: 0.1,
+                }),
+              });
 
-            totalLlmLatency += (Date.now() - llmStart);
+              totalLlmLatency += (Date.now() - llmStart);
 
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || '';
-              try {
-                // Strip code block formatting if LLM includes it
-                let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error('No JSON object found in response');
-                const parsed = JSON.parse(jsonMatch[0]);
-                candidateInfo = {
-                  name: parsed.name && parsed.name !== 'Candidate' && parsed.name !== 'Not Provided' ? parsed.name : (semantic_map?.name || file.filename),
-                  match_score: typeof parsed.match_score === 'number' ? parsed.match_score : 0.5,
-                  role: parsed.role || 'Unknown',
-                  key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
-                  primary_domain: parsed.primary_domain || 'Unknown',
-                  alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
-                  reason: parsed.reason || (parsed.match_score < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
-                };
-                success = true;
-                break;
-              } catch (e) {
-                console.error('Failed to parse candidate JSON content:', content, e);
+              if (response.ok) {
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content?.trim() || '';
+                try {
+                  let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+                  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+                  if (!jsonMatch) throw new Error('No JSON object found in response');
+                  const parsed = JSON.parse(jsonMatch[0]);
+                  candidateInfo = {
+                    name: parsed.name && parsed.name !== 'Candidate' && parsed.name !== 'Not Provided' ? parsed.name : (semantic_map?.name || file.filename),
+                    match_score: typeof parsed.match_score === 'number' ? parsed.match_score : 0.5,
+                    role: parsed.role || 'Unknown',
+                    key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
+                    primary_domain: parsed.primary_domain || 'Unknown',
+                    alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
+                    reason: parsed.reason || (parsed.match_score < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
+                  };
+                  success = true;
+                  break;
+                } catch (e) {
+                  console.error('Failed to parse candidate JSON content:', content, e);
+                }
+              } else {
+                console.warn(`Groq API key ${i + 1} model ${model} failed with status: ${response.status}`);
               }
+            } catch (err) {
+              console.error(`Error with Groq API key index ${i + 1}:`, err);
             }
-          } catch (err) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err);
           }
+          if (success) break;
         }
       }
 

@@ -100630,8 +100630,8 @@ authRouter.post("/refresh", async (c) => {
       JWT_SECRET2,
       { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
-    session.lastActivity = /* @__PURE__ */ new Date();
-    await session.save();
+    await UserSession.updateOne({ _id: session._id }, { lastActivity: /* @__PURE__ */ new Date() }).catch(() => {
+    });
     return c.json({ accessToken });
   } catch (error) {
     console.error("Token Refresh Error:", error);
