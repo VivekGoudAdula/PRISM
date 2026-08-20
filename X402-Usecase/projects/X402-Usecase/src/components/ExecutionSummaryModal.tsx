@@ -220,31 +220,41 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
             const finalTotal = totalCost;
 
             return (
-              <div className="rounded-xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-2 flex flex-col gap-1 shadow-sm">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1">
-                  <div className="flex items-center gap-1">
-                    <FiZap className="text-emerald-400 text-[9px]" />
-                    <span className="text-[9px] font-extrabold text-emerald-300 uppercase tracking-wider">
+              <div className="mt-1.5 rounded-xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-3 flex flex-col gap-1.5 shadow-md">
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <FiZap className="text-emerald-400 text-xs" />
+                    <span className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
                       {titleText}
                     </span>
                   </div>
-                  <span className="text-[8px] text-emerald-400/90 font-medium italic">
+                  <span className="text-[9px] text-emerald-400/90 font-medium italic">
                     Workload &amp; optimization pricing
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400">Base: <strong className="text-slate-300 font-mono">${baseTotal.toFixed(4)}</strong></span>
-                  <span className="text-slate-400">Saved: <strong className="text-emerald-400 font-mono">-${totalSavings.toFixed(4)}</strong></span>
-                  <span className="text-white font-bold">You pay: <strong className="text-emerald-300 font-mono text-[11px]">${finalTotal.toFixed(4)}</strong></span>
+                <div className="flex flex-col gap-1 text-[11px]">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Original price</span>
+                    <span className="font-mono font-medium text-slate-300">${baseTotal.toFixed(4)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>PRISM optimization savings</span>
+                    <span className="font-mono font-semibold text-emerald-400">-${totalSavings.toFixed(4)}</span>
+                  </div>
+                  <div className="my-0.5 border-t border-slate-700/60" />
+                  <div className="flex items-center justify-between font-extrabold text-xs text-white">
+                    <span>You pay</span>
+                    <span className="font-mono text-emerald-300">${finalTotal.toFixed(4)}</span>
+                  </div>
                 </div>
               </div>
             );
           })()}
 
-          {/* Payment Breakdown Box — Expanded Height & Prominent Visibility */}
+          {/* Payment Breakdown Box — Moderately Decreased Height */}
           {preview.length > 0 && (
-            <div className="mt-1 rounded-2xl border border-indigo-500/30 bg-slate-950/95 overflow-hidden shadow-xl flex flex-col flex-1 min-h-[220px] max-h-80">
+            <div className="mt-1.5 rounded-2xl border border-slate-700/60 bg-slate-950/95 overflow-hidden shadow-xl flex flex-col min-h-[140px] max-h-56">
               <div className="px-3.5 py-1.5 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 shrink-0">
                 <div className="flex items-center gap-1.5">
                   <FiDollarSign className="text-indigo-400 text-xs" />
@@ -262,7 +272,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                   <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
                 </label>
               </div>
-              <div className="flex flex-col divide-y divide-slate-800/50 flex-1 min-h-[180px] max-h-72 overflow-y-auto">
+              <div className="flex flex-col divide-y divide-slate-800/50 max-h-48 overflow-y-auto">
                 {preview.map((item, idx) => {
                   const isChecked =
                     item.type === 'execution'
@@ -273,7 +283,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                   return (
                     <div
                       key={idx}
-                      className={`flex items-center justify-between px-3.5 py-2 transition-opacity duration-200 ${
+                      className={`flex items-center justify-between px-3.5 py-1.5 transition-opacity duration-200 ${
                         item.type === 'execution' && !isChecked ? 'opacity-40' : ''
                       }`}
                     >
