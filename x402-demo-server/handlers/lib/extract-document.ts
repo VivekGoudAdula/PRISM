@@ -1,8 +1,6 @@
 import { config } from 'dotenv';
 import { PDFParse } from 'pdf-parse';
 import pdfExtractModule from 'pdf.js-extract';
-import Tesseract from 'tesseract.js';
-
 config();
 
 let pdfExtractInstance: any = null;
@@ -102,7 +100,8 @@ export async function extractText(
           }
 
           console.log(`OCR processing image ${i + 1}/${images.length} for ${filename}...`);
-          const worker = await Tesseract.createWorker('eng');
+          const { createWorker } = await import('tesseract.js');
+          const worker = await createWorker('eng');
           const result = await worker.recognize(imageBuffer);
           ocrText += result.data.text + '\n';
           await worker.terminate();
