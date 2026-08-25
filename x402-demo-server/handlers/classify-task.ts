@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import type { Context } from 'hono';
-import { callOpenRouter } from './lib/openrouter-client';
+import { callOpenRouter, FAST_MODEL } from './lib/openrouter-client';
 config();
 
 /**
@@ -92,7 +92,7 @@ export async function handleClassifyTaskRequest(c: Context) {
     let category = 'unsupported';
     try {
       const openRouterContent = await callOpenRouter({
-        model: 'google/gemini-2.0-flash-001',
+        model: FAST_MODEL,
         messages: [
           {
             role: 'system',

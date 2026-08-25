@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { extractText } from '../handlers/lib/extract-document';
 import { estimateTokens } from './tokenAnalytics';
-import { callOpenRouter } from '../handlers/lib/openrouter-client';
+import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
 
 config();
 
@@ -115,7 +115,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
 
   try {
     const rawContent = await callOpenRouter({
-      model: 'google/gemini-2.0-flash-001',
+      model: FAST_MODEL,
       messages: [
         { role: 'system', content: systemInstruction },
         { role: 'user', content: `Task Request: "${promptText}"${contextStr}` },
@@ -156,7 +156,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
       constraints: sanitizeStringArray(parsed.constraints),
       suggestions: sanitizeStringArray(parsed.suggestions),
       improvedPrompt,
-      modelUsed: 'google/gemini-2.0-flash-001',
+      modelUsed: FAST_MODEL,
       originalInputTokens: inputTokens,
     };
   } catch (err) {

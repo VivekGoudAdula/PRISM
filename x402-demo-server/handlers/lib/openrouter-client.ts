@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
-dotenv.config();
+export const FAST_MODEL = process.env.FAST_MODEL || 'google/gemini-2.5-flash';
+export const ACCURATE_MODEL = process.env.ACCURATE_MODEL || 'meta-llama/llama-3.3-70b-instruct';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -61,7 +61,7 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
     throw new Error('No OPENROUTER_API_KEY found in environment variables.');
   }
 
-  const model = options.model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
+  const model = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
   let lastError: Error | null = null;
 
   for (let index = 0; index < keys.length; index++) {

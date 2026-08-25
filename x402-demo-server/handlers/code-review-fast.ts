@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { resolveFiles } from './lib/resolve-files';
-import { callOpenRouter } from './lib/openrouter-client';
+import { callOpenRouter, FAST_MODEL } from './lib/openrouter-client';
 import { parseRobustJson } from './lib/parse-json-robust';
 
 /**
@@ -43,7 +43,7 @@ export async function handleCodeReviewFastRequest(c: Context) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: 'google/gemini-2.0-flash-001',
+        model: FAST_MODEL,
         messages: [
           {
             role: 'system',

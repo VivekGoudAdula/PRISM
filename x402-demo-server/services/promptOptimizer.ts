@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import { estimateTokens, calculateTokenSavings } from './tokenAnalytics';
-import { callOpenRouter } from '../handlers/lib/openrouter-client';
+import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
 
 config();
 
@@ -309,7 +309,7 @@ Return ONLY a JSON object with this exact structure:
 
     try {
       const rawContent = await callOpenRouter({
-        model: 'google/gemini-2.0-flash-001',
+        model: FAST_MODEL,
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
@@ -330,7 +330,7 @@ Return ONLY a JSON object with this exact structure:
 
         if (validation.isValid) {
           currentContext = candidateText;
-          modelUsed = 'google/gemini-2.0-flash-001 + deterministic';
+          modelUsed = `${FAST_MODEL} + deterministic`;
           if (Array.isArray(parsed.removedRedundancies)) {
             removedRedundancies.push(...parsed.removedRedundancies);
           }

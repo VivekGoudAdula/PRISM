@@ -86365,7 +86365,7 @@ async function callOpenRouter(options) {
   if (keys.length === 0) {
     throw new Error("No OPENROUTER_API_KEY found in environment variables.");
   }
-  const model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
+  const model16 = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
   let lastError = null;
   for (let index = 0; index < keys.length; index++) {
     const apiKey = keys[index];
@@ -86417,12 +86417,12 @@ async function callOpenRouter(options) {
   }
   throw lastError || new Error("All OpenRouter API attempts failed.");
 }
-var import_dotenv2;
+var FAST_MODEL, ACCURATE_MODEL;
 var init_openrouter_client = __esm({
   "handlers/lib/openrouter-client.ts"() {
     "use strict";
-    import_dotenv2 = __toESM(require_main());
-    import_dotenv2.default.config();
+    FAST_MODEL = process.env.FAST_MODEL || "google/gemini-2.5-flash";
+    ACCURATE_MODEL = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
   }
 });
 
@@ -88063,7 +88063,7 @@ async function buildSemanticMap(category, extracted_text, filename = "document")
   if (extracted_text.trim().length > 0) {
     try {
       const content = await callOpenRouter({
-        model: "google/gemini-2.0-flash-001",
+        model: FAST_MODEL,
         messages: [
           { role: "system", content: promptSystem },
           { role: "user", content: `Document text:
@@ -88280,7 +88280,7 @@ Return ONLY a JSON object with this exact structure:
 }`;
     try {
       const rawContent = await callOpenRouter({
-        model: "google/gemini-2.0-flash-001",
+        model: FAST_MODEL,
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: `Task Type: ${input.taskType || "general_query"}
@@ -88301,7 +88301,7 @@ ${currentContext}` }
         );
         if (validation.isValid) {
           currentContext = candidateText;
-          modelUsed = "google/gemini-2.0-flash-001 + deterministic";
+          modelUsed = `${FAST_MODEL} + deterministic`;
           if (Array.isArray(parsed.removedRedundancies)) {
             removedRedundancies.push(...parsed.removedRedundancies);
           }
@@ -88349,14 +88349,14 @@ ${currentContext}` }
     measurementSource: "estimated"
   };
 }
-var import_dotenv4;
+var import_dotenv3;
 var init_promptOptimizer = __esm({
   "services/promptOptimizer.ts"() {
     "use strict";
-    import_dotenv4 = __toESM(require_main());
+    import_dotenv3 = __toESM(require_main());
     init_tokenAnalytics();
     init_openrouter_client();
-    (0, import_dotenv4.config)();
+    (0, import_dotenv3.config)();
   }
 });
 
@@ -88438,7 +88438,7 @@ async function handleResumeScreenFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "google/gemini-2.0-flash-001",
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -88707,7 +88707,7 @@ async function handleContractAnalyzeFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "google/gemini-2.0-flash-001",
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -88946,7 +88946,7 @@ async function handleInvoiceExtractFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "google/gemini-2.0-flash-001",
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -89183,7 +89183,7 @@ async function handleCodeReviewFastRequest(c) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: "google/gemini-2.0-flash-001",
+        model: FAST_MODEL,
         messages: [
           {
             role: "system",
@@ -89640,7 +89640,7 @@ async function handleClassifyTaskRequest(c) {
     let category = "unsupported";
     try {
       const openRouterContent = await callOpenRouter({
-        model: "google/gemini-2.0-flash-001",
+        model: FAST_MODEL,
         messages: [
           {
             role: "system",
@@ -89722,13 +89722,13 @@ function localClassify(description) {
   }
   return "unsupported";
 }
-var import_dotenv5;
+var import_dotenv4;
 var init_classify_task = __esm({
   "handlers/classify-task.ts"() {
     "use strict";
-    import_dotenv5 = __toESM(require_main());
+    import_dotenv4 = __toESM(require_main());
     init_openrouter_client();
-    (0, import_dotenv5.config)();
+    (0, import_dotenv4.config)();
   }
 });
 
@@ -90608,7 +90608,7 @@ INSTRUCTIONS:
 5. Keep your response concise, clear, and under 3-4 sentences.`;
   try {
     const content = await callOpenRouter({
-      model: "google/gemini-2.0-flash-001",
+      model: FAST_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message }
@@ -91578,12 +91578,12 @@ async function fetchRepoFiles(repoUrl) {
   setCached(partialKey, result);
   return result;
 }
-var import_dotenv6, CACHE_TTL_MS, repoCache, EXCLUDED_DIRS, BINARY_EXTENSIONS, HIGH_PRIORITY_EXTS, MEDIUM_PRIORITY_EXTS, PRIORITY_FOLDERS;
+var import_dotenv5, CACHE_TTL_MS, repoCache, EXCLUDED_DIRS, BINARY_EXTENSIONS, HIGH_PRIORITY_EXTS, MEDIUM_PRIORITY_EXTS, PRIORITY_FOLDERS;
 var init_fetch_repo = __esm({
   "handlers/lib/fetch-repo.ts"() {
     "use strict";
-    import_dotenv6 = __toESM(require_main());
-    (0, import_dotenv6.config)();
+    import_dotenv5 = __toESM(require_main());
+    (0, import_dotenv5.config)();
     CACHE_TTL_MS = 10 * 60 * 1e3;
     repoCache = /* @__PURE__ */ new Map();
     EXCLUDED_DIRS = /* @__PURE__ */ new Set([
@@ -91833,12 +91833,12 @@ async function fetchSitePages(siteUrl) {
     skipped
   };
 }
-var import_dotenv7;
+var import_dotenv6;
 var init_fetch_website = __esm({
   "handlers/lib/fetch-website.ts"() {
     "use strict";
-    import_dotenv7 = __toESM(require_main());
-    (0, import_dotenv7.config)();
+    import_dotenv6 = __toESM(require_main());
+    (0, import_dotenv6.config)();
   }
 });
 
@@ -92401,11 +92401,11 @@ async function handlePlanTaskRequest(c) {
     return c.json({ error: "Internal server error", message: err2.message }, 500);
   }
 }
-var import_dotenv8, PLATFORM_FEE, PROVIDER_NAMES;
+var import_dotenv7, PLATFORM_FEE, PROVIDER_NAMES;
 var init_plan_task = __esm({
   "handlers/plan-task.ts"() {
     "use strict";
-    import_dotenv8 = __toESM(require_main());
+    import_dotenv7 = __toESM(require_main());
     init_classify_task();
     init_fetch_repo();
     init_fetch_website();
@@ -92413,7 +92413,7 @@ var init_plan_task = __esm({
     init_User();
     init_AuditLog();
     init_tokenAnalytics();
-    (0, import_dotenv8.config)();
+    (0, import_dotenv7.config)();
     PLATFORM_FEE = 0;
     PROVIDER_NAMES = {
       "/resume-screen-fast": "ResumeAI Fast",
@@ -92432,7 +92432,7 @@ var init_plan_task = __esm({
 
 // index.ts
 var import_node_dns = __toESM(require("node:dns"));
-var import_dotenv9 = __toESM(require_main());
+var import_dotenv8 = __toESM(require_main());
 
 // node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
@@ -101977,11 +101977,11 @@ adminRouter.get("/analytics/tasks/:taskId", async (c) => {
 });
 
 // services/promptTutor.ts
-var import_dotenv3 = __toESM(require_main());
+var import_dotenv2 = __toESM(require_main());
 init_extract_document();
 init_tokenAnalytics();
 init_openrouter_client();
-(0, import_dotenv3.config)();
+(0, import_dotenv2.config)();
 async function analyzePromptWithLLM(originalPrompt, files = [], hintCategory) {
   const promptText = (originalPrompt || "").trim();
   if (!promptText && files.length === 0) {
@@ -102059,7 +102059,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
 }`;
   try {
     const rawContent = await callOpenRouter({
-      model: "google/gemini-2.0-flash-001",
+      model: FAST_MODEL,
       messages: [
         { role: "system", content: systemInstruction },
         { role: "user", content: `Task Request: "${promptText}"${contextStr}` }
@@ -102097,7 +102097,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
       constraints: sanitizeStringArray(parsed.constraints),
       suggestions: sanitizeStringArray(parsed.suggestions),
       improvedPrompt,
-      modelUsed: "google/gemini-2.0-flash-001",
+      modelUsed: FAST_MODEL,
       originalInputTokens: inputTokens
     };
   } catch (err2) {
@@ -103374,7 +103374,7 @@ var promptOptimizer_default = promptOptimizerRouter;
 // index.ts
 init_User();
 import_node_dns.default.setDefaultResultOrder("ipv4first");
-(0, import_dotenv9.config)();
+(0, import_dotenv8.config)();
 var mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017";
 var mongoDbName = process.env.MONGO_DB_NAME || "prism_app";
 var connectionString = mongoUri;

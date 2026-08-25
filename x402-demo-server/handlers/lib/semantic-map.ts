@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { encode } from 'gpt-tokenizer';
 import { SavingsLog } from '../../models/AnalyticsData';
-import { callOpenRouter } from './openrouter-client';
+import { callOpenRouter, FAST_MODEL } from './openrouter-client';
 
 /**
  * Interface representing the semantic map extraction output structure and token count statistics.
@@ -114,7 +114,7 @@ export async function buildSemanticMap(
   if (extracted_text.trim().length > 0) {
     try {
       const content = await callOpenRouter({
-        model: 'google/gemini-2.0-flash-001',
+        model: FAST_MODEL,
         messages: [
           { role: 'system', content: promptSystem },
           { role: 'user', content: `Document text:\n${extracted_text.substring(0, 8000)}` }

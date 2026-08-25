@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { Task } from '../models/Task';
-import { callOpenRouter } from './lib/openrouter-client';
+import { callOpenRouter, FAST_MODEL } from './lib/openrouter-client';
 
 /**
  * POST /chat-reply (PUBLIC — free, no payment)
@@ -92,7 +92,7 @@ INSTRUCTIONS:
 
   try {
     const content = await callOpenRouter({
-      model: 'google/gemini-2.0-flash-001',
+      model: FAST_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message },
