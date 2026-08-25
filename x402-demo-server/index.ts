@@ -11,6 +11,8 @@
  * 4. Start server: npm start
  * 5. Test: curl http://localhost:4021/your-endpoint
  */
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
 
 import { config } from 'dotenv';
 import { Hono } from 'hono';

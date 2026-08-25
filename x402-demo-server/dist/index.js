@@ -92431,6 +92431,7 @@ var init_plan_task = __esm({
 });
 
 // index.ts
+var import_node_dns = __toESM(require("node:dns"));
 var import_dotenv9 = __toESM(require_main());
 
 // node_modules/hono/dist/compose.js
@@ -103372,6 +103373,7 @@ var promptOptimizer_default = promptOptimizerRouter;
 
 // index.ts
 init_User();
+import_node_dns.default.setDefaultResultOrder("ipv4first");
 (0, import_dotenv9.config)();
 var mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017";
 var mongoDbName = process.env.MONGO_DB_NAME || "prism_app";
