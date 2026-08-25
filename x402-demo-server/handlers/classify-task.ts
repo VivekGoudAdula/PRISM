@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import type { Context } from 'hono';
+import { callOpenRouter } from './lib/openrouter-client';
 config();
 
 /**
@@ -80,42 +81,22 @@ export async function handleClassifyTaskRequest(c: Context) {
       }
     }
 
-    const { openrouterManager } = await import('./lib/openrouter-manager');
-    let category = 'unsupported';
-    let success = false;
+    // ── Pre-check 1: Fast Deterministic Local Classification (Skip AI if confident) ──
+    const fastCategory = localClassify(task_description);
+    if (fastCategory !== 'unsupported') {
+      console.log(`[classify-task] Deterministic local match found: '${fastCategory}' (Skipped AI call)`);
+      return c.json({ category: fastCategory, raw_input: task_description });
+    }
 
+    // ── LLM Classification via OpenRouter for ambiguous inputs ───────────────
+    let category = 'unsupported';
     try {
-      const res = await openrouterManager.chatCompletion({
-        model: 'meta-llama/llama-3.3-70b-instruct',
-        responseFormatJson: false,
+      const openRouterContent = await callOpenRouter({
+        model: 'google/gemini-2.0-flash-001',
         messages: [
           {
             role: 'system',
             content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
-
-Rules & Few-Shot Examples:
-- Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
-  Input: "hi" -> conversational
-  Input: "hello" -> conversational
-  Input: "what can you do?" -> conversational
-  Input: "how does pricing work?" -> conversational
-  Input: "who are you?" -> conversational
-
-- Bare category mentions or document screening/analysis tasks (when files or repo URLs are provided):
-  Input: "resume" -> resume_screening
-  Input: "invoice" -> invoice_extraction
-  Input: "contract" -> contract_analysis
-  Input: "review this github repo" -> code_review
-  Input: "code review https://github.com/owner/repo" -> code_review
-  Input: "audit our website" -> seo_audit
-  Input: "check our site for SEO issues" -> seo_audit
-  Input: "screen candidates for frontend developer" -> resume_screening
-  Input: "review NDA termination clause" -> contract_analysis
-  Input: "extract line items from vendor bill" -> invoice_extraction
-
-- Random gibberish or uninterpretable noise MUST be classified as unsupported:
-  Input: "asdkfjasdf" -> unsupported
-  Input: "123987!@#" -> unsupported
 
 Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`,
           },
@@ -125,10 +106,10 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
           },
         ],
         temperature: 0,
+        max_tokens: 10,
       });
 
-      const content = res.rawContent?.trim() || '';
-      const normalized = content.toLowerCase();
+      const normalized = openRouterContent.toLowerCase().trim();
       if (normalized.includes('conversational')) {
         category = 'conversational';
       } else if (normalized.includes('resume_screening') || normalized.includes('resume screening') || normalized.includes('resume')) {
@@ -142,17 +123,11 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
       } else if (normalized.includes('seo_audit') || normalized.includes('seo audit') || normalized.includes('seo')) {
         category = 'seo_audit';
       } else {
-        category = localClassify(task_description);
+        category = 'unsupported';
       }
-      success = true;
-      console.log(`Successfully classified task as '${category}' using groqManager`);
-    } catch (e) {
-      console.warn('Groq classification via groqManager failed:', e);
-    }
-
-    if (!success || category === 'unsupported') {
-      console.warn('LLM classification unsupported or unavailable. Running local classification fallback.');
-      category = localClassify(task_description);
+      console.log(`[classify-task] OpenRouter classified task as '${category}'`);
+    } catch (err) {
+      console.warn('[classify-task] OpenRouter classification failed, using local safety fallbacks:', err);
     }
 
     // Safety net: If files are attached and category is still unsupported, run file-sensitive fallback

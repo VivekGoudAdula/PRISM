@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { encode } from 'gpt-tokenizer';
 import { SavingsLog } from '../../models/AnalyticsData';
+import { callOpenRouter } from './openrouter-client';
 
 /**
  * Interface representing the semantic map extraction output structure and token count statistics.
@@ -35,20 +36,7 @@ export async function logSavings(filename: string, raw_tokens: number, map_token
 }
 
 /**
- * Helper to get Groq API Keys from environment
- */
-function getGroqKeys(): string[] {
-  const keys: string[] = [];
-  if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 20; i++) {
-    const k = process.env[`GROQ_API_KEY_${i}`];
-    if (k) keys.push(k);
-  }
-  return keys;
-}
-
-/**
- * Extract structured semantic map from document raw text.
+ * Extract structured semantic map from document raw text using OpenRouter API.
  */
 export async function buildSemanticMap(
   category: string,
@@ -120,12 +108,13 @@ export async function buildSemanticMap(
     };
   }
 
+  let extractedMap = defaultFallbackMap;
+  let success = false;
+
   if (extracted_text.trim().length > 0) {
     try {
-      const { openrouterManager } = await import('./openrouter-manager');
-      const res = await openrouterManager.chatCompletion({
-        model: 'meta-llama/llama-3.3-70b-instruct',
-        responseFormatJson: false,
+      const content = await callOpenRouter({
+        model: 'google/gemini-2.0-flash-001',
         messages: [
           { role: 'system', content: promptSystem },
           { role: 'user', content: `Document text:\n${extracted_text.substring(0, 8000)}` }
@@ -133,21 +122,14 @@ export async function buildSemanticMap(
         temperature: 0.1,
       });
 
-      if (res.data || res.rawContent) {
-        if (typeof res.data === 'object' && res.data && Object.keys(res.data).length > 0) {
-          extractedMap = res.data;
-          success = true;
-        } else {
-          const cleaned = (res.rawContent || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            extractedMap = JSON.parse(jsonMatch[0]);
-            success = true;
-          }
-        }
+      const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        extractedMap = JSON.parse(jsonMatch[0]);
+        success = true;
       }
     } catch (err) {
-      console.warn('Groq buildSemanticMap failed via groqManager:', err);
+      console.error(`[SemanticMap] OpenRouter buildSemanticMap failed for category=${category}, filename=${filename}:`, err);
     }
   }
 

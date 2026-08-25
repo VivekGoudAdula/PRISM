@@ -51,105 +51,38 @@ function buildMockContext(bodyData: Record<string, any>): Context {
  * Each task category has its own merge strategy.
  */
 function aggregateResults(category: string, results: any[]): any {
-  if (results.length === 0) {
-    return {
-      success: false,
-      error: { code: 'NO_RESULTS', message: 'No results returned from provider' },
-    };
-  }
-
-  const validResults = results.filter((r) => r && r.success !== false && !r.error);
-  const failedResults = results.filter((r) => !r || r.success === false || r.error);
-
-  if (validResults.length === 0 && failedResults.length > 0) {
-    const firstErr = failedResults[0]?.error?.message || failedResults[0]?.error || `All ${category} AI analysis attempts failed`;
-    return {
-      success: false,
-      error: {
-        code: failedResults[0]?.error?.code || 'AI_ANALYSIS_FAILED',
-        message: firstErr,
-      },
-      totalFiles: 0,
-      failedFilesCount: failedResults.length,
-    };
-  }
+  if (results.length === 0) return {};
 
   if (category === 'code_review') {
-    const allFiles = validResults.map((r) => ({
+    const allFiles = results.map((r) => ({
       file_path: r.file_path,
       issues: r.issues ?? [],
-      overall_quality_score: r.overall_quality_score ?? 0.85,
-      confidence: r.confidence ?? 0.95,
+      overall_quality_score: r.overall_quality_score ?? 0,
+      confidence: r.confidence ?? 0,
       latency_ms: r.latency_ms ?? 0,
     }));
-
     const totalFilesReviewed = allFiles.length;
-    const allIssues = validResults.flatMap((r) =>
-      (r.issues ?? []).map((i: any) => ({ ...i, file_path: i.file_path || r.file_path }))
-    );
-
-    const bugs = allIssues.filter(
-      (i) => i.severity === 'high' || (i.description && /bug|null|undefined|exception|crash|overflow/i.test(i.description))
-    ).length;
-
-    const securityIssues = allIssues.filter(
-      (i) => i.severity === 'high' || (i.description && /security|vulnerability|injection|auth|token|secret|xss|csrf/i.test(i.description))
-    ).length;
-
-    const codeQualityIssues = allIssues.filter(
-      (i) => i.severity === 'low' || i.severity === 'medium' || (i.description && /quality|style|lint|formatting|naming|refactor/i.test(i.description))
-    ).length;
-
+    const allIssues = results.flatMap((r) => r.issues ?? []);
     const issuesBySeverity = {
       low: allIssues.filter((i) => i.severity === 'low').length,
       medium: allIssues.filter((i) => i.severity === 'medium').length,
       high: allIssues.filter((i) => i.severity === 'high').length,
     };
-
-    const avgQualityScore = validResults.reduce((sum, r) => sum + (r.overall_quality_score ?? 0.85), 0) / (validResults.length || 1);
-    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0.95), 0) / (validResults.length || 1);
-
-    const overallScore = Math.round(avgQualityScore * 100);
-
-    const summary = allIssues.length === 0
-      ? `Successfully analyzed ${totalFilesReviewed} source files across the repository. No critical issues, bugs, or security vulnerabilities were found.`
-      : `Repository analysis completed across ${totalFilesReviewed} source files. Identified ${allIssues.length} issue(s) (${bugs} bug(s), ${securityIssues} security vulnerability(ies), ${codeQualityIssues} code quality item(s)). Overall quality score: ${overallScore}/100.`;
+    const avgQualityScore = results.reduce((sum, r) => sum + (r.overall_quality_score ?? 0), 0) / (results.length || 1);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
 
     return {
-      success: true,
-      summary,
       totalFilesReviewed,
       totalIssues: allIssues.length,
-      metrics: {
-        bugs,
-        securityIssues,
-        codeQualityIssues,
-        totalIssues: allIssues.length,
-        overallScore,
-      },
-      bugs,
-      securityIssues,
-      codeQualityIssues,
-      overallScore,
       issuesBySeverity,
       averageQualityScore: parseFloat(avgQualityScore.toFixed(3)),
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
       files: allFiles,
-      findings: allIssues.map((i) => ({
-        type: i.severity === 'high' ? 'bug' : 'quality',
-        severity: i.severity || 'medium',
-        file: i.file_path || 'unknown',
-        line: i.line_estimate || 1,
-        title: i.description ? i.description.split('.')[0] : 'Issue detected',
-        description: i.description || '',
-        recommendation: i.suggestion || '',
-      })),
-      failedFilesCount: failedResults.length,
     };
   }
 
   if (category === 'seo_audit') {
-    const allPages = validResults.map((r) => ({
+    const allPages = results.map((r) => ({
       page_url: r.page_url,
       issues: r.issues ?? [],
       seo_score: r.seo_score ?? 0,
@@ -157,7 +90,7 @@ function aggregateResults(category: string, results: any[]): any {
       latency_ms: r.latency_ms ?? 0,
     }));
     const totalPagesAudited = allPages.length;
-    const allIssues = validResults.flatMap((r) => r.issues ?? []);
+    const allIssues = results.flatMap((r) => r.issues ?? []);
 
     const issuesByCategory = {
       metadata: allIssues.filter((i) => i.category === 'metadata'),
@@ -173,11 +106,10 @@ function aggregateResults(category: string, results: any[]): any {
       high: allIssues.filter((i) => i.severity === 'high').length,
     };
 
-    const overallSiteScore = validResults.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (validResults.length || 1);
-    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
+    const overallSiteScore = results.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (results.length || 1);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
 
     return {
-      success: true,
       totalPagesAudited,
       totalIssues: allIssues.length,
       overallSiteScore: parseFloat(overallSiteScore.toFixed(3)),
@@ -189,40 +121,33 @@ function aggregateResults(category: string, results: any[]): any {
   }
 
   if (category === 'resume_screening') {
-    const allCandidates = validResults.flatMap((r) => r.candidates ?? []);
-    const totalConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
+    const allCandidates = results.flatMap((r) => r.candidates ?? []);
+    const totalConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
     return {
-      success: true,
       candidates: allCandidates,
-      averageConfidence: parseFloat((totalConfidence / (validResults.length || 1)).toFixed(3)),
-      totalFiles: validResults.length,
+      averageConfidence: parseFloat((totalConfidence / results.length).toFixed(3)),
+      totalFiles: results.length,
     };
   }
 
   if (category === 'contract_analysis') {
-    const allDocuments = validResults.map((r, i) => ({
+    const allDocuments = results.map((r, i) => ({
       document: i + 1,
-      clauses: r.clauses ?? r.clauses_flagged ?? [],
+      clauses: r.clauses ?? [],
       confidence: r.confidence ?? 0,
     }));
-    const clauses_flagged = validResults.flatMap((r) => r.clauses_flagged ?? r.clauses ?? []);
-    const avgRiskScore = validResults.reduce((sum, r) => sum + (r.overall_risk_score ?? 0.5), 0) / (validResults.length || 1);
-    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
-
+    const totalClauses = allDocuments.reduce((sum, d) => sum + d.clauses.length, 0);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
     return {
-      success: true,
       documents: allDocuments,
-      clauses: clauses_flagged,
-      clauses_flagged,
-      overall_risk_score: parseFloat(avgRiskScore.toFixed(2)),
-      totalClauses: clauses_flagged.length,
+      totalClauses,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: validResults.length,
+      totalFiles: results.length,
     };
   }
 
   if (category === 'invoice_extraction') {
-    const allDocuments = validResults.map((r, i) => ({
+    const allDocuments = results.map((r, i) => ({
       document: i + 1,
       vendor_name: r.vendor_name,
       invoice_number: r.invoice_number,
@@ -231,28 +156,28 @@ function aggregateResults(category: string, results: any[]): any {
       total_amount: r.total_amount,
       confidence: r.confidence ?? 0,
     }));
-    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
-    const line_items = validResults.flatMap((r) => r.line_items ?? []);
-    const vendor_name = validResults.find((r) => r.vendor_name && r.vendor_name !== 'Unknown')?.vendor_name || validResults[0]?.vendor_name || 'Unknown';
-    const invoice_number = validResults.find((r) => r.invoice_number && r.invoice_number !== 'Unknown')?.invoice_number || validResults[0]?.invoice_number || 'Unknown';
-    const date = validResults.find((r) => r.date && r.date !== 'Unknown')?.date || validResults[0]?.date || 'Unknown';
-    const total_amount = validResults.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
+    const totalLineItems = allDocuments.reduce((sum, d) => sum + d.line_items.length, 0);
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
+    const line_items = results.flatMap((r) => r.line_items ?? []);
+    const vendor_name = results.find((r) => r.vendor_name && r.vendor_name !== 'Unknown')?.vendor_name || results[0]?.vendor_name || 'Unknown';
+    const invoice_number = results.find((r) => r.invoice_number && r.invoice_number !== 'Unknown')?.invoice_number || results[0]?.invoice_number || 'Unknown';
+    const date = results.find((r) => r.date && r.date !== 'Unknown')?.date || results[0]?.date || 'Unknown';
+    const total_amount = results.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
 
     return {
-      success: true,
       vendor_name,
       invoice_number,
       date,
       line_items,
       total_amount,
       documents: allDocuments,
-      totalLineItems: line_items.length,
+      totalLineItems,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: validResults.length,
+      totalFiles: results.length,
     };
   }
 
-  return { success: true, results: validResults };
+  return { results };
 }
 
 /**
@@ -378,56 +303,6 @@ export async function handleExecuteTaskRequest(c: Context) {
 
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
-
-    // ── Step 3.5: Server-Side Batch Execution if results not pre-computed ────
-    if (!Array.isArray(results) || results.length === 0) {
-      console.log(`🚀 Executing task ${planId} (${category}) server-side for ${taskRecord.executionQuantity || 1} item(s)...`);
-      results = [];
-      const po = taskRecord.plannerOutput || {};
-
-      let itemsToProcess: any[] = [];
-      if (category === 'code_review' && Array.isArray(po.files) && po.files.length > 0) {
-        itemsToProcess = po.files;
-      } else if (category === 'seo_audit' && Array.isArray(po.pages) && po.pages.length > 0) {
-        itemsToProcess = po.pages;
-      } else if (Array.isArray(po.files) && po.files.length > 0) {
-        itemsToProcess = po.files;
-      } else {
-        itemsToProcess = [{ task_description: taskRecord.prompt }];
-      }
-
-      for (let idx = 0; idx < itemsToProcess.length; idx++) {
-        const item = itemsToProcess[idx];
-        let payload: Record<string, any> = {};
-
-        if (category === 'code_review') {
-          payload = { file_path: item.path, raw_url: item.raw_url };
-        } else if (category === 'seo_audit') {
-          payload = { page_url: item.url, task_description: taskRecord.prompt };
-        } else if (item.index !== undefined) {
-          payload = { file_index: item.index, plan_id: planId, task_description: taskRecord.prompt };
-        } else {
-          payload = { task_description: taskRecord.prompt, files: [item] };
-        }
-
-        try {
-          if (idx > 0) {
-            await new Promise((r) => setTimeout(r, 1200));
-          }
-          const itemRes = await invokeProviderHandler(winnerEndpoint, payload);
-          results.push(itemRes);
-        } catch (itemErr: any) {
-          console.error(`Error processing item ${idx + 1} (${item.path || item.url || item.filename}):`, itemErr);
-          results.push({
-            success: false,
-            error: {
-              code: itemErr.code || 'ITEM_EXECUTION_FAILED',
-              message: itemErr.message || 'Failed to process item',
-            },
-          });
-        }
-      }
-    }
 
     const actualQuantity = results.length;
 
@@ -580,7 +455,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       ? sumCompletionTokens 
       : estimateTokens(JSON.stringify(combinedResult));
 
-    const modelName = 'openai/gpt-oss-20b';
+    const modelName = winnerEndpoint.includes('accurate') ? 'llama-3.3-70b-versatile' : 'llama3-8b-8192';
     const measurementSource = hasProviderUsage ? 'provider_usage' : 'estimated';
 
     const tokenAnalytics = await recordExecutionMetrics({

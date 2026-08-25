@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
 import { analyzeHtmlSeoRules, SeoIssue } from './seo-audit-fast';
-import { openrouterManager } from './lib/openrouter-manager';
+import { callOpenRouter } from './lib/openrouter-client';
 
 /**
  * POST /seo-audit-accurate
- * High-precision LLM-assisted SEO audit for a single page URL.
+ * High-precision LLM-assisted SEO audit for a single page URL using OpenRouter API.
  */
 export async function handleSeoAuditAccurateRequest(c: Context) {
   const startTime = Date.now();
@@ -40,35 +40,51 @@ export async function handleSeoAuditAccurateRequest(c: Context) {
       .slice(0, 3000)
       .trim();
 
-    const aiResult = await groqManager.chatCompletion<{
-      llm_issues?: SeoIssue[];
-      seo_score?: number;
-    }>({
-      model: 'openai/gpt-oss-20b',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert SEO specialist and technical auditor. Analyze webpage text content for readability, engagement, keyword relevance, search intent match, and content depth. Return ONLY valid JSON: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number } where seo_score is a float between 0.0 and 1.0.',
-        },
-        {
-          role: 'user',
-          content: `Page URL: ${targetUrl}\n\nWebpage Extract:\n${cleanText}`,
-        },
-      ],
-      temperature: 0.1,
-    });
+    let llmIssues: SeoIssue[] = [];
+    let llmScore = ruleScore;
+    let success = false;
 
-    const parsed = aiResult.data || {};
-    const llmIssues: SeoIssue[] = Array.isArray(parsed.llm_issues) ? parsed.llm_issues : [];
-    const llmScore = typeof parsed.seo_score === 'number' ? Math.max(0, Math.min(1, parsed.seo_score)) : ruleScore;
+    const llmStart = Date.now();
+    try {
+      const content = await callOpenRouter({
+        model: 'meta-llama/llama-3.3-70b-instruct',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert SEO specialist and technical auditor. Analyze the provided webpage text content for readability grade level, content engagement, keyword relevance, search intent match, and content depth. Return ONLY valid JSON matching this schema: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number }. seo_score must be a float between 0.0 and 1.0. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
+          },
+          {
+            role: 'user',
+            content: `Page URL: ${targetUrl}\n\nWebpage Extract:\n${cleanText}`,
+          },
+        ],
+        temperature: 0.1,
+      });
+
+      let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON object found in LLM response');
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      if (Array.isArray(parsed.llm_issues)) {
+        llmIssues = parsed.llm_issues;
+      }
+      if (typeof parsed.seo_score === 'number') {
+        llmScore = Math.max(0, Math.min(1, parsed.seo_score));
+      }
+      success = true;
+    } catch (err) {
+      console.warn(`[seo-audit-accurate] OpenRouter analysis unavailable for ${targetUrl} — using rule-based analysis:`, err);
+    }
 
     // Combine rule-based issues and LLM issues
     const combinedIssues = [...ruleIssues, ...llmIssues];
-    const finalScore = parseFloat(((ruleScore * 0.4) + (llmScore * 0.6)).toFixed(2));
+    const finalScore = success
+      ? parseFloat(((ruleScore * 0.4) + (llmScore * 0.6)).toFixed(2))
+      : ruleScore;
     const totalLatency = Date.now() - startTime;
 
     return c.json({
-      success: true,
       page_url: targetUrl,
       issues: combinedIssues,
       seo_score: finalScore,
@@ -78,15 +94,6 @@ export async function handleSeoAuditAccurateRequest(c: Context) {
     });
   } catch (error: any) {
     console.error('Error in seo-audit-accurate handler:', error);
-    const status = error.status && typeof error.status === 'number' ? error.status : 500;
-    return c.json({
-      success: false,
-      error: {
-        code: error.code || 'AI_ANALYSIS_FAILED',
-        message: error.message || 'SEO audit AI analysis failed',
-        status,
-        rotationReasons: error.rotationReasons,
-      },
-    }, status);
+    return c.json({ error: 'Internal server error', message: error.message }, 500);
   }
 }

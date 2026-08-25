@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { extractText } from '../handlers/lib/extract-document';
 import { estimateTokens } from './tokenAnalytics';
+import { callOpenRouter } from '../handlers/lib/openrouter-client';
 
 config();
 
@@ -25,21 +26,8 @@ export interface PromptAnalysisResult {
 }
 
 /**
- * Helper to fetch all Groq API keys available in environment variables
- */
-function getGroqKeys(): string[] {
-  const keys: string[] = [];
-  if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 20; i++) {
-    const k = process.env[`GROQ_API_KEY_${i}`];
-    if (k) keys.push(k);
-  }
-  return keys;
-}
-
-/**
  * Modular Prompt Tutor Service
- * Analyzes user prompts for clarity, specificity, completeness, constraints, and structure.
+ * Analyzes user prompts for clarity, specificity, completeness, constraints, and structure using OpenRouter.
  */
 export async function analyzePromptWithLLM(
   originalPrompt: string,
@@ -90,11 +78,9 @@ export async function analyzePromptWithLLM(
   const fullUserPayload = `${promptText}${contextStr}`;
   const inputTokens = estimateTokens(fullUserPayload);
 
-  const keys = getGroqKeys();
   let analysis: PromptAnalysisResult | null = null;
 
-  if (keys.length > 0) {
-    const systemInstruction = `You are Prompt Tutor, an expert AI prompt optimization layer for PRISM.
+  const systemInstruction = `You are Prompt Tutor, an expert AI prompt optimization layer for PRISM.
 Your job is to analyze the user's task request BEFORE execution and provide structured feedback to improve prompt engineering.
 
 Evaluate:
@@ -127,59 +113,54 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
 
-    try {
-      const { openrouterManager } = await import('../handlers/lib/openrouter-manager');
-      const res = await openrouterManager.chatCompletion({
-        model: 'meta-llama/llama-3.3-70b-instruct',
-        responseFormatJson: false,
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: `Task Request: "${promptText}"${contextStr}` },
-        ],
-        temperature: 0.1,
-      });
+  try {
+    const rawContent = await callOpenRouter({
+      model: 'google/gemini-2.0-flash-001',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: `Task Request: "${promptText}"${contextStr}` },
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    });
 
-      if (res.data || res.rawContent) {
-        const rawContent = res.rawContent;
-        const parsed = typeof res.data === 'object' && res.data ? res.data : JSON.parse(rawContent);
-        const sanitizeStringArray = (val: any): string[] => {
-          if (!val) return [];
-          if (Array.isArray(val)) {
-            return val.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).filter(Boolean);
-          }
-          if (typeof val === 'string') {
-            return [val];
-          }
-          return [JSON.stringify(val)];
-        };
-
-        let improvedPrompt = parsed.improvedPrompt || promptText;
-        const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
-        if (urlMatches) {
-          for (const url of urlMatches) {
-            if (!improvedPrompt.includes(url)) {
-              improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
-            }
-          }
-        }
-
-        analysis = {
-          score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
-          intent: parsed.intent || 'Task analysis',
-          taskType: parsed.taskType || hintCategory || 'general_query',
-          issues: sanitizeStringArray(parsed.issues),
-          requiredInformation: sanitizeStringArray(parsed.requiredInformation),
-          irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
-          constraints: sanitizeStringArray(parsed.constraints),
-          suggestions: sanitizeStringArray(parsed.suggestions),
-          improvedPrompt,
-          modelUsed: 'openai/gpt-oss-20b',
-          originalInputTokens: inputTokens,
-        };
+    const parsed = JSON.parse(rawContent);
+    const sanitizeStringArray = (val: any): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) {
+        return val.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).filter(Boolean);
       }
-    } catch (err) {
-      console.warn('Prompt Tutor groqManager analysis failed:', err);
+      if (typeof val === 'string') {
+        return [val];
+      }
+      return [JSON.stringify(val)];
+    };
+
+    let improvedPrompt = parsed.improvedPrompt || promptText;
+    const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
+    if (urlMatches) {
+      for (const url of urlMatches) {
+        if (!improvedPrompt.includes(url)) {
+          improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
+        }
+      }
     }
+
+    analysis = {
+      score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
+      intent: parsed.intent || 'Task analysis',
+      taskType: parsed.taskType || hintCategory || 'general_query',
+      issues: sanitizeStringArray(parsed.issues),
+      requiredInformation: sanitizeStringArray(parsed.requiredInformation),
+      irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
+      constraints: sanitizeStringArray(parsed.constraints),
+      suggestions: sanitizeStringArray(parsed.suggestions),
+      improvedPrompt,
+      modelUsed: 'google/gemini-2.0-flash-001',
+      originalInputTokens: inputTokens,
+    };
+  } catch (err) {
+    console.warn('[PromptTutor] OpenRouter prompt analysis failed, using fallback:', err);
   }
 
   // Fallback to local rule-based heuristic if LLM API unavailable

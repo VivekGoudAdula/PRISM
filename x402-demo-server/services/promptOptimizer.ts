@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
-import { estimateTokens, calculateTokenSavings, calculateCompressionRatio } from './tokenAnalytics';
+import { estimateTokens, calculateTokenSavings } from './tokenAnalytics';
+import { callOpenRouter } from '../handlers/lib/openrouter-client';
 
 config();
 
@@ -35,20 +36,9 @@ export interface PromptOptimizationOutput {
   measurementSource: 'provider_usage' | 'estimated' | 'hybrid';
 }
 
-function getGroqKeys(): string[] {
-  const keys: string[] = [];
-  if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 20; i++) {
-    const k = process.env[`GROQ_API_KEY_${i}`];
-    if (k) keys.push(k);
-  }
-  return keys;
-}
-
 /**
  * Extracts essential entities (names, numbers, dates, emails, skills, IDs, negations, constraints).
  */
-
 export function extractCriticalTerms(text: string): {
   negations: string[];
   numbers: string[];
@@ -155,7 +145,6 @@ export function applyDeterministicCompression(text: string): {
 
 /**
  * Checks if a specific negation or constraint is semantically preserved in the optimized context.
- * Equivalent terms for "ONLY" include "exclusively", "solely", "must be limited to", "only include".
  */
 function isNegationPreserved(neg: string, optimizedText: string): boolean {
   const optLower = optimizedText.toLowerCase();
@@ -211,7 +200,6 @@ export function validateSemanticPreservation(
 
   const origTerms = extractCriticalTerms(originalContext);
 
-  // 1. Check user negations (ONLY, MUST NOT, EXCLUDE, etc.)
   for (const neg of origTerms.negations) {
     if (!isNegationPreserved(neg, optimizedContext)) {
       console.warn(`[PreservationFailure] Negation constraint lost: "${neg}" in context: "${originalContext.slice(0, 100)}..."`);
@@ -219,7 +207,6 @@ export function validateSemanticPreservation(
     }
   }
 
-  // 2. Check explicit required entities
   const missingEntities: string[] = [];
   const optLower = optimizedContext.toLowerCase();
 
@@ -229,7 +216,6 @@ export function validateSemanticPreservation(
     }
   }
 
-  // 3. Check explicit constraints
   const missingConstraints: string[] = [];
   for (const con of requiredConstraints) {
     if (con && !optLower.includes(con.toLowerCase())) {
@@ -246,13 +232,11 @@ export function validateSemanticPreservation(
 }
 
 /**
- * Main End-to-End Prompt Optimizer Service function.
+ * Main End-to-End Prompt Optimizer Service function using OpenRouter.
  */
 export async function optimizePrompt(input: PromptOptimizationInput): Promise<PromptOptimizationOutput> {
-  const originalPrompt = input.originalPrompt || '';
   const startingPrompt = (input.improvedPrompt || input.originalPrompt || '').trim();
 
-  // Build full raw context string (excluding base64)
   let rawContextParts: string[] = [startingPrompt];
 
   if (input.files && input.files.length > 0) {
@@ -266,7 +250,6 @@ export async function optimizePrompt(input: PromptOptimizationInput): Promise<Pr
   const fullOriginalContext = rawContextParts.join('\n\n').trim();
   const originalInputTokens = estimateTokens(fullOriginalContext);
 
-  // Default output structure for fallback
   const defaultOutput: PromptOptimizationOutput = {
     originalPrompt: fullOriginalContext,
     optimizedPrompt: fullOriginalContext,
@@ -297,20 +280,16 @@ export async function optimizePrompt(input: PromptOptimizationInput): Promise<Pr
   let summarizedSections = [...deterministicResult.summarizedSections];
   let modelUsed = 'deterministic-preprocess';
 
-  // Extract critical terms for preservation tracking
   const terms = extractCriticalTerms(fullOriginalContext);
   const preservedEntities = Array.from(new Set([...(input.requiredEntities || []), ...terms.properNouns.slice(0, 10)]));
   const preservedConstraints = Array.from(new Set([...(input.constraints || []), ...terms.negations]));
   const preservedRelationships = input.requiredRelationships || [];
 
-  // Step 2: Decide whether LLM semantic compression is needed
   const deterministicTokens = estimateTokens(currentContext);
 
-  // If deterministic alone achieved compression and context is small, or LLM disabled
+  // Step 2: LLM semantic compression via OpenRouter if context size warrants it
   if (deterministicTokens > 120) {
-    const keys = getGroqKeys();
-    if (keys.length > 0) {
-      const systemInstruction = `You are PRISM Prompt Optimizer, an expert context compressor.
+    const systemInstruction = `You are PRISM Prompt Optimizer, an expert context compressor.
 Compress and restructure the input execution context to minimize token usage while preserving 100% of task-critical semantics.
 
 CRITICAL PRESERVATION RULES:
@@ -329,47 +308,39 @@ Return ONLY a JSON object with this exact structure:
 }`;
 
     try {
-      const { openrouterManager } = await import('../handlers/lib/openrouter-manager');
-      const res = await openrouterManager.chatCompletion({
-        model: 'meta-llama/llama-3.3-70b-instruct',
-        responseFormatJson: false,
+      const rawContent = await callOpenRouter({
+        model: 'google/gemini-2.0-flash-001',
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
         ],
         temperature: 0.1,
+        response_format: { type: 'json_object' },
       });
 
-      if (res.data || res.rawContent) {
-        const rawContent = res.rawContent;
-        const parsed = typeof res.data === 'object' && res.data ? res.data : JSON.parse(rawContent);
-        if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
-          const candidateText = parsed.optimizedContext.trim();
+      const parsed = JSON.parse(rawContent);
+      if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
+        const candidateText = parsed.optimizedContext.trim();
+        const validation = validateSemanticPreservation(
+          fullOriginalContext,
+          candidateText,
+          input.requiredEntities,
+          input.constraints
+        );
 
-          const validation = validateSemanticPreservation(
-            fullOriginalContext,
-            candidateText,
-            input.requiredEntities,
-            input.constraints
-          );
-
-          if (validation.isValid) {
-            currentContext = candidateText;
-            modelUsed = `openai/gpt-oss-20b + deterministic`;
-            if (Array.isArray(parsed.removedRedundancies)) {
-              removedRedundancies.push(...parsed.removedRedundancies);
-            }
-            if (Array.isArray(parsed.summarizedSections)) {
-              summarizedSections.push(...parsed.summarizedSections);
-            }
-          } else {
-            console.warn('⚠️ Semantic preservation validation failed. Discarding LLM optimization fallback to original context.', validation);
+        if (validation.isValid) {
+          currentContext = candidateText;
+          modelUsed = 'google/gemini-2.0-flash-001 + deterministic';
+          if (Array.isArray(parsed.removedRedundancies)) {
+            removedRedundancies.push(...parsed.removedRedundancies);
+          }
+          if (Array.isArray(parsed.summarizedSections)) {
+            summarizedSections.push(...parsed.summarizedSections);
           }
         }
       }
     } catch (err) {
-      console.warn('Prompt Optimizer groqManager optimization failed:', err);
-    }
+      console.warn('[PromptOptimizer] OpenRouter optimization failed, using deterministic compression:', err);
     }
   }
 
@@ -387,7 +358,6 @@ Return ONLY a JSON object with this exact structure:
 
   const optimizedInputTokens = estimateTokens(currentContext);
 
-  // If optimization resulted in no token reduction or larger size, fallback
   if (optimizedInputTokens >= originalInputTokens) {
     return defaultOutput;
   }

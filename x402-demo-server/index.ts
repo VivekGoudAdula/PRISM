@@ -417,16 +417,6 @@ app.get('/health', (c) => {
   });
 });
 
-app.get('/api/health/openrouter', async (c) => {
-  const { handleOpenRouterHealthCheck } = await import('./routes/health-openrouter');
-  return handleOpenRouterHealthCheck(c);
-});
-
-app.get('/api/health/groq', async (c) => {
-  const { handleOpenRouterHealthCheck } = await import('./routes/health-openrouter');
-  return handleOpenRouterHealthCheck(c);
-});
-
 app.post('/classify-task', async (c) => {
   const { handleClassifyTaskRequest } = await import('./handlers/classify-task');
   return handleClassifyTaskRequest(c);

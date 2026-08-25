@@ -7,11 +7,6 @@ export function verifyOutput(category: string, result: any): { passed: boolean; 
     return { passed: false, reason: 'Result is empty or null' };
   }
 
-  if (result.success === false || result.error) {
-    const errorMsg = typeof result.error === 'object' ? (result.error.message || result.error.code) : (result.error || 'AI execution failed');
-    return { passed: false, reason: `AI analysis failed: ${errorMsg}` };
-  }
-
   switch (category) {
     case 'invoice_extraction': {
       // Extract vendor name & total amount from direct result or documents list

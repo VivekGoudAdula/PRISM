@@ -1,9 +1,10 @@
 import type { Context } from 'hono';
 import { Task } from '../models/Task';
+import { callOpenRouter } from './lib/openrouter-client';
 
 /**
  * POST /chat-reply (PUBLIC — free, no payment)
- * Generates a direct, short conversational response using Groq LLM API.
+ * Generates a direct, short conversational response using OpenRouter API.
  */
 export async function handleChatReplyRequest(c: Context) {
   try {
@@ -31,7 +32,7 @@ export async function handleChatReplyRequest(c: Context) {
 }
 
 /**
- * Helper to generate direct Groq LLM response for conversational prompts,
+ * Helper to generate direct OpenRouter LLM response for conversational prompts,
  * grounded in recent task execution context from MongoDB.
  */
 export async function generateChatReply(message: string): Promise<string> {
@@ -77,18 +78,6 @@ export async function generateChatReply(message: string): Promise<string> {
     return "I don't have a previous result to reference — could you clarify what you'd like me to look at?";
   }
 
-  const getGroqKeys = () => {
-    const keys = [];
-    if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-    for (let i = 1; i <= 10; i++) {
-      const k = process.env[`GROQ_API_KEY_${i}`];
-      if (k) keys.push(k);
-    }
-    return keys;
-  };
-
-  const keys = getGroqKeys();
-
   const systemPrompt = `You are Prism, an AI routing assistant built on Algorand's x402 payment protocol.
 
 CONTEXT FROM PREVIOUS TASK EXECUTIONS:
@@ -102,27 +91,19 @@ INSTRUCTIONS:
 5. Keep your response concise, clear, and under 3-4 sentences.`;
 
   try {
-    const { openrouterManager } = await import('./lib/openrouter-manager');
-    const res = await openrouterManager.chatCompletion({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      responseFormatJson: false,
+    const content = await callOpenRouter({
+      model: 'google/gemini-2.0-flash-001',
       messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: message,
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message },
       ],
       temperature: 0.1,
+      max_tokens: 250,
     });
-    if (res.rawContent) {
-      return res.rawContent;
-    }
-  } catch (e) {
-    console.error('Error generating chat reply with groqManager:', e);
+
+    if (content) return content.trim();
+  } catch (err) {
+    console.error('Error generating chat reply with OpenRouter:', err);
   }
 
   // Local fallback response

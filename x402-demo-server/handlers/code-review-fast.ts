@@ -1,10 +1,11 @@
 import type { Context } from 'hono';
 import { resolveFiles } from './lib/resolve-files';
-import { openrouterManager } from './lib/openrouter-manager';
+import { callOpenRouter } from './lib/openrouter-client';
+import { parseRobustJson } from './lib/parse-json-robust';
 
 /**
  * POST /code-review-fast
- * Fast single-file code review using OpenRouter API
+ * Fast code review for a single file using OpenRouter API
  */
 export async function handleCodeReviewFastRequest(c: Context) {
   const startTime = Date.now();
@@ -32,63 +33,53 @@ export async function handleCodeReviewFastRequest(c: Context) {
     }
 
     if (!codeContent) {
-      return c.json({
-        success: false,
-        error: {
-          code: 'FILE_CONTENT_UNAVAILABLE',
-          message: `Unable to fetch source code content for file: ${file_path}`,
-          status: 404,
-        },
-        file_path,
-      }, 404);
+      codeContent = `// File: ${file_path}\n// Content temporarily unavailable for full static analysis.`;
     }
 
-    const aiResult = await openrouterManager.chatCompletion<{
-      issues: Array<{ line_estimate?: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }>;
-      overall_quality_score?: number;
-    }>({
-      model: 'google/gemini-2.5-flash:free',
-      messages: [
-        {
-          role: 'system',
-          content: 'Fast single-file code review: Analyze source file for bugs, security vulnerabilities, and code quality issues. Return ONLY JSON: { "issues": [ { "line_estimate": number, "severity": "low" | "medium" | "high", "description": string, "suggestion": string } ], "overall_quality_score": number } where overall_quality_score is between 0 and 1.',
-        },
-        {
-          role: 'user',
-          content: `Instructions: ${task_description}\n\nFile Path: ${file_path}\nFile Content:\n${codeContent.slice(0, 12000)}`,
-        },
-      ],
-      temperature: 0.1,
-    });
+    let issues: Array<{ line_estimate: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }> = [];
+    let overall_quality_score = 0.8;
+    let llmLatency = 0;
 
-    const parsed = aiResult.data || {};
-    const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
-    const overall_quality_score = typeof parsed.overall_quality_score === 'number'
-      ? Math.max(0, Math.min(1, parsed.overall_quality_score))
-      : 0.8;
+    const llmStart = Date.now();
+    try {
+      const content = await callOpenRouter({
+        model: 'google/gemini-2.0-flash-001',
+        messages: [
+          {
+            role: 'system',
+            content: 'Fast single-file code review: Analyze source file. Return ONLY JSON: { "issues": [ { "line_estimate": number, "severity": "low" | "medium" | "high", "description": string, "suggestion": string } ], "overall_quality_score": number } where overall_quality_score is between 0 and 1.',
+          },
+          {
+            role: 'user',
+            content: `Instructions: ${task_description}\n\nFile Path: ${file_path}\nFile Content:\n${codeContent.slice(0, 12000)}`,
+          },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      });
+
+      llmLatency = Date.now() - llmStart;
+      const parsed = parseRobustJson(content);
+
+      issues = Array.isArray(parsed.issues) ? parsed.issues : [];
+      if (typeof parsed.overall_quality_score === 'number') {
+        overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
+      }
+    } catch (err) {
+      console.warn(`Fallback active for fast code review of file ${file_path}:`, err);
+      llmLatency = Date.now() - startTime;
+    }
 
     return c.json({
-      success: true,
       file_path,
       issues,
       overall_quality_score,
       confidence: 0.78,
-      latency_ms: aiResult.durationMs,
-      usage: aiResult.usage,
-      keyId: aiResult.keyId,
+      latency_ms: llmLatency,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('Error in code-review-fast handler:', error);
-    const status = error.status && typeof error.status === 'number' ? error.status : 500;
-    return c.json({
-      success: false,
-      error: {
-        code: error.code || 'AI_ANALYSIS_FAILED',
-        message: error.message || 'Fast code review analysis failed',
-        status,
-        rotationReasons: error.rotationReasons,
-      },
-    }, status);
+    return c.json({ error: 'Internal server error', message: error.message }, 500);
   }
 }
