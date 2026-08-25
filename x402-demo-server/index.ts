@@ -39,6 +39,7 @@ import {
 import { bazaarResourceServerExtension } from '@x402-avm/extensions';
 import type { ResourceServerExtension } from '@x402/core/types';
 import createPaymentConfig, { EndpointConfig, NETWORK_CONFIG, NETWORK_MODE } from './endpoints.config';
+import { getCanonicalResourceUrl } from './endpoints.registry';
 
 // Import Middlewares and Routers
 import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
@@ -193,12 +194,13 @@ x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
 
 // Add x402 Debug Logging Hooks
 x402Server.onBeforeVerify(async (context) => {
-  const canonicalResourceUrl = context.requirements.resource || '';
-  let endpointPath = '/';
+  const reqPath = (context.transportContext as any)?.request?.path || (context.transportContext as any)?.request?.routePattern || '';
+  const canonicalResourceUrl = context.paymentPayload?.resource?.url || getCanonicalResourceUrl(reqPath);
+  let endpointPath = reqPath;
   try {
     endpointPath = new URL(canonicalResourceUrl).pathname;
   } catch {
-    endpointPath = canonicalResourceUrl;
+    endpointPath = reqPath;
   }
   const resourceId = endpointPath.replace(/^\//, '');
   const rawAmount = context.requirements.amount;
@@ -214,12 +216,13 @@ x402Server.onBeforeVerify(async (context) => {
 });
 
 x402Server.onAfterSettle(async (context) => {
-  const canonicalResourceUrl = context.requirements.resource || '';
-  let endpointPath = '/';
+  const reqPath = (context.transportContext as any)?.request?.path || (context.transportContext as any)?.request?.routePattern || '';
+  const canonicalResourceUrl = context.paymentPayload?.resource?.url || getCanonicalResourceUrl(reqPath);
+  let endpointPath = reqPath;
   try {
     endpointPath = new URL(canonicalResourceUrl).pathname;
   } catch {
-    endpointPath = canonicalResourceUrl;
+    endpointPath = reqPath;
   }
   const resourceId = endpointPath.replace(/^\//, '');
   const transactionId = context.result.transaction || 'unknown';

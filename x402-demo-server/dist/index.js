@@ -81161,6 +81161,14 @@ var init_Task = __esm({
 });
 
 // endpoints.registry.ts
+function getCanonicalResourceUrl(routePath) {
+  const cleanPath = routePath.replace(/^(GET|POST|PUT|DELETE|OPTIONS)\s+/, "").split("?")[0];
+  const endpointKey = cleanPath.replace(/^\//, "");
+  if (CANONICAL_ENDPOINTS[endpointKey]) {
+    return CANONICAL_ENDPOINTS[endpointKey].resourceUrl;
+  }
+  return `${CANONICAL_BASE_URL}${cleanPath.startsWith("/") ? cleanPath : "/" + cleanPath}`;
+}
 var CANONICAL_BASE_URL, CANONICAL_ENDPOINTS;
 var init_endpoints_registry = __esm({
   "endpoints.registry.ts"() {
@@ -81847,19 +81855,6 @@ function createPaymentConfig(avmAddress2) {
       description: CANONICAL_ENDPOINTS["seo-audit-accurate"].description,
       mimeType: "application/json",
       extensions: seoAuditAccuratePostDiscovery
-    },
-    "POST /execute-task": {
-      resource: CANONICAL_ENDPOINTS["execute-task"].resourceUrl,
-      accepts: [{
-        scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress2,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
-      }],
-      description: CANONICAL_ENDPOINTS["execute-task"].description,
-      mimeType: "application/json",
-      extensions: executeTaskPostDiscovery
     },
     "GET /run-task": {
       resource: CANONICAL_ENDPOINTS["run-task"].resourceUrl,
@@ -98378,6 +98373,7 @@ var ExactAvmScheme = class {
 var import_mongoose30 = __toESM(require("mongoose"));
 init_esm();
 init_endpoints_config();
+init_endpoints_registry();
 
 // middleware/common.ts
 var rateLimitMap = /* @__PURE__ */ new Map();
@@ -103613,12 +103609,13 @@ x402Server.registerExtension(bazaarResourceServerExtension2);
 var avmServerScheme = new ExactAvmScheme();
 x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
 x402Server.onBeforeVerify(async (context) => {
-  const canonicalResourceUrl = context.requirements.resource || "";
-  let endpointPath = "/";
+  const reqPath = context.transportContext?.request?.path || context.transportContext?.request?.routePattern || "";
+  const canonicalResourceUrl = context.paymentPayload?.resource?.url || getCanonicalResourceUrl(reqPath);
+  let endpointPath = reqPath;
   try {
     endpointPath = new URL(canonicalResourceUrl).pathname;
   } catch {
-    endpointPath = canonicalResourceUrl;
+    endpointPath = reqPath;
   }
   const resourceId = endpointPath.replace(/^\//, "");
   const rawAmount = context.requirements.amount;
@@ -103632,12 +103629,13 @@ x402Server.onBeforeVerify(async (context) => {
   });
 });
 x402Server.onAfterSettle(async (context) => {
-  const canonicalResourceUrl = context.requirements.resource || "";
-  let endpointPath = "/";
+  const reqPath = context.transportContext?.request?.path || context.transportContext?.request?.routePattern || "";
+  const canonicalResourceUrl = context.paymentPayload?.resource?.url || getCanonicalResourceUrl(reqPath);
+  let endpointPath = reqPath;
   try {
     endpointPath = new URL(canonicalResourceUrl).pathname;
   } catch {
-    endpointPath = canonicalResourceUrl;
+    endpointPath = reqPath;
   }
   const resourceId = endpointPath.replace(/^\//, "");
   const transactionId = context.result.transaction || "unknown";

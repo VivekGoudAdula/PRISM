@@ -727,20 +727,6 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       extensions: seoAuditAccuratePostDiscovery,
     },
 
-    'POST /execute-task': {
-      resource: CANONICAL_ENDPOINTS['execute-task'].resourceUrl,
-      accepts: [{
-        scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
-        network: NETWORK_CONFIG.caip2,
-        payTo: avmAddress,
-        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
-      }],
-      description: CANONICAL_ENDPOINTS['execute-task'].description,
-      mimeType: 'application/json',
-      extensions: executeTaskPostDiscovery,
-    },
-
     'GET /run-task': {
       resource: CANONICAL_ENDPOINTS['run-task'].resourceUrl,
       accepts: [{
