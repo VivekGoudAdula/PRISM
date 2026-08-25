@@ -191,6 +191,50 @@ x402Server.registerExtension(bazaarResourceServerExtension as unknown as Resourc
 const avmServerScheme = new ExactAvmScheme();
 x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
 
+// Add x402 Debug Logging Hooks
+x402Server.onBeforeVerify(async (context) => {
+  const canonicalResourceUrl = context.requirements.resource || '';
+  let endpointPath = '/';
+  try {
+    endpointPath = new URL(canonicalResourceUrl).pathname;
+  } catch {
+    endpointPath = canonicalResourceUrl;
+  }
+  const resourceId = endpointPath.replace(/^\//, '');
+  const rawAmount = context.requirements.amount;
+  const paymentAmount = parseFloat((Number(rawAmount) / 1e6).toFixed(4));
+
+  console.log('[x402 DIAGNOSTIC VERIFY]', {
+    endpointPath,
+    canonicalResourceUrl,
+    resourceId,
+    transactionId: 'verifying',
+    paymentAmount,
+  });
+});
+
+x402Server.onAfterSettle(async (context) => {
+  const canonicalResourceUrl = context.requirements.resource || '';
+  let endpointPath = '/';
+  try {
+    endpointPath = new URL(canonicalResourceUrl).pathname;
+  } catch {
+    endpointPath = canonicalResourceUrl;
+  }
+  const resourceId = endpointPath.replace(/^\//, '');
+  const transactionId = context.result.transaction || 'unknown';
+  const rawAmount = context.result.amount || context.requirements.amount;
+  const paymentAmount = parseFloat((Number(rawAmount) / 1e6).toFixed(4));
+
+  console.log('[x402 DIAGNOSTIC SETTLED]', {
+    endpointPath,
+    canonicalResourceUrl,
+    resourceId,
+    transactionId,
+    paymentAmount,
+  });
+});
+
 // Create Hono app
 const app = new Hono();
 

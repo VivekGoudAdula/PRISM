@@ -81160,6 +81160,89 @@ var init_Task = __esm({
   }
 });
 
+// endpoints.registry.ts
+var CANONICAL_BASE_URL, CANONICAL_ENDPOINTS;
+var init_endpoints_registry = __esm({
+  "endpoints.registry.ts"() {
+    "use strict";
+    CANONICAL_BASE_URL = process.env.PUBLIC_URL || process.env.CANONICAL_HOST || process.env.BASE_URL || "https://prism-99h2.onrender.com";
+    CANONICAL_ENDPOINTS = {
+      "code-review-fast": {
+        id: "code-review-fast",
+        path: "/code-review-fast",
+        resourceUrl: `${CANONICAL_BASE_URL}/code-review-fast`,
+        description: "Reviews a single code file for bugs, security issues, syntax errors, and code quality problems with fast LLM turnarounds."
+      },
+      "code-review-accurate": {
+        id: "code-review-accurate",
+        path: "/code-review-accurate",
+        resourceUrl: `${CANONICAL_BASE_URL}/code-review-accurate`,
+        description: "Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning."
+      },
+      "resume-screen-fast": {
+        id: "resume-screen-fast",
+        path: "/resume-screen-fast",
+        resourceUrl: `${CANONICAL_BASE_URL}/resume-screen-fast`,
+        description: "Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking."
+      },
+      "resume-screen-accurate": {
+        id: "resume-screen-accurate",
+        path: "/resume-screen-accurate",
+        resourceUrl: `${CANONICAL_BASE_URL}/resume-screen-accurate`,
+        description: "Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning."
+      },
+      "contract-analyze-fast": {
+        id: "contract-analyze-fast",
+        path: "/contract-analyze-fast",
+        resourceUrl: `${CANONICAL_BASE_URL}/contract-analyze-fast`,
+        description: "Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds."
+      },
+      "contract-analyze-accurate": {
+        id: "contract-analyze-accurate",
+        path: "/contract-analyze-accurate",
+        resourceUrl: `${CANONICAL_BASE_URL}/contract-analyze-accurate`,
+        description: "Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning."
+      },
+      "invoice-extract-fast": {
+        id: "invoice-extract-fast",
+        path: "/invoice-extract-fast",
+        resourceUrl: `${CANONICAL_BASE_URL}/invoice-extract-fast`,
+        description: "Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents."
+      },
+      "invoice-extract-accurate": {
+        id: "invoice-extract-accurate",
+        path: "/invoice-extract-accurate",
+        resourceUrl: `${CANONICAL_BASE_URL}/invoice-extract-accurate`,
+        description: "Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices."
+      },
+      "seo-audit-fast": {
+        id: "seo-audit-fast",
+        path: "/seo-audit-fast",
+        resourceUrl: `${CANONICAL_BASE_URL}/seo-audit-fast`,
+        description: "Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability."
+      },
+      "seo-audit-accurate": {
+        id: "seo-audit-accurate",
+        path: "/seo-audit-accurate",
+        resourceUrl: `${CANONICAL_BASE_URL}/seo-audit-accurate`,
+        description: "Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure."
+      },
+      "execute-task": {
+        id: "execute-task",
+        path: "/execute-task",
+        resourceUrl: `${CANONICAL_BASE_URL}/execute-task`,
+        description: "Executes planned multi-file AI tasks with dynamic pricing and automated output verification."
+      },
+      "run-task": {
+        id: "run-task",
+        path: "/run-task",
+        resourceUrl: `${CANONICAL_BASE_URL}/run-task`,
+        description: "Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection."
+      }
+    };
+  }
+});
+
 // endpoints.config.ts
 function createDynamicPriceResolver(fallbackPrice) {
   return async (context) => {
@@ -81491,9 +81574,22 @@ function createPaymentConfig(avmAddress2) {
       }
     }
   });
+  const executeTaskPostDiscovery = declareDiscoveryExtension2({
+    bodyType: "json",
+    input: { planId: "66b4c1234567890123456789" },
+    output: {
+      example: {
+        planId: "66b4c1234567890123456789",
+        status: "completed",
+        result: { success: true },
+        executionTime: 1450
+      }
+    }
+  });
   return {
     // ── Individual AI Endpoints (dynamic pricing supported via planId) ──────
     "GET /resume-screen-fast": {
+      resource: CANONICAL_ENDPOINTS["resume-screen-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81501,11 +81597,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking.",
+      description: CANONICAL_ENDPOINTS["resume-screen-fast"].description,
       mimeType: "application/json",
       extensions: resumeScreenFastGetDiscovery
     },
     "POST /resume-screen-fast": {
+      resource: CANONICAL_ENDPOINTS["resume-screen-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81513,11 +81610,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Screens candidate resumes against job criteria using Llama 3 for fast initial candidate ranking.",
+      description: CANONICAL_ENDPOINTS["resume-screen-fast"].description,
       mimeType: "application/json",
       extensions: resumeScreenFastPostDiscovery
     },
     "GET /resume-screen-accurate": {
+      resource: CANONICAL_ENDPOINTS["resume-screen-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81525,11 +81623,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning.",
+      description: CANONICAL_ENDPOINTS["resume-screen-accurate"].description,
       mimeType: "application/json",
       extensions: resumeScreenAccurateGetDiscovery
     },
     "POST /resume-screen-accurate": {
+      resource: CANONICAL_ENDPOINTS["resume-screen-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81537,11 +81636,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Screens a batch of resumes against a target job description and returns ranked candidates with detailed match scores using high-precision LLM reasoning.",
+      description: CANONICAL_ENDPOINTS["resume-screen-accurate"].description,
       mimeType: "application/json",
       extensions: resumeScreenAccuratePostDiscovery
     },
     "GET /contract-analyze-fast": {
+      resource: CANONICAL_ENDPOINTS["contract-analyze-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.15"),
@@ -81549,11 +81649,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds.",
+      description: CANONICAL_ENDPOINTS["contract-analyze-fast"].description,
       mimeType: "application/json",
       extensions: contractAnalyzeFastGetDiscovery
     },
     "POST /contract-analyze-fast": {
+      resource: CANONICAL_ENDPOINTS["contract-analyze-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.15"),
@@ -81561,11 +81662,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Extracts core legal clauses, liabilities, and obligations from contract documents with fast turnarounds.",
+      description: CANONICAL_ENDPOINTS["contract-analyze-fast"].description,
       mimeType: "application/json",
       extensions: contractAnalyzeFastPostDiscovery
     },
     "GET /contract-analyze-accurate": {
+      resource: CANONICAL_ENDPOINTS["contract-analyze-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.35"),
@@ -81573,11 +81675,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning.",
+      description: CANONICAL_ENDPOINTS["contract-analyze-accurate"].description,
       mimeType: "application/json",
       extensions: contractAnalyzeAccurateGetDiscovery
     },
     "POST /contract-analyze-accurate": {
+      resource: CANONICAL_ENDPOINTS["contract-analyze-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.35"),
@@ -81585,11 +81688,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs comprehensive legal contract risk analysis, clause extraction, and anomaly flagging with deep reasoning.",
+      description: CANONICAL_ENDPOINTS["contract-analyze-accurate"].description,
       mimeType: "application/json",
       extensions: contractAnalyzeAccuratePostDiscovery
     },
     "GET /invoice-extract-fast": {
+      resource: CANONICAL_ENDPOINTS["invoice-extract-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.08"),
@@ -81597,11 +81701,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents.",
+      description: CANONICAL_ENDPOINTS["invoice-extract-fast"].description,
       mimeType: "application/json",
       extensions: invoiceExtractFastGetDiscovery
     },
     "POST /invoice-extract-fast": {
+      resource: CANONICAL_ENDPOINTS["invoice-extract-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.08"),
@@ -81609,11 +81714,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Extracts vendor details, invoice numbers, totals, and line items quickly from billing documents.",
+      description: CANONICAL_ENDPOINTS["invoice-extract-fast"].description,
       mimeType: "application/json",
       extensions: invoiceExtractFastPostDiscovery
     },
     "GET /invoice-extract-accurate": {
+      resource: CANONICAL_ENDPOINTS["invoice-extract-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.20"),
@@ -81621,11 +81727,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices.",
+      description: CANONICAL_ENDPOINTS["invoice-extract-accurate"].description,
       mimeType: "application/json",
       extensions: invoiceExtractAccurateGetDiscovery
     },
     "POST /invoice-extract-accurate": {
+      resource: CANONICAL_ENDPOINTS["invoice-extract-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.20"),
@@ -81633,11 +81740,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs high-precision structured data extraction of line items, taxes, vendor info, and totals from complex multi-page invoices.",
+      description: CANONICAL_ENDPOINTS["invoice-extract-accurate"].description,
       mimeType: "application/json",
       extensions: invoiceExtractAccuratePostDiscovery
     },
     "GET /code-review-fast": {
+      resource: CANONICAL_ENDPOINTS["code-review-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81645,11 +81753,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Reviews a single code file for bugs, security issues, syntax errors, and code quality problems with fast LLM turnarounds.",
+      description: CANONICAL_ENDPOINTS["code-review-fast"].description,
       mimeType: "application/json",
       extensions: codeReviewFastGetDiscovery
     },
     "POST /code-review-fast": {
+      resource: CANONICAL_ENDPOINTS["code-review-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81657,11 +81766,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Reviews a single code file for bugs, security issues, syntax errors, and code quality problems with fast LLM turnarounds.",
+      description: CANONICAL_ENDPOINTS["code-review-fast"].description,
       mimeType: "application/json",
       extensions: codeReviewFastPostDiscovery
     },
     "GET /code-review-accurate": {
+      resource: CANONICAL_ENDPOINTS["code-review-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.20"),
@@ -81669,11 +81779,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning.",
+      description: CANONICAL_ENDPOINTS["code-review-accurate"].description,
       mimeType: "application/json",
       extensions: codeReviewAccurateGetDiscovery
     },
     "POST /code-review-accurate": {
+      resource: CANONICAL_ENDPOINTS["code-review-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.20"),
@@ -81681,11 +81792,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs comprehensive senior-engineer code review and security auditing on a single code file using high-precision LLM reasoning.",
+      description: CANONICAL_ENDPOINTS["code-review-accurate"].description,
       mimeType: "application/json",
       extensions: codeReviewAccuratePostDiscovery
     },
     "GET /seo-audit-fast": {
+      resource: CANONICAL_ENDPOINTS["seo-audit-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81693,11 +81805,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.",
+      description: CANONICAL_ENDPOINTS["seo-audit-fast"].description,
       mimeType: "application/json",
       extensions: seoAuditFastGetDiscovery
     },
     "POST /seo-audit-fast": {
+      resource: CANONICAL_ENDPOINTS["seo-audit-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.10"),
@@ -81705,11 +81818,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs fast rule-based SEO audit checks on a webpage including metadata, headings, images, links, and readability.",
+      description: CANONICAL_ENDPOINTS["seo-audit-fast"].description,
       mimeType: "application/json",
       extensions: seoAuditFastPostDiscovery
     },
     "GET /seo-audit-accurate": {
+      resource: CANONICAL_ENDPOINTS["seo-audit-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81717,11 +81831,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.",
+      description: CANONICAL_ENDPOINTS["seo-audit-accurate"].description,
       mimeType: "application/json",
       extensions: seoAuditAccurateGetDiscovery
     },
     "POST /seo-audit-accurate": {
+      resource: CANONICAL_ENDPOINTS["seo-audit-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81729,11 +81844,12 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Performs deep LLM-assisted SEO auditing analyzing readability, content depth, keyword relevance, and technical SEO structure.",
+      description: CANONICAL_ENDPOINTS["seo-audit-accurate"].description,
       mimeType: "application/json",
       extensions: seoAuditAccuratePostDiscovery
     },
-    "GET /run-task": {
+    "POST /execute-task": {
+      resource: CANONICAL_ENDPOINTS["execute-task"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81741,11 +81857,25 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.",
+      description: CANONICAL_ENDPOINTS["execute-task"].description,
+      mimeType: "application/json",
+      extensions: executeTaskPostDiscovery
+    },
+    "GET /run-task": {
+      resource: CANONICAL_ENDPOINTS["run-task"].resourceUrl,
+      accepts: [{
+        scheme: "exact",
+        price: createDynamicPriceResolver("$0.25"),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress2,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
+      }],
+      description: CANONICAL_ENDPOINTS["run-task"].description,
       mimeType: "application/json",
       extensions: runTaskGetDiscovery
     },
     "POST /run-task": {
+      resource: CANONICAL_ENDPOINTS["run-task"].resourceUrl,
       accepts: [{
         scheme: "exact",
         price: createDynamicPriceResolver("$0.25"),
@@ -81753,7 +81883,7 @@ function createPaymentConfig(avmAddress2) {
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
       }],
-      description: "Orchestrates document classification, endpoint selection, execution, and output verification with automated refund protection.",
+      description: CANONICAL_ENDPOINTS["run-task"].description,
       mimeType: "application/json",
       extensions: runTaskPostDiscovery
     }
@@ -81767,6 +81897,7 @@ var init_endpoints_config = __esm({
     init_esm();
     import_mongoose2 = __toESM(require("mongoose"));
     init_Task();
+    init_endpoints_registry();
     NETWORK_CONFIG = {
       caip2: ALGORAND_MAINNET_CAIP2,
       usdcAssetId: Number(USDC_MAINNET_ASA_ID),
@@ -103481,6 +103612,45 @@ var x402Server = new x402ResourceServer(facilitatorClient);
 x402Server.registerExtension(bazaarResourceServerExtension2);
 var avmServerScheme = new ExactAvmScheme();
 x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
+x402Server.onBeforeVerify(async (context) => {
+  const canonicalResourceUrl = context.requirements.resource || "";
+  let endpointPath = "/";
+  try {
+    endpointPath = new URL(canonicalResourceUrl).pathname;
+  } catch {
+    endpointPath = canonicalResourceUrl;
+  }
+  const resourceId = endpointPath.replace(/^\//, "");
+  const rawAmount = context.requirements.amount;
+  const paymentAmount = parseFloat((Number(rawAmount) / 1e6).toFixed(4));
+  console.log("[x402 DIAGNOSTIC VERIFY]", {
+    endpointPath,
+    canonicalResourceUrl,
+    resourceId,
+    transactionId: "verifying",
+    paymentAmount
+  });
+});
+x402Server.onAfterSettle(async (context) => {
+  const canonicalResourceUrl = context.requirements.resource || "";
+  let endpointPath = "/";
+  try {
+    endpointPath = new URL(canonicalResourceUrl).pathname;
+  } catch {
+    endpointPath = canonicalResourceUrl;
+  }
+  const resourceId = endpointPath.replace(/^\//, "");
+  const transactionId = context.result.transaction || "unknown";
+  const rawAmount = context.result.amount || context.requirements.amount;
+  const paymentAmount = parseFloat((Number(rawAmount) / 1e6).toFixed(4));
+  console.log("[x402 DIAGNOSTIC SETTLED]", {
+    endpointPath,
+    canonicalResourceUrl,
+    resourceId,
+    transactionId,
+    paymentAmount
+  });
+});
 var app = new Hono2();
 app.use("*", async (c, next) => {
   const corsHeaders = {
