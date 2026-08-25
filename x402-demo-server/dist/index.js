@@ -88373,323 +88373,7 @@ var init_resolve_files = __esm({
   }
 });
 
-// handlers/resume-screen-fast.ts
-var resume_screen_fast_exports = {};
-__export(resume_screen_fast_exports, {
-  handleResumeScreenFastRequest: () => handleResumeScreenFastRequest
-});
-async function handleResumeScreenFastRequest(c) {
-  const startTime = Date.now();
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /resume-screen-fast handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one resume file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    const candidates = [];
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let extracted_text = file.text || file.extracted_text || "";
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("resume_screening", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let candidateInfo = {
-        name: semantic_map?.name || file.filename,
-        match_score: 0.5,
-        role: "Unknown",
-        key_skills: [],
-        primary_domain: "Unknown",
-        alternative_roles: [],
-        reason: ""
-      };
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content: 'Fast screen: Rate match score (0-1), extract name (use candidate name from semantic map), role, top key skills, primary_domain, alternative_roles, and reason (concise score rationale) based on structured resume semantic map. Return ONLY JSON: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }'
-                  },
-                  {
-                    role: "user",
-                    content: `Role: ${task_description}
-Semantic Map JSON: ${JSON.stringify(semantic_map)}`
-                  }
-                ],
-                temperature: 0.1
-              })
-            });
-            totalLlmLatency += Date.now() - llmStart;
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              try {
-                let cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) throw new Error("No JSON object found in response");
-                const parsed = JSON.parse(jsonMatch[0]);
-                candidateInfo = {
-                  name: parsed.name && parsed.name !== "Candidate" && parsed.name !== "Not Provided" ? parsed.name : semantic_map?.name || file.filename,
-                  match_score: typeof parsed.match_score === "number" ? parsed.match_score : 0.5,
-                  role: parsed.role || "Unknown",
-                  key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
-                  primary_domain: parsed.primary_domain || "Unknown",
-                  alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
-                  reason: parsed.reason || (parsed.match_score < 0.5 ? "Resume shows limited experience relative to the target role requirements." : "Candidate profile evaluated against target role.")
-                };
-                success = true;
-                break;
-              } catch (e) {
-                console.error("Failed to parse candidate JSON content:", content, e);
-              }
-            }
-          } catch (err2) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err2);
-          }
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for fast candidate processing of file: ${file.filename}`);
-        let fallbackSkills = Array.isArray(semantic_map?.skills) && semantic_map.skills.length > 0 ? semantic_map.skills : [];
-        if (fallbackSkills.length === 0 && extracted_text) {
-          const found = extracted_text.match(/\b(Python|Node|React|TypeScript|JavaScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|C\#|HTML|CSS|Kubernetes|Linux|Git|CI\/CD|DevOps|Microservices|REST|GraphQL|MongoDB|Redis|Agile|Scrum|SEO|Marketing|Management|Leadership|Sales|Analytics|Design|Security|Architecture)\b/gi) || [];
-          fallbackSkills = Array.from(new Set(found.map((s) => s.trim()))).slice(0, 6);
-        }
-        if (fallbackSkills.length === 0) {
-          fallbackSkills = ["Technical Background", "Core Competencies"];
-        }
-        const rawName = semantic_map?.name && semantic_map.name !== "Candidate" ? semantic_map.name : file.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-        const candidateName = rawName.replace(/\s+Profile$/i, "").trim();
-        candidateInfo = {
-          name: candidateName,
-          match_score: 0.88,
-          role: "Senior Software Engineer",
-          target_matched_role: "Senior Software Engineer",
-          key_skills: fallbackSkills,
-          primary_domain: "Software Engineering",
-          alternative_roles: ["Full Stack Developer", "Technical Lead"],
-          reason: `Evaluated ${candidateName} against position criteria based on verified technical profile and resume experience.`
-        };
-      }
-      candidates.push(candidateInfo);
-    }
-    return c.json({
-      candidates,
-      confidence: 0.75,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in resume-screen-fast handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_resume_screen_fast = __esm({
-  "handlers/resume-screen-fast.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
-  }
-});
-
-// handlers/resume-screen-accurate.ts
-var resume_screen_accurate_exports = {};
-__export(resume_screen_accurate_exports, {
-  handleResumeScreenAccurateRequest: () => handleResumeScreenAccurateRequest
-});
-async function handleResumeScreenAccurateRequest(c) {
-  const startTime = Date.now();
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /resume-screen-accurate handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one resume file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    const candidates = [];
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let extracted_text = file.text || file.extracted_text || "";
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("resume_screening", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let candidateInfo = {
-        name: semantic_map?.name || file.filename,
-        match_score: 0.5,
-        role: "Unknown",
-        key_skills: [],
-        primary_domain: "Unknown",
-        alternative_roles: [],
-        reason: ""
-      };
-      let success = false;
-      const modelsToTry = ["llama-3.3-70b-versatile", "gemma2-9b-it", "qwen-2.5-coder-32b", "deepseek-r1-distill-llama-70b"];
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          for (const model16 of modelsToTry) {
-            try {
-              const llmStart = Date.now();
-              const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                  model: model16,
-                  messages: [
-                    {
-                      role: "system",
-                      content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score, especially when match_score is low or skills detail is missing. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.'
-                    },
-                    {
-                      role: "user",
-                      content: `Target role: ${task_description}
-
-Candidate Semantic Map JSON:
-${JSON.stringify(semantic_map, null, 2)}`
-                    }
-                  ],
-                  temperature: 0.1
-                })
-              });
-              totalLlmLatency += Date.now() - llmStart;
-              if (response.ok) {
-                const data = await response.json();
-                const content = data.choices?.[0]?.message?.content?.trim() || "";
-                try {
-                  let cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-                  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-                  if (!jsonMatch) throw new Error("No JSON object found in response");
-                  const parsed = JSON.parse(jsonMatch[0]);
-                  candidateInfo = {
-                    name: parsed.name && parsed.name !== "Candidate" && parsed.name !== "Not Provided" ? parsed.name : semantic_map?.name || file.filename,
-                    match_score: typeof parsed.match_score === "number" ? parsed.match_score : 0.5,
-                    role: parsed.role || "Unknown",
-                    key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
-                    primary_domain: parsed.primary_domain || "Unknown",
-                    alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
-                    reason: parsed.reason || (parsed.match_score < 0.5 ? "Resume shows limited experience relative to the target role requirements." : "Candidate profile evaluated against target role.")
-                  };
-                  success = true;
-                  break;
-                } catch (e) {
-                  console.error("Failed to parse candidate JSON content:", content, e);
-                }
-              } else {
-                console.warn(`Groq API key ${i + 1} model ${model16} failed with status: ${response.status}`);
-              }
-            } catch (err2) {
-              console.error(`Error with Groq API key index ${i + 1}:`, err2);
-            }
-          }
-          if (success) break;
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for candidate processing of file: ${file.filename}`);
-        let fallbackSkills = Array.isArray(semantic_map?.skills) && semantic_map.skills.length > 0 ? semantic_map.skills : [];
-        if (fallbackSkills.length === 0 && extracted_text) {
-          const found = extracted_text.match(/\b(Python|Node|React|TypeScript|JavaScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|C\#|HTML|CSS|Kubernetes|Linux|Git|CI\/CD|DevOps|Microservices|REST|GraphQL|MongoDB|Redis|Agile|Scrum|SEO|Marketing|Management|Leadership|Sales|Analytics|Design|Security|Architecture)\b/gi) || [];
-          fallbackSkills = Array.from(new Set(found.map((s) => s.trim()))).slice(0, 6);
-        }
-        if (fallbackSkills.length === 0) {
-          fallbackSkills = ["Technical Background", "Core Competencies"];
-        }
-        const rawName = semantic_map?.name && semantic_map.name !== "Candidate" ? semantic_map.name : file.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-        const candidateName = rawName.replace(/\s+Profile$/i, "").trim();
-        candidateInfo = {
-          name: candidateName,
-          match_score: 0.88,
-          role: "Senior Software Engineer",
-          target_matched_role: "Senior Software Engineer",
-          key_skills: fallbackSkills,
-          primary_domain: "Software Engineering",
-          alternative_roles: ["Full Stack Developer", "Technical Lead"],
-          reason: `Evaluated ${candidateName} against position criteria based on verified technical profile and resume experience.`
-        };
-      }
-      candidates.push(candidateInfo);
-    }
-    return c.json({
-      candidates,
-      confidence: 0.93,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in resume-screen-accurate handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_resume_screen_accurate = __esm({
-  "handlers/resume-screen-accurate.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
-  }
-});
-
 // handlers/lib/parse-json-robust.ts
-var parse_json_robust_exports = {};
-__export(parse_json_robust_exports, {
-  parseRobustJson: () => parseRobustJson
-});
 function parseRobustJson(content) {
   if (!content || typeof content !== "string") {
     throw new Error("Empty or invalid content provided for JSON parsing");
@@ -88728,624 +88412,6 @@ function parseRobustJson(content) {
 var init_parse_json_robust = __esm({
   "handlers/lib/parse-json-robust.ts"() {
     "use strict";
-  }
-});
-
-// handlers/contract-analyze-fast.ts
-var contract_analyze_fast_exports = {};
-__export(contract_analyze_fast_exports, {
-  handleContractAnalyzeFastRequest: () => handleContractAnalyzeFastRequest
-});
-async function handleContractAnalyzeFastRequest(c) {
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /contract-analyze-fast handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one contract file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    let clauses_flagged = [];
-    let totalRiskScore = 0;
-    let filesWithRisk = 0;
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        let extracted_text = file.text || "";
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("contract_analysis", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let fileClauses = [];
-      let fileRiskScore = 0.5;
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content: 'Fast contract analysis: Identify risk clauses, non-standard terms, or missing standard protections based on structured contract semantic map. Return ONLY JSON: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.'
-                  },
-                  {
-                    role: "user",
-                    content: `Instructions: ${task_description}
-
-Contract Semantic Map JSON:
-${JSON.stringify(semantic_map)}`
-                  }
-                ],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-              })
-            });
-            totalLlmLatency += Date.now() - llmStart;
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              try {
-                const { parseRobustJson: parseRobustJson2 } = await Promise.resolve().then(() => (init_parse_json_robust(), parse_json_robust_exports));
-                const parsed = parseRobustJson2(content);
-                const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
-                fileClauses = rawClauses.map((clause) => {
-                  const summary = clause.clause_summary || "Risky clause identified";
-                  const riskLevel = clause.risk_level || "medium";
-                  const suggestion = clause.suggestion || "No recommendation provided.";
-                  return {
-                    clause_summary: summary,
-                    risk_level: riskLevel,
-                    suggestion,
-                    risk: riskLevel,
-                    type: "Risk Clause",
-                    clause_text: summary,
-                    description: summary,
-                    mitigation: suggestion
-                  };
-                });
-                fileRiskScore = typeof parsed.overall_risk_score === "number" ? parsed.overall_risk_score : 0.5;
-                success = true;
-                break;
-              } catch (e) {
-                console.error("Failed to parse contract JSON content:", content, e);
-              }
-            }
-          } catch (err2) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err2);
-          }
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for fast contract analysis of file: ${file.filename}`);
-        fileClauses = [
-          {
-            clause_summary: "Could not perform real LLM analysis on this document.",
-            risk_level: "medium",
-            suggestion: "Please verify the API connection or check input document format.",
-            risk: "medium",
-            type: "Error",
-            clause_text: "Could not perform real LLM analysis on this document.",
-            description: "Could not perform real LLM analysis on this document.",
-            mitigation: "Please verify the API connection or check input document format."
-          }
-        ];
-        fileRiskScore = 0.5;
-      }
-      clauses_flagged = clauses_flagged.concat(fileClauses);
-      totalRiskScore += fileRiskScore;
-      filesWithRisk++;
-    }
-    const overall_risk_score = filesWithRisk > 0 ? parseFloat((totalRiskScore / filesWithRisk).toFixed(2)) : 0.5;
-    return c.json({
-      clauses_flagged,
-      clauses: clauses_flagged,
-      // alias to pass verifyOutput validation
-      overall_risk_score,
-      confidence: 0.75,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in contract-analyze-fast handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_contract_analyze_fast = __esm({
-  "handlers/contract-analyze-fast.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
-  }
-});
-
-// handlers/contract-analyze-accurate.ts
-var contract_analyze_accurate_exports = {};
-__export(contract_analyze_accurate_exports, {
-  handleContractAnalyzeAccurateRequest: () => handleContractAnalyzeAccurateRequest
-});
-async function handleContractAnalyzeAccurateRequest(c) {
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /contract-analyze-accurate handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one contract file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    let clauses_flagged = [];
-    let totalRiskScore = 0;
-    let filesWithRisk = 0;
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        let extracted_text = file.text || "";
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("contract_analysis", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let fileClauses = [];
-      let fileRiskScore = 0.5;
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content: 'Analyze the contract structured semantic map. Identify risk clauses, non-standard terms, or missing standard protections. Return ONLY a valid JSON object matching this schema: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.'
-                  },
-                  {
-                    role: "user",
-                    content: `Instructions: ${task_description}
-
-Contract Semantic Map JSON:
-${JSON.stringify(semantic_map, null, 2)}`
-                  }
-                ],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-              })
-            });
-            totalLlmLatency += Date.now() - llmStart;
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              try {
-                const { parseRobustJson: parseRobustJson2 } = await Promise.resolve().then(() => (init_parse_json_robust(), parse_json_robust_exports));
-                const parsed = parseRobustJson2(content);
-                const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
-                fileClauses = rawClauses.map((clause) => {
-                  const summary = clause.clause_summary || "Risky clause identified";
-                  const riskLevel = clause.risk_level || "medium";
-                  const suggestion = clause.suggestion || "No recommendation provided.";
-                  return {
-                    clause_summary: summary,
-                    risk_level: riskLevel,
-                    suggestion,
-                    risk: riskLevel,
-                    type: "Risk Clause",
-                    clause_text: summary,
-                    description: summary,
-                    mitigation: suggestion
-                  };
-                });
-                fileRiskScore = typeof parsed.overall_risk_score === "number" ? parsed.overall_risk_score : 0.5;
-                success = true;
-                break;
-              } catch (e) {
-                console.error("Failed to parse contract JSON content:", content, e);
-              }
-            }
-          } catch (err2) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err2);
-          }
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for contract analysis of file: ${file.filename}`);
-        fileClauses = [
-          {
-            clause_summary: "Could not perform real LLM analysis on this document.",
-            risk_level: "medium",
-            suggestion: "Please verify the API connection or check input document format.",
-            risk: "medium",
-            type: "Error",
-            clause_text: "Could not perform real LLM analysis on this document.",
-            description: "Could not perform real LLM analysis on this document.",
-            mitigation: "Please verify the API connection or check input document format."
-          }
-        ];
-        fileRiskScore = 0.5;
-      }
-      clauses_flagged = clauses_flagged.concat(fileClauses);
-      totalRiskScore += fileRiskScore;
-      filesWithRisk++;
-    }
-    const overall_risk_score = filesWithRisk > 0 ? parseFloat((totalRiskScore / filesWithRisk).toFixed(2)) : 0.5;
-    return c.json({
-      clauses_flagged,
-      clauses: clauses_flagged,
-      // alias to pass verifyOutput validation
-      overall_risk_score,
-      confidence: 0.93,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in contract-analyze-accurate handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_contract_analyze_accurate = __esm({
-  "handlers/contract-analyze-accurate.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
-  }
-});
-
-// handlers/invoice-extract-fast.ts
-var invoice_extract_fast_exports = {};
-__export(invoice_extract_fast_exports, {
-  handleInvoiceExtractFastRequest: () => handleInvoiceExtractFastRequest
-});
-async function handleInvoiceExtractFastRequest(c) {
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /invoice-extract-fast handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one invoice file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    let line_items = [];
-    let vendor_name = "Unknown";
-    let invoice_number = "Unknown";
-    let date = "Unknown";
-    let total_amount = 0;
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        let extracted_text = file.text || "";
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("invoice_extraction", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let fileItems = [];
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content: 'Fast invoice extraction: Extract structured data based on invoice semantic map. Return ONLY JSON: { "vendor_name": string, "invoice_number": string, "date": string, "line_items": [ { "description": string, "quantity": number, "unit_price": number, "total": number } ], "total_amount": number }'
-                  },
-                  {
-                    role: "user",
-                    content: `Instructions: ${task_description}
-
-Invoice Semantic Map JSON:
-${JSON.stringify(semantic_map)}`
-                  }
-                ],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-              })
-            });
-            totalLlmLatency += Date.now() - llmStart;
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              try {
-                const { parseRobustJson: parseRobustJson2 } = await Promise.resolve().then(() => (init_parse_json_robust(), parse_json_robust_exports));
-                const parsed = parseRobustJson2(content);
-                const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
-                fileItems = rawItems.map((item) => {
-                  const unit_price = typeof item.unit_price === "number" ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, "")) || 0;
-                  const quantity = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || 1).replace(/[^0-9.]/g, "")) || 1;
-                  const rawTotal = item.total !== void 0 ? item.total : item.amount;
-                  const total = typeof rawTotal === "number" ? rawTotal : parseFloat(String(rawTotal || unit_price * quantity).replace(/[^0-9.]/g, "")) || unit_price * quantity;
-                  return {
-                    description: item.description || "Unknown Item",
-                    quantity,
-                    unit_price,
-                    total,
-                    amount: total
-                  };
-                });
-                if (parsed.vendor_name && vendor_name === "Unknown") vendor_name = parsed.vendor_name;
-                if (parsed.invoice_number && invoice_number === "Unknown") invoice_number = parsed.invoice_number;
-                if (parsed.date && date === "Unknown") date = parsed.date;
-                if (typeof parsed.total_amount === "number") {
-                  total_amount += parsed.total_amount;
-                } else if (typeof parsed.total_amount === "string") {
-                  const parsedAmt = parseFloat(parsed.total_amount.replace(/[^0-9.]/g, ""));
-                  if (!isNaN(parsedAmt)) total_amount += parsedAmt;
-                }
-                success = true;
-                break;
-              } catch (e) {
-                console.error("Failed to parse invoice JSON content:", content, e);
-              }
-            }
-          } catch (err2) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err2);
-          }
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for fast invoice extraction of file: ${file.filename}`);
-        fileItems = [
-          {
-            description: "Could not perform real LLM extraction on this document.",
-            quantity: 1,
-            unit_price: 0,
-            total: 0,
-            amount: 0
-          }
-        ];
-      }
-      line_items = line_items.concat(fileItems);
-    }
-    return c.json({
-      vendor_name,
-      invoice_number,
-      date,
-      line_items,
-      total_amount,
-      confidence: 0.75,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in invoice-extract-fast handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_invoice_extract_fast = __esm({
-  "handlers/invoice-extract-fast.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
-  }
-});
-
-// handlers/invoice-extract-accurate.ts
-var invoice_extract_accurate_exports = {};
-__export(invoice_extract_accurate_exports, {
-  handleInvoiceExtractAccurateRequest: () => handleInvoiceExtractAccurateRequest
-});
-async function handleInvoiceExtractAccurateRequest(c) {
-  try {
-    console.log("\u2713 PAYMENT VERIFIED - POST /invoice-extract-accurate handler executing");
-    const body = await c.req.json().catch(() => ({}));
-    const { files, taskDescription: task_description } = await resolveFiles(body);
-    if (!files || files.length === 0) {
-      return c.json({ error: "No files provided. At least one invoice file must be uploaded." }, 400);
-    }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    let line_items = [];
-    let vendor_name = "Unknown";
-    let invoice_number = "Unknown";
-    let date = "Unknown";
-    let total_amount = 0;
-    let totalLlmLatency = 0;
-    for (const file of files) {
-      let semantic_map = file.semantic_map;
-      if (!semantic_map) {
-        let extracted_text = file.text || "";
-        if (!extracted_text && file.content_base64) {
-          try {
-            const extResult = await extractText(file.filename, file.content_base64);
-            extracted_text = extResult.text;
-          } catch (err2) {
-            console.error(`Failed to extract text for ${file.filename}:`, err2);
-          }
-        }
-        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
-        const mapRes = await buildSemanticMap2("invoice_extraction", extracted_text, file.filename);
-        semantic_map = mapRes.map;
-      }
-      let fileItems = [];
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content: 'Extract structured line items and total amounts from the invoice semantic map. Return ONLY a valid JSON object matching this schema: { "vendor_name": string, "invoice_number": string, "date": string, "line_items": [ { "description": string, "quantity": number, "unit_price": number, "total": number } ], "total_amount": number }.'
-                  },
-                  {
-                    role: "user",
-                    content: `Instructions: ${task_description}
-
-Invoice Semantic Map JSON:
-${JSON.stringify(semantic_map, null, 2)}`
-                  }
-                ],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-              })
-            });
-            totalLlmLatency += Date.now() - llmStart;
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              try {
-                const { parseRobustJson: parseRobustJson2 } = await Promise.resolve().then(() => (init_parse_json_robust(), parse_json_robust_exports));
-                const parsed = parseRobustJson2(content);
-                const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
-                fileItems = rawItems.map((item) => {
-                  const unit_price = typeof item.unit_price === "number" ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, "")) || 0;
-                  const quantity = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || 1).replace(/[^0-9.]/g, "")) || 1;
-                  const rawTotal = item.total !== void 0 ? item.total : item.amount;
-                  const total = typeof rawTotal === "number" ? rawTotal : parseFloat(String(rawTotal || unit_price * quantity).replace(/[^0-9.]/g, "")) || unit_price * quantity;
-                  return {
-                    description: item.description || "Unknown Item",
-                    quantity,
-                    unit_price,
-                    total,
-                    amount: total
-                  };
-                });
-                if (parsed.vendor_name && vendor_name === "Unknown") vendor_name = parsed.vendor_name;
-                if (parsed.invoice_number && invoice_number === "Unknown") invoice_number = parsed.invoice_number;
-                if (parsed.date && date === "Unknown") date = parsed.date;
-                if (typeof parsed.total_amount === "number") {
-                  total_amount += parsed.total_amount;
-                } else if (typeof parsed.total_amount === "string") {
-                  const parsedAmt = parseFloat(parsed.total_amount.replace(/[^0-9.]/g, ""));
-                  if (!isNaN(parsedAmt)) total_amount += parsedAmt;
-                }
-                success = true;
-                break;
-              } catch (e) {
-                console.error("Failed to parse invoice JSON content:", content, e);
-              }
-            }
-          } catch (err2) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err2);
-          }
-        }
-      }
-      if (!success) {
-        console.warn(`Fallback active for invoice extraction of file: ${file.filename}`);
-        fileItems = [
-          {
-            description: "Could not perform real LLM extraction on this document.",
-            quantity: 1,
-            unit_price: 0,
-            total: 0,
-            amount: 0
-          }
-        ];
-      }
-      line_items = line_items.concat(fileItems);
-    }
-    return c.json({
-      vendor_name,
-      invoice_number,
-      date,
-      line_items,
-      total_amount,
-      confidence: 0.93,
-      latency_ms: totalLlmLatency,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (error) {
-    console.error("Error in invoice-extract-accurate handler:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-var init_invoice_extract_accurate = __esm({
-  "handlers/invoice-extract-accurate.ts"() {
-    "use strict";
-    init_extract_document();
-    init_resolve_files();
   }
 });
 
@@ -89625,6 +88691,630 @@ var init_groq_manager = __esm({
       }
     };
     groqManager = new GroqManagerService();
+  }
+});
+
+// handlers/resume-screen-fast.ts
+var resume_screen_fast_exports = {};
+__export(resume_screen_fast_exports, {
+  handleResumeScreenFastRequest: () => handleResumeScreenFastRequest
+});
+async function handleResumeScreenFastRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /resume-screen-fast handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one resume file must be uploaded." }, 400);
+    }
+    const candidates = [];
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let extracted_text = file.text || file.extracted_text || "";
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("resume_screening", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Fast screen: Rate match score (0-1), extract name (use candidate name from semantic map), role, top key skills, primary_domain, alternative_roles, and reason (concise score rationale) based on structured resume semantic map. Return ONLY JSON: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }'
+          },
+          {
+            role: "user",
+            content: `Role: ${task_description}
+Semantic Map JSON: ${JSON.stringify(semantic_map)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const candidateName = parsed.name && parsed.name !== "Candidate" && parsed.name !== "Not Provided" ? parsed.name : semantic_map?.name || file.filename.replace(/\.[^/.]+$/, "");
+      candidates.push({
+        name: candidateName,
+        match_score: typeof parsed.match_score === "number" ? Math.max(0, Math.min(1, parsed.match_score)) : 0.5,
+        role: parsed.role || "Unknown",
+        key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
+        primary_domain: parsed.primary_domain || "Software Development",
+        alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
+        reason: parsed.reason || "Candidate evaluated against job criteria."
+      });
+    }
+    return c.json({
+      success: true,
+      candidates,
+      confidence: 0.78,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in resume-screen-fast handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Fast resume screening AI analysis failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_resume_screen_fast = __esm({
+  "handlers/resume-screen-fast.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
+  }
+});
+
+// handlers/resume-screen-accurate.ts
+var resume_screen_accurate_exports = {};
+__export(resume_screen_accurate_exports, {
+  handleResumeScreenAccurateRequest: () => handleResumeScreenAccurateRequest
+});
+async function handleResumeScreenAccurateRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /resume-screen-accurate handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one resume file must be uploaded." }, 400);
+    }
+    const candidates = [];
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let extracted_text = file.text || file.extracted_text || "";
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("resume_screening", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Evaluate candidate resume semantic map against target position requirements. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string } where match_score is a float between 0.0 and 1.0.'
+          },
+          {
+            role: "user",
+            content: `Target role: ${task_description}
+
+Candidate Semantic Map:
+${JSON.stringify(semantic_map, null, 2)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const candidateName = parsed.name && parsed.name !== "Candidate" && parsed.name !== "Not Provided" ? parsed.name : semantic_map?.name || file.filename.replace(/\.[^/.]+$/, "");
+      candidates.push({
+        name: candidateName,
+        match_score: typeof parsed.match_score === "number" ? Math.max(0, Math.min(1, parsed.match_score)) : 0.5,
+        role: parsed.role || "Unknown",
+        key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
+        primary_domain: parsed.primary_domain || "Software Development",
+        alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
+        reason: parsed.reason || "Candidate evaluated against job criteria."
+      });
+    }
+    return c.json({
+      success: true,
+      candidates,
+      confidence: 0.93,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in resume-screen-accurate handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Resume screening AI analysis failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_resume_screen_accurate = __esm({
+  "handlers/resume-screen-accurate.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
+  }
+});
+
+// handlers/contract-analyze-fast.ts
+var contract_analyze_fast_exports = {};
+__export(contract_analyze_fast_exports, {
+  handleContractAnalyzeFastRequest: () => handleContractAnalyzeFastRequest
+});
+async function handleContractAnalyzeFastRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /contract-analyze-fast handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one contract file must be uploaded." }, 400);
+    }
+    let clauses_flagged = [];
+    let totalRiskScore = 0;
+    let filesWithRisk = 0;
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || "";
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("contract_analysis", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Fast contract analysis: Identify risk clauses or missing protections based on contract semantic map. Return ONLY JSON: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.'
+          },
+          {
+            role: "user",
+            content: `Instructions: ${task_description}
+
+Contract Semantic Map:
+${JSON.stringify(semantic_map)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
+      const fileClauses = rawClauses.map((clause) => {
+        const summary = clause.clause_summary || "Risk clause identified";
+        const riskLevel = clause.risk_level || "medium";
+        const suggestion = clause.suggestion || "Review term with legal counsel.";
+        return {
+          clause_summary: summary,
+          risk_level: riskLevel,
+          suggestion,
+          risk: riskLevel,
+          type: "Risk Clause",
+          clause_text: summary,
+          description: summary,
+          mitigation: suggestion
+        };
+      });
+      const fileRiskScore = typeof parsed.overall_risk_score === "number" ? Math.max(0, Math.min(1, parsed.overall_risk_score)) : 0.5;
+      clauses_flagged = clauses_flagged.concat(fileClauses);
+      totalRiskScore += fileRiskScore;
+      filesWithRisk++;
+    }
+    const overall_risk_score = filesWithRisk > 0 ? parseFloat((totalRiskScore / filesWithRisk).toFixed(2)) : 0.5;
+    return c.json({
+      success: true,
+      clauses_flagged,
+      clauses: clauses_flagged,
+      overall_risk_score,
+      confidence: 0.78,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in contract-analyze-fast handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Fast contract analysis AI failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_contract_analyze_fast = __esm({
+  "handlers/contract-analyze-fast.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
+  }
+});
+
+// handlers/contract-analyze-accurate.ts
+var contract_analyze_accurate_exports = {};
+__export(contract_analyze_accurate_exports, {
+  handleContractAnalyzeAccurateRequest: () => handleContractAnalyzeAccurateRequest
+});
+async function handleContractAnalyzeAccurateRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /contract-analyze-accurate handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one contract file must be uploaded." }, 400);
+    }
+    let clauses_flagged = [];
+    let totalRiskScore = 0;
+    let filesWithRisk = 0;
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || "";
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("contract_analysis", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Analyze contract semantic map. Identify risk clauses, non-standard terms, or missing protections. Return ONLY JSON: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.'
+          },
+          {
+            role: "user",
+            content: `Instructions: ${task_description}
+
+Contract Semantic Map:
+${JSON.stringify(semantic_map, null, 2)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
+      const fileClauses = rawClauses.map((clause) => {
+        const summary = clause.clause_summary || "Risk clause identified";
+        const riskLevel = clause.risk_level || "medium";
+        const suggestion = clause.suggestion || "Review term with legal counsel.";
+        return {
+          clause_summary: summary,
+          risk_level: riskLevel,
+          suggestion,
+          risk: riskLevel,
+          type: "Risk Clause",
+          clause_text: summary,
+          description: summary,
+          mitigation: suggestion
+        };
+      });
+      const fileRiskScore = typeof parsed.overall_risk_score === "number" ? Math.max(0, Math.min(1, parsed.overall_risk_score)) : 0.5;
+      clauses_flagged = clauses_flagged.concat(fileClauses);
+      totalRiskScore += fileRiskScore;
+      filesWithRisk++;
+    }
+    const overall_risk_score = filesWithRisk > 0 ? parseFloat((totalRiskScore / filesWithRisk).toFixed(2)) : 0.5;
+    return c.json({
+      success: true,
+      clauses_flagged,
+      clauses: clauses_flagged,
+      overall_risk_score,
+      confidence: 0.93,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in contract-analyze-accurate handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Contract analysis AI failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_contract_analyze_accurate = __esm({
+  "handlers/contract-analyze-accurate.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
+  }
+});
+
+// handlers/invoice-extract-fast.ts
+var invoice_extract_fast_exports = {};
+__export(invoice_extract_fast_exports, {
+  handleInvoiceExtractFastRequest: () => handleInvoiceExtractFastRequest
+});
+async function handleInvoiceExtractFastRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /invoice-extract-fast handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one invoice file must be uploaded." }, 400);
+    }
+    let line_items = [];
+    let vendor_name = "Unknown";
+    let invoice_number = "Unknown";
+    let date = "Unknown";
+    let total_amount = 0;
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || "";
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("invoice_extraction", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Fast invoice extraction: Extract structured vendor details, dates, line items, and totals from invoice semantic map. Return ONLY JSON: { "vendor_name": string, "invoice_number": string, "date": string, "line_items": [ { "description": string, "quantity": number, "unit_price": number, "total": number } ], "total_amount": number }.'
+          },
+          {
+            role: "user",
+            content: `Instructions: ${task_description}
+
+Invoice Semantic Map:
+${JSON.stringify(semantic_map)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+      const fileItems = rawItems.map((item) => {
+        const unit_price = typeof item.unit_price === "number" ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, "")) || 0;
+        const quantity = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || 1).replace(/[^0-9.]/g, "")) || 1;
+        const rawTotal = item.total !== void 0 ? item.total : item.amount;
+        const total = typeof rawTotal === "number" ? rawTotal : parseFloat(String(rawTotal || unit_price * quantity).replace(/[^0-9.]/g, "")) || unit_price * quantity;
+        return {
+          description: item.description || "Extracted Item",
+          quantity,
+          unit_price,
+          total,
+          amount: total
+        };
+      });
+      if (parsed.vendor_name && vendor_name === "Unknown") vendor_name = parsed.vendor_name;
+      if (parsed.invoice_number && invoice_number === "Unknown") invoice_number = parsed.invoice_number;
+      if (parsed.date && date === "Unknown") date = parsed.date;
+      if (typeof parsed.total_amount === "number") {
+        total_amount += parsed.total_amount;
+      } else if (typeof parsed.total_amount === "string") {
+        const parsedAmt = parseFloat(parsed.total_amount.replace(/[^0-9.]/g, ""));
+        if (!isNaN(parsedAmt)) total_amount += parsedAmt;
+      }
+      line_items = line_items.concat(fileItems);
+    }
+    return c.json({
+      success: true,
+      vendor_name,
+      invoice_number,
+      date,
+      line_items,
+      total_amount,
+      confidence: 0.78,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in invoice-extract-fast handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Fast invoice extraction AI failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_invoice_extract_fast = __esm({
+  "handlers/invoice-extract-fast.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
+  }
+});
+
+// handlers/invoice-extract-accurate.ts
+var invoice_extract_accurate_exports = {};
+__export(invoice_extract_accurate_exports, {
+  handleInvoiceExtractAccurateRequest: () => handleInvoiceExtractAccurateRequest
+});
+async function handleInvoiceExtractAccurateRequest(c) {
+  const startTime = Date.now();
+  try {
+    console.log("\u2713 PAYMENT VERIFIED - POST /invoice-extract-accurate handler executing");
+    const body = await c.req.json().catch(() => ({}));
+    const { files, taskDescription: task_description } = await resolveFiles(body);
+    if (!files || files.length === 0) {
+      return c.json({ error: "No files provided. At least one invoice file must be uploaded." }, 400);
+    }
+    let line_items = [];
+    let vendor_name = "Unknown";
+    let invoice_number = "Unknown";
+    let date = "Unknown";
+    let total_amount = 0;
+    let totalLlmLatency = 0;
+    for (const file of files) {
+      let semantic_map = file.semantic_map;
+      if (!semantic_map) {
+        let extracted_text = file.text || "";
+        if (!extracted_text && file.content_base64) {
+          try {
+            const extResult = await extractText(file.filename, file.content_base64);
+            extracted_text = extResult.text;
+          } catch (err2) {
+            console.error(`Failed to extract text for ${file.filename}:`, err2);
+          }
+        }
+        const { buildSemanticMap: buildSemanticMap2 } = await Promise.resolve().then(() => (init_semantic_map(), semantic_map_exports));
+        const mapRes = await buildSemanticMap2("invoice_extraction", extracted_text, file.filename);
+        semantic_map = mapRes.map;
+      }
+      const aiResult = await groqManager.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          {
+            role: "system",
+            content: 'Extract structured line items, vendor details, and totals from invoice semantic map. Return ONLY JSON: { "vendor_name": string, "invoice_number": string, "date": string, "line_items": [ { "description": string, "quantity": number, "unit_price": number, "total": number } ], "total_amount": number }.'
+          },
+          {
+            role: "user",
+            content: `Instructions: ${task_description}
+
+Invoice Semantic Map:
+${JSON.stringify(semantic_map, null, 2)}`
+          }
+        ],
+        temperature: 0.1
+      });
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const rawItems = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+      const fileItems = rawItems.map((item) => {
+        const unit_price = typeof item.unit_price === "number" ? item.unit_price : parseFloat(String(item.unit_price || 0).replace(/[^0-9.]/g, "")) || 0;
+        const quantity = typeof item.quantity === "number" ? item.quantity : parseFloat(String(item.quantity || 1).replace(/[^0-9.]/g, "")) || 1;
+        const rawTotal = item.total !== void 0 ? item.total : item.amount;
+        const total = typeof rawTotal === "number" ? rawTotal : parseFloat(String(rawTotal || unit_price * quantity).replace(/[^0-9.]/g, "")) || unit_price * quantity;
+        return {
+          description: item.description || "Extracted Item",
+          quantity,
+          unit_price,
+          total,
+          amount: total
+        };
+      });
+      if (parsed.vendor_name && vendor_name === "Unknown") vendor_name = parsed.vendor_name;
+      if (parsed.invoice_number && invoice_number === "Unknown") invoice_number = parsed.invoice_number;
+      if (parsed.date && date === "Unknown") date = parsed.date;
+      if (typeof parsed.total_amount === "number") {
+        total_amount += parsed.total_amount;
+      } else if (typeof parsed.total_amount === "string") {
+        const parsedAmt = parseFloat(parsed.total_amount.replace(/[^0-9.]/g, ""));
+        if (!isNaN(parsedAmt)) total_amount += parsedAmt;
+      }
+      line_items = line_items.concat(fileItems);
+    }
+    return c.json({
+      success: true,
+      vendor_name,
+      invoice_number,
+      date,
+      line_items,
+      total_amount,
+      confidence: 0.93,
+      latency_ms: totalLlmLatency,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error("Error in invoice-extract-accurate handler:", error);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "Invoice extraction AI failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
+  }
+}
+var init_invoice_extract_accurate = __esm({
+  "handlers/invoice-extract-accurate.ts"() {
+    "use strict";
+    init_extract_document();
+    init_resolve_files();
+    init_groq_manager();
   }
 });
 
@@ -90026,82 +89716,31 @@ async function handleSeoAuditAccurateRequest(c) {
     const html = await pageRes.text();
     const { issues: ruleIssues, seo_score: ruleScore } = await analyzeHtmlSeoRules(html, targetUrl);
     const cleanText = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 3e3).trim();
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      return keys2;
-    };
-    const keys = getGroqKeys4();
-    let llmIssues = [];
-    let llmScore = ruleScore;
-    let llmLatency = 0;
-    let success = false;
-    if (keys.length > 0) {
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        try {
-          const llmStart = Date.now();
-          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${key}`
-            },
-            body: JSON.stringify({
-              model: "groq/compound",
-              messages: [
-                {
-                  role: "system",
-                  content: 'You are an expert SEO specialist and technical auditor. Analyze the provided webpage text content for readability grade level, content engagement, keyword relevance, search intent match, and content depth. Return ONLY valid JSON matching this schema: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number }. seo_score must be a float between 0.0 and 1.0. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.'
-                },
-                {
-                  role: "user",
-                  content: `Page URL: ${targetUrl}
+    const aiResult = await groqManager.chatCompletion({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        {
+          role: "system",
+          content: 'You are an expert SEO specialist and technical auditor. Analyze webpage text content for readability, engagement, keyword relevance, search intent match, and content depth. Return ONLY valid JSON: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number } where seo_score is a float between 0.0 and 1.0.'
+        },
+        {
+          role: "user",
+          content: `Page URL: ${targetUrl}
 
 Webpage Extract:
 ${cleanText}`
-                }
-              ],
-              temperature: 0.1
-            })
-          });
-          llmLatency = Date.now() - llmStart;
-          if (response.ok) {
-            const data = await response.json();
-            const content = data.choices?.[0]?.message?.content?.trim() || "";
-            try {
-              let cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-              const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-              if (!jsonMatch) throw new Error("No JSON object found in LLM response");
-              const parsed = JSON.parse(jsonMatch[0]);
-              if (Array.isArray(parsed.llm_issues)) {
-                llmIssues = parsed.llm_issues;
-              }
-              if (typeof parsed.seo_score === "number") {
-                llmScore = Math.max(0, Math.min(1, parsed.seo_score));
-              }
-              success = true;
-              break;
-            } catch (e) {
-              console.warn("Failed to parse SEO audit JSON content from LLM, using fallback:", e);
-            }
-          }
-        } catch (err2) {
-          console.warn(`Error with Groq API key index ${i + 1}:`, err2);
         }
-      }
-    }
-    if (!success) {
-      console.warn(`[seo-audit-accurate] LLM analysis unavailable or failed to parse for ${targetUrl} \u2014 falling back to rule-based analysis.`);
-    }
+      ],
+      temperature: 0.1
+    });
+    const parsed = aiResult.data || {};
+    const llmIssues = Array.isArray(parsed.llm_issues) ? parsed.llm_issues : [];
+    const llmScore = typeof parsed.seo_score === "number" ? Math.max(0, Math.min(1, parsed.seo_score)) : ruleScore;
     const combinedIssues = [...ruleIssues, ...llmIssues];
-    const finalScore = success ? parseFloat((ruleScore * 0.4 + llmScore * 0.6).toFixed(2)) : ruleScore;
+    const finalScore = parseFloat((ruleScore * 0.4 + llmScore * 0.6).toFixed(2));
     const totalLatency = Date.now() - startTime;
     return c.json({
+      success: true,
       page_url: targetUrl,
       issues: combinedIssues,
       seo_score: finalScore,
@@ -90111,13 +89750,23 @@ ${cleanText}`
     });
   } catch (error) {
     console.error("Error in seo-audit-accurate handler:", error);
-    return c.json({ error: "Internal server error", message: error.message }, 500);
+    const status = error.status && typeof error.status === "number" ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || "AI_ANALYSIS_FAILED",
+        message: error.message || "SEO audit AI analysis failed",
+        status,
+        rotationReasons: error.rotationReasons
+      }
+    }, status);
   }
 }
 var init_seo_audit_accurate = __esm({
   "handlers/seo-audit-accurate.ts"() {
     "use strict";
     init_seo_audit_fast();
+    init_groq_manager();
   }
 });
 
@@ -90534,6 +90183,10 @@ var init_select_endpoint = __esm({
 function verifyOutput(category, result) {
   if (!result) {
     return { passed: false, reason: "Result is empty or null" };
+  }
+  if (result.success === false || result.error) {
+    const errorMsg = typeof result.error === "object" ? result.error.message || result.error.code : result.error || "AI execution failed";
+    return { passed: false, reason: `AI analysis failed: ${errorMsg}` };
   }
   switch (category) {
     case "invoice_extraction": {
@@ -91261,31 +90914,27 @@ __export(execute_task_exports, {
   handleExecuteTaskRequest: () => handleExecuteTaskRequest
 });
 function aggregateResults(category, results) {
-  if (results.length === 0) return {};
+  if (results.length === 0) {
+    return {
+      success: false,
+      error: { code: "NO_RESULTS", message: "No results returned from provider" }
+    };
+  }
+  const validResults = results.filter((r) => r && r.success !== false && !r.error);
+  const failedResults = results.filter((r) => !r || r.success === false || r.error);
+  if (validResults.length === 0 && failedResults.length > 0) {
+    const firstErr = failedResults[0]?.error?.message || failedResults[0]?.error || `All ${category} AI analysis attempts failed`;
+    return {
+      success: false,
+      error: {
+        code: failedResults[0]?.error?.code || "AI_ANALYSIS_FAILED",
+        message: firstErr
+      },
+      totalFiles: 0,
+      failedFilesCount: failedResults.length
+    };
+  }
   if (category === "code_review") {
-    const validResults = results.filter((r) => r && r.success !== false && !r.error);
-    const failedResults = results.filter((r) => !r || r.success === false || r.error);
-    if (validResults.length === 0 && failedResults.length > 0) {
-      const firstErr = failedResults[0]?.error?.message || failedResults[0]?.error || "All AI code review file analysis attempts failed";
-      return {
-        success: false,
-        error: {
-          code: failedResults[0]?.error?.code || "AI_ANALYSIS_FAILED",
-          message: firstErr
-        },
-        totalFilesReviewed: 0,
-        totalIssues: 0,
-        metrics: { bugs: 0, securityIssues: 0, codeQualityIssues: 0, totalIssues: 0, overallScore: 0 },
-        bugs: 0,
-        securityIssues: 0,
-        codeQualityIssues: 0,
-        overallScore: 0,
-        issuesBySeverity: { low: 0, medium: 0, high: 0 },
-        averageQualityScore: 0,
-        files: [],
-        failedFilesCount: failedResults.length
-      };
-    }
     const allFiles = validResults.map((r) => ({
       file_path: r.file_path,
       issues: r.issues ?? [],
@@ -91348,7 +90997,7 @@ function aggregateResults(category, results) {
     };
   }
   if (category === "seo_audit") {
-    const allPages = results.map((r) => ({
+    const allPages = validResults.map((r) => ({
       page_url: r.page_url,
       issues: r.issues ?? [],
       seo_score: r.seo_score ?? 0,
@@ -91356,7 +91005,7 @@ function aggregateResults(category, results) {
       latency_ms: r.latency_ms ?? 0
     }));
     const totalPagesAudited = allPages.length;
-    const allIssues = results.flatMap((r) => r.issues ?? []);
+    const allIssues = validResults.flatMap((r) => r.issues ?? []);
     const issuesByCategory = {
       metadata: allIssues.filter((i) => i.category === "metadata"),
       heading: allIssues.filter((i) => i.category === "heading"),
@@ -91369,9 +91018,10 @@ function aggregateResults(category, results) {
       medium: allIssues.filter((i) => i.severity === "medium").length,
       high: allIssues.filter((i) => i.severity === "high").length
     };
-    const overallSiteScore = results.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (results.length || 1);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
+    const overallSiteScore = validResults.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (validResults.length || 1);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
     return {
+      success: true,
       totalPagesAudited,
       totalIssues: allIssues.length,
       overallSiteScore: parseFloat(overallSiteScore.toFixed(3)),
@@ -91382,31 +91032,37 @@ function aggregateResults(category, results) {
     };
   }
   if (category === "resume_screening") {
-    const allCandidates = results.flatMap((r) => r.candidates ?? []);
-    const totalConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
+    const allCandidates = validResults.flatMap((r) => r.candidates ?? []);
+    const totalConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
     return {
+      success: true,
       candidates: allCandidates,
-      averageConfidence: parseFloat((totalConfidence / results.length).toFixed(3)),
-      totalFiles: results.length
+      averageConfidence: parseFloat((totalConfidence / (validResults.length || 1)).toFixed(3)),
+      totalFiles: validResults.length
     };
   }
   if (category === "contract_analysis") {
-    const allDocuments = results.map((r, i) => ({
+    const allDocuments = validResults.map((r, i) => ({
       document: i + 1,
-      clauses: r.clauses ?? [],
+      clauses: r.clauses ?? r.clauses_flagged ?? [],
       confidence: r.confidence ?? 0
     }));
-    const totalClauses = allDocuments.reduce((sum, d) => sum + d.clauses.length, 0);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
+    const clauses_flagged = validResults.flatMap((r) => r.clauses_flagged ?? r.clauses ?? []);
+    const avgRiskScore = validResults.reduce((sum, r) => sum + (r.overall_risk_score ?? 0.5), 0) / (validResults.length || 1);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
     return {
+      success: true,
       documents: allDocuments,
-      totalClauses,
+      clauses: clauses_flagged,
+      clauses_flagged,
+      overall_risk_score: parseFloat(avgRiskScore.toFixed(2)),
+      totalClauses: clauses_flagged.length,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: results.length
+      totalFiles: validResults.length
     };
   }
   if (category === "invoice_extraction") {
-    const allDocuments = results.map((r, i) => ({
+    const allDocuments = validResults.map((r, i) => ({
       document: i + 1,
       vendor_name: r.vendor_name,
       invoice_number: r.invoice_number,
@@ -91415,26 +91071,26 @@ function aggregateResults(category, results) {
       total_amount: r.total_amount,
       confidence: r.confidence ?? 0
     }));
-    const totalLineItems = allDocuments.reduce((sum, d) => sum + d.line_items.length, 0);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
-    const line_items = results.flatMap((r) => r.line_items ?? []);
-    const vendor_name = results.find((r) => r.vendor_name && r.vendor_name !== "Unknown")?.vendor_name || results[0]?.vendor_name || "Unknown";
-    const invoice_number = results.find((r) => r.invoice_number && r.invoice_number !== "Unknown")?.invoice_number || results[0]?.invoice_number || "Unknown";
-    const date = results.find((r) => r.date && r.date !== "Unknown")?.date || results[0]?.date || "Unknown";
-    const total_amount = results.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
+    const line_items = validResults.flatMap((r) => r.line_items ?? []);
+    const vendor_name = validResults.find((r) => r.vendor_name && r.vendor_name !== "Unknown")?.vendor_name || validResults[0]?.vendor_name || "Unknown";
+    const invoice_number = validResults.find((r) => r.invoice_number && r.invoice_number !== "Unknown")?.invoice_number || validResults[0]?.invoice_number || "Unknown";
+    const date = validResults.find((r) => r.date && r.date !== "Unknown")?.date || validResults[0]?.date || "Unknown";
+    const total_amount = validResults.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
     return {
+      success: true,
       vendor_name,
       invoice_number,
       date,
       line_items,
       total_amount,
       documents: allDocuments,
-      totalLineItems,
+      totalLineItems: line_items.length,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: results.length
+      totalFiles: validResults.length
     };
   }
-  return { results };
+  return { success: true, results: validResults };
 }
 async function handleExecuteTaskRequest(c) {
   const startTime = Date.now();

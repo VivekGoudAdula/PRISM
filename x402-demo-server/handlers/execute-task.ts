@@ -51,35 +51,30 @@ function buildMockContext(bodyData: Record<string, any>): Context {
  * Each task category has its own merge strategy.
  */
 function aggregateResults(category: string, results: any[]): any {
-  if (results.length === 0) return {};
+  if (results.length === 0) {
+    return {
+      success: false,
+      error: { code: 'NO_RESULTS', message: 'No results returned from provider' },
+    };
+  }
+
+  const validResults = results.filter((r) => r && r.success !== false && !r.error);
+  const failedResults = results.filter((r) => !r || r.success === false || r.error);
+
+  if (validResults.length === 0 && failedResults.length > 0) {
+    const firstErr = failedResults[0]?.error?.message || failedResults[0]?.error || `All ${category} AI analysis attempts failed`;
+    return {
+      success: false,
+      error: {
+        code: failedResults[0]?.error?.code || 'AI_ANALYSIS_FAILED',
+        message: firstErr,
+      },
+      totalFiles: 0,
+      failedFilesCount: failedResults.length,
+    };
+  }
 
   if (category === 'code_review') {
-    const validResults = results.filter((r) => r && r.success !== false && !r.error);
-    const failedResults = results.filter((r) => !r || r.success === false || r.error);
-
-    // If ALL results failed, mark aggregate as failure
-    if (validResults.length === 0 && failedResults.length > 0) {
-      const firstErr = failedResults[0]?.error?.message || failedResults[0]?.error || 'All AI code review file analysis attempts failed';
-      return {
-        success: false,
-        error: {
-          code: failedResults[0]?.error?.code || 'AI_ANALYSIS_FAILED',
-          message: firstErr,
-        },
-        totalFilesReviewed: 0,
-        totalIssues: 0,
-        metrics: { bugs: 0, securityIssues: 0, codeQualityIssues: 0, totalIssues: 0, overallScore: 0 },
-        bugs: 0,
-        securityIssues: 0,
-        codeQualityIssues: 0,
-        overallScore: 0,
-        issuesBySeverity: { low: 0, medium: 0, high: 0 },
-        averageQualityScore: 0,
-        files: [],
-        failedFilesCount: failedResults.length,
-      };
-    }
-
     const allFiles = validResults.map((r) => ({
       file_path: r.file_path,
       issues: r.issues ?? [],
@@ -154,7 +149,7 @@ function aggregateResults(category: string, results: any[]): any {
   }
 
   if (category === 'seo_audit') {
-    const allPages = results.map((r) => ({
+    const allPages = validResults.map((r) => ({
       page_url: r.page_url,
       issues: r.issues ?? [],
       seo_score: r.seo_score ?? 0,
@@ -162,7 +157,7 @@ function aggregateResults(category: string, results: any[]): any {
       latency_ms: r.latency_ms ?? 0,
     }));
     const totalPagesAudited = allPages.length;
-    const allIssues = results.flatMap((r) => r.issues ?? []);
+    const allIssues = validResults.flatMap((r) => r.issues ?? []);
 
     const issuesByCategory = {
       metadata: allIssues.filter((i) => i.category === 'metadata'),
@@ -178,10 +173,11 @@ function aggregateResults(category: string, results: any[]): any {
       high: allIssues.filter((i) => i.severity === 'high').length,
     };
 
-    const overallSiteScore = results.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (results.length || 1);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
+    const overallSiteScore = validResults.reduce((sum, r) => sum + (r.seo_score ?? 0), 0) / (validResults.length || 1);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
 
     return {
+      success: true,
       totalPagesAudited,
       totalIssues: allIssues.length,
       overallSiteScore: parseFloat(overallSiteScore.toFixed(3)),
@@ -193,33 +189,40 @@ function aggregateResults(category: string, results: any[]): any {
   }
 
   if (category === 'resume_screening') {
-    const allCandidates = results.flatMap((r) => r.candidates ?? []);
-    const totalConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
+    const allCandidates = validResults.flatMap((r) => r.candidates ?? []);
+    const totalConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0);
     return {
+      success: true,
       candidates: allCandidates,
-      averageConfidence: parseFloat((totalConfidence / results.length).toFixed(3)),
-      totalFiles: results.length,
+      averageConfidence: parseFloat((totalConfidence / (validResults.length || 1)).toFixed(3)),
+      totalFiles: validResults.length,
     };
   }
 
   if (category === 'contract_analysis') {
-    const allDocuments = results.map((r, i) => ({
+    const allDocuments = validResults.map((r, i) => ({
       document: i + 1,
-      clauses: r.clauses ?? [],
+      clauses: r.clauses ?? r.clauses_flagged ?? [],
       confidence: r.confidence ?? 0,
     }));
-    const totalClauses = allDocuments.reduce((sum, d) => sum + d.clauses.length, 0);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
+    const clauses_flagged = validResults.flatMap((r) => r.clauses_flagged ?? r.clauses ?? []);
+    const avgRiskScore = validResults.reduce((sum, r) => sum + (r.overall_risk_score ?? 0.5), 0) / (validResults.length || 1);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
+
     return {
+      success: true,
       documents: allDocuments,
-      totalClauses,
+      clauses: clauses_flagged,
+      clauses_flagged,
+      overall_risk_score: parseFloat(avgRiskScore.toFixed(2)),
+      totalClauses: clauses_flagged.length,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: results.length,
+      totalFiles: validResults.length,
     };
   }
 
   if (category === 'invoice_extraction') {
-    const allDocuments = results.map((r, i) => ({
+    const allDocuments = validResults.map((r, i) => ({
       document: i + 1,
       vendor_name: r.vendor_name,
       invoice_number: r.invoice_number,
@@ -228,28 +231,28 @@ function aggregateResults(category: string, results: any[]): any {
       total_amount: r.total_amount,
       confidence: r.confidence ?? 0,
     }));
-    const totalLineItems = allDocuments.reduce((sum, d) => sum + d.line_items.length, 0);
-    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / results.length;
-    const line_items = results.flatMap((r) => r.line_items ?? []);
-    const vendor_name = results.find((r) => r.vendor_name && r.vendor_name !== 'Unknown')?.vendor_name || results[0]?.vendor_name || 'Unknown';
-    const invoice_number = results.find((r) => r.invoice_number && r.invoice_number !== 'Unknown')?.invoice_number || results[0]?.invoice_number || 'Unknown';
-    const date = results.find((r) => r.date && r.date !== 'Unknown')?.date || results[0]?.date || 'Unknown';
-    const total_amount = results.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
+    const avgConfidence = validResults.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (validResults.length || 1);
+    const line_items = validResults.flatMap((r) => r.line_items ?? []);
+    const vendor_name = validResults.find((r) => r.vendor_name && r.vendor_name !== 'Unknown')?.vendor_name || validResults[0]?.vendor_name || 'Unknown';
+    const invoice_number = validResults.find((r) => r.invoice_number && r.invoice_number !== 'Unknown')?.invoice_number || validResults[0]?.invoice_number || 'Unknown';
+    const date = validResults.find((r) => r.date && r.date !== 'Unknown')?.date || validResults[0]?.date || 'Unknown';
+    const total_amount = validResults.reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
 
     return {
+      success: true,
       vendor_name,
       invoice_number,
       date,
       line_items,
       total_amount,
       documents: allDocuments,
-      totalLineItems,
+      totalLineItems: line_items.length,
       averageConfidence: parseFloat(avgConfidence.toFixed(3)),
-      totalFiles: results.length,
+      totalFiles: validResults.length,
     };
   }
 
-  return { results };
+  return { success: true, results: validResults };
 }
 
 /**

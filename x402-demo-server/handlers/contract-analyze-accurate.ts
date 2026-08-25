@@ -1,12 +1,14 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
+import { groqManager } from './lib/groq-manager';
 
 /**
  * POST /contract-analyze-accurate
- * Accurate contract analysis using Groq LLM API
+ * High-precision contract analysis using Groq LLM API
  */
 export async function handleContractAnalyzeAccurateRequest(c: Context) {
+  const startTime = Date.now();
   try {
     console.log('✓ PAYMENT VERIFIED - POST /contract-analyze-accurate handler executing');
     const body = await c.req.json().catch(() => ({}));
@@ -16,17 +18,6 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
       return c.json({ error: 'No files provided. At least one contract file must be uploaded.' }, 400);
     }
 
-    const getGroqKeys = () => {
-      const keys = [];
-      if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 10; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys.push(k);
-      }
-      return keys;
-    };
-
-    const keys = getGroqKeys();
     let clauses_flagged: any[] = [];
     let totalRiskScore = 0;
     let filesWithRisk = 0;
@@ -48,91 +39,46 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
         const mapRes = await buildSemanticMap('contract_analysis', extracted_text, file.filename);
         semantic_map = mapRes.map;
       }
-      
-      let fileClauses = [];
-      let fileRiskScore = 0.5;
-      let success = false;
-      if (keys.length > 0) {
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          try {
-            const llmStart = Date.now();
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${key}`,
-              },
-              body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'Analyze the contract structured semantic map. Identify risk clauses, non-standard terms, or missing standard protections. Return ONLY a valid JSON object matching this schema: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.',
-                  },
-                  {
-                    role: 'user',
-                    content: `Instructions: ${task_description}\n\nContract Semantic Map JSON:\n${JSON.stringify(semantic_map, null, 2)}`,
-                  },
-                ],
-                temperature: 0.1,
-                response_format: { type: 'json_object' },
-              }),
-            });
 
-            totalLlmLatency += (Date.now() - llmStart);
-
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || '';
-              try {
-                const { parseRobustJson } = await import('./lib/parse-json-robust');
-                const parsed = parseRobustJson(content);
-                const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
-                fileClauses = rawClauses.map((clause: any) => {
-                  const summary = clause.clause_summary || 'Risky clause identified';
-                  const riskLevel = clause.risk_level || 'medium';
-                  const suggestion = clause.suggestion || 'No recommendation provided.';
-                  return {
-                    clause_summary: summary,
-                    risk_level: riskLevel,
-                    suggestion: suggestion,
-                    risk: riskLevel,
-                    type: 'Risk Clause',
-                    clause_text: summary,
-                    description: summary,
-                    mitigation: suggestion
-                  };
-                });
-                fileRiskScore = typeof parsed.overall_risk_score === 'number' ? parsed.overall_risk_score : 0.5;
-                success = true;
-                break;
-              } catch (e) {
-                console.error('Failed to parse contract JSON content:', content, e);
-              }
-            }
-          } catch (err) {
-            console.error(`Error with Groq API key index ${i + 1}:`, err);
-          }
-        }
-      }
-
-      if (!success) {
-        console.warn(`Fallback active for contract analysis of file: ${file.filename}`);
-        fileClauses = [
+      const aiResult = await groqManager.chatCompletion<{
+        clauses_flagged?: Array<{ clause_summary?: string; risk_level?: 'low' | 'medium' | 'high'; suggestion?: string }>;
+        overall_risk_score?: number;
+      }>({
+        model: 'openai/gpt-oss-20b',
+        messages: [
           {
-            clause_summary: 'Could not perform real LLM analysis on this document.',
-            risk_level: 'medium',
-            suggestion: 'Please verify the API connection or check input document format.',
-            risk: 'medium',
-            type: 'Error',
-            clause_text: 'Could not perform real LLM analysis on this document.',
-            description: 'Could not perform real LLM analysis on this document.',
-            mitigation: 'Please verify the API connection or check input document format.',
+            role: 'system',
+            content: 'Analyze contract semantic map. Identify risk clauses, non-standard terms, or missing protections. Return ONLY JSON: { "clauses_flagged": [ { "clause_summary": string, "risk_level": "low" | "medium" | "high", "suggestion": string } ], "overall_risk_score": number } where overall_risk_score is between 0 and 1.',
           },
-        ];
-        fileRiskScore = 0.5;
-      }
+          {
+            role: 'user',
+            content: `Instructions: ${task_description}\n\nContract Semantic Map:\n${JSON.stringify(semantic_map, null, 2)}`,
+          },
+        ],
+        temperature: 0.1,
+      });
+
+      totalLlmLatency += aiResult.durationMs;
+      const parsed = aiResult.data || {};
+      const rawClauses = Array.isArray(parsed.clauses_flagged) ? parsed.clauses_flagged : [];
+
+      const fileClauses = rawClauses.map((clause: any) => {
+        const summary = clause.clause_summary || 'Risk clause identified';
+        const riskLevel = clause.risk_level || 'medium';
+        const suggestion = clause.suggestion || 'Review term with legal counsel.';
+        return {
+          clause_summary: summary,
+          risk_level: riskLevel,
+          suggestion,
+          risk: riskLevel,
+          type: 'Risk Clause',
+          clause_text: summary,
+          description: summary,
+          mitigation: suggestion,
+        };
+      });
+
+      const fileRiskScore = typeof parsed.overall_risk_score === 'number' ? Math.max(0, Math.min(1, parsed.overall_risk_score)) : 0.5;
 
       clauses_flagged = clauses_flagged.concat(fileClauses);
       totalRiskScore += fileRiskScore;
@@ -142,15 +88,25 @@ export async function handleContractAnalyzeAccurateRequest(c: Context) {
     const overall_risk_score = filesWithRisk > 0 ? parseFloat((totalRiskScore / filesWithRisk).toFixed(2)) : 0.5;
 
     return c.json({
+      success: true,
       clauses_flagged,
-      clauses: clauses_flagged, // alias to pass verifyOutput validation
+      clauses: clauses_flagged,
       overall_risk_score,
       confidence: 0.93,
       latency_ms: totalLlmLatency,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in contract-analyze-accurate handler:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    const status = error.status && typeof error.status === 'number' ? error.status : 500;
+    return c.json({
+      success: false,
+      error: {
+        code: error.code || 'AI_ANALYSIS_FAILED',
+        message: error.message || 'Contract analysis AI failed',
+        status,
+        rotationReasons: error.rotationReasons,
+      },
+    }, status);
   }
 }
