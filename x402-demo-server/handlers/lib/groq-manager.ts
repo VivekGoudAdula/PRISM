@@ -108,16 +108,19 @@ class GroqManagerService {
     }));
   }
 
-  /** Select an available healthy key */
+  private lastKeyIndex = 0;
+
+  /** Select an available healthy key using Round-Robin distribution */
   private selectHealthyKey(): KeyEntry | null {
     const now = Date.now();
-    // Filter out unauthorized keys
     const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
     if (validKeys.length === 0) return null;
 
-    // Find a key that is not rate-limited
-    const availableKey = validKeys.find((k) => k.rateLimitedUntil <= now);
-    if (availableKey) return availableKey;
+    const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
+    if (availableKeys.length > 0) {
+      this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
+      return availableKeys[this.lastKeyIndex];
+    }
 
     return null;
   }
@@ -151,7 +154,20 @@ class GroqManagerService {
       attempts++;
       this.reloadKeys();
 
-      const keyEntry = this.selectHealthyKey();
+      let keyEntry = this.selectHealthyKey();
+      if (!keyEntry) {
+        const now = Date.now();
+        const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+        if (validKeys.length > 0) {
+          const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
+          if (minWait > 0 && minWait <= 15000 && attempts < totalMaxAttempts) {
+            console.warn(`⏳ All keys rate-limited. Pausing ${(minWait / 1000).toFixed(1)}s for key pool reset...`);
+            await new Promise((r) => setTimeout(r, minWait + 500));
+            keyEntry = this.selectHealthyKey();
+          }
+        }
+      }
+
       if (!keyEntry) {
         this.metrics.failedRequests++;
         const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
@@ -310,8 +326,8 @@ class GroqManagerService {
         // 429 Rate Limited — Temporary Cooldown
         if (status === 429) {
           this.metrics.rateLimitedRequests++;
-          // Cooldown key for 60 seconds
-          keyEntry.rateLimitedUntil = Date.now() + 60 * 1000;
+          // Cooldown key for 15 seconds
+          keyEntry.rateLimitedUntil = Date.now() + 15 * 1000;
           const msg = `Key ${keyEntry.id} hit rate limit (HTTP 429) — temporarily rotating to next available key`;
           console.warn(`⚠️ ${msg}`);
           rotationReasons.push(msg);

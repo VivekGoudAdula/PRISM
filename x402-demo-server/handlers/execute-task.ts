@@ -379,6 +379,56 @@ export async function handleExecuteTaskRequest(c: Context) {
     const winnerEndpoint: string = taskRecord.selectedEndpoint;
     const category: string = taskRecord.category;
 
+    // ── Step 3.5: Server-Side Batch Execution if results not pre-computed ────
+    if (!Array.isArray(results) || results.length === 0) {
+      console.log(`🚀 Executing task ${planId} (${category}) server-side for ${taskRecord.executionQuantity || 1} item(s)...`);
+      results = [];
+      const po = taskRecord.plannerOutput || {};
+
+      let itemsToProcess: any[] = [];
+      if (category === 'code_review' && Array.isArray(po.files) && po.files.length > 0) {
+        itemsToProcess = po.files;
+      } else if (category === 'seo_audit' && Array.isArray(po.pages) && po.pages.length > 0) {
+        itemsToProcess = po.pages;
+      } else if (Array.isArray(po.files) && po.files.length > 0) {
+        itemsToProcess = po.files;
+      } else {
+        itemsToProcess = [{ task_description: taskRecord.prompt }];
+      }
+
+      for (let idx = 0; idx < itemsToProcess.length; idx++) {
+        const item = itemsToProcess[idx];
+        let payload: Record<string, any> = {};
+
+        if (category === 'code_review') {
+          payload = { file_path: item.path, raw_url: item.raw_url };
+        } else if (category === 'seo_audit') {
+          payload = { page_url: item.url, task_description: taskRecord.prompt };
+        } else if (item.index !== undefined) {
+          payload = { file_index: item.index, plan_id: planId, task_description: taskRecord.prompt };
+        } else {
+          payload = { task_description: taskRecord.prompt, files: [item] };
+        }
+
+        try {
+          if (idx > 0) {
+            await new Promise((r) => setTimeout(r, 150));
+          }
+          const itemRes = await invokeProviderHandler(winnerEndpoint, payload);
+          results.push(itemRes);
+        } catch (itemErr: any) {
+          console.error(`Error processing item ${idx + 1} (${item.path || item.url || item.filename}):`, itemErr);
+          results.push({
+            success: false,
+            error: {
+              code: itemErr.code || 'ITEM_EXECUTION_FAILED',
+              message: itemErr.message || 'Failed to process item',
+            },
+          });
+        }
+      }
+    }
+
     const actualQuantity = results.length;
 
     // ── Step 4: Aggregate results ────────────────────────────────────────────

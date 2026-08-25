@@ -88482,13 +88482,17 @@ var init_groq_manager = __esm({
           failedCalls
         }));
       }
-      /** Select an available healthy key */
+      lastKeyIndex = 0;
+      /** Select an available healthy key using Round-Robin distribution */
       selectHealthyKey() {
         const now = Date.now();
         const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
         if (validKeys.length === 0) return null;
-        const availableKey = validKeys.find((k) => k.rateLimitedUntil <= now);
-        if (availableKey) return availableKey;
+        const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
+        if (availableKeys.length > 0) {
+          this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
+          return availableKeys[this.lastKeyIndex];
+        }
         return null;
       }
       /**
@@ -88504,7 +88508,19 @@ var init_groq_manager = __esm({
         while (attempts < totalMaxAttempts) {
           attempts++;
           this.reloadKeys();
-          const keyEntry = this.selectHealthyKey();
+          let keyEntry = this.selectHealthyKey();
+          if (!keyEntry) {
+            const now = Date.now();
+            const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+            if (validKeys.length > 0) {
+              const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
+              if (minWait > 0 && minWait <= 15e3 && attempts < totalMaxAttempts) {
+                console.warn(`\u23F3 All keys rate-limited. Pausing ${(minWait / 1e3).toFixed(1)}s for key pool reset...`);
+                await new Promise((r) => setTimeout(r, minWait + 500));
+                keyEntry = this.selectHealthyKey();
+              }
+            }
+          }
           if (!keyEntry) {
             this.metrics.failedRequests++;
             const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
@@ -88641,7 +88657,7 @@ var init_groq_manager = __esm({
             }
             if (status === 429) {
               this.metrics.rateLimitedRequests++;
-              keyEntry.rateLimitedUntil = Date.now() + 60 * 1e3;
+              keyEntry.rateLimitedUntil = Date.now() + 15 * 1e3;
               const msg = `Key ${keyEntry.id} hit rate limit (HTTP 429) \u2014 temporarily rotating to next available key`;
               console.warn(`\u26A0\uFE0F ${msg}`);
               rotationReasons.push(msg);
@@ -90913,6 +90929,12 @@ var execute_task_exports = {};
 __export(execute_task_exports, {
   handleExecuteTaskRequest: () => handleExecuteTaskRequest
 });
+function buildMockContext(bodyData) {
+  return {
+    req: { json: async () => bodyData },
+    json: (data) => data
+  };
+}
 function aggregateResults(category, results) {
   if (results.length === 0) {
     return {
@@ -91092,6 +91114,33 @@ function aggregateResults(category, results) {
   }
   return { success: true, results: validResults };
 }
+async function invokeProviderHandler(endpoint, bodyData) {
+  const ctx = buildMockContext(bodyData);
+  switch (endpoint) {
+    case "/resume-screen-fast":
+      return handleResumeScreenFastRequest(ctx);
+    case "/resume-screen-accurate":
+      return handleResumeScreenAccurateRequest(ctx);
+    case "/contract-analyze-fast":
+      return handleContractAnalyzeFastRequest(ctx);
+    case "/contract-analyze-accurate":
+      return handleContractAnalyzeAccurateRequest(ctx);
+    case "/invoice-extract-fast":
+      return handleInvoiceExtractFastRequest(ctx);
+    case "/invoice-extract-accurate":
+      return handleInvoiceExtractAccurateRequest(ctx);
+    case "/code-review-fast":
+      return handleCodeReviewFastRequest(ctx);
+    case "/code-review-accurate":
+      return handleCodeReviewAccurateRequest(ctx);
+    case "/seo-audit-fast":
+      return handleSeoAuditFastRequest(ctx);
+    case "/seo-audit-accurate":
+      return handleSeoAuditAccurateRequest(ctx);
+    default:
+      throw new Error(`Unknown endpoint: ${endpoint}`);
+  }
+}
 async function handleExecuteTaskRequest(c) {
   const startTime = Date.now();
   let taskRecord = null;
@@ -91150,6 +91199,50 @@ async function handleExecuteTaskRequest(c) {
     }
     const winnerEndpoint = taskRecord.selectedEndpoint;
     const category = taskRecord.category;
+    if (!Array.isArray(results) || results.length === 0) {
+      console.log(`\u{1F680} Executing task ${planId} (${category}) server-side for ${taskRecord.executionQuantity || 1} item(s)...`);
+      results = [];
+      const po = taskRecord.plannerOutput || {};
+      let itemsToProcess = [];
+      if (category === "code_review" && Array.isArray(po.files) && po.files.length > 0) {
+        itemsToProcess = po.files;
+      } else if (category === "seo_audit" && Array.isArray(po.pages) && po.pages.length > 0) {
+        itemsToProcess = po.pages;
+      } else if (Array.isArray(po.files) && po.files.length > 0) {
+        itemsToProcess = po.files;
+      } else {
+        itemsToProcess = [{ task_description: taskRecord.prompt }];
+      }
+      for (let idx = 0; idx < itemsToProcess.length; idx++) {
+        const item = itemsToProcess[idx];
+        let payload = {};
+        if (category === "code_review") {
+          payload = { file_path: item.path, raw_url: item.raw_url };
+        } else if (category === "seo_audit") {
+          payload = { page_url: item.url, task_description: taskRecord.prompt };
+        } else if (item.index !== void 0) {
+          payload = { file_index: item.index, plan_id: planId, task_description: taskRecord.prompt };
+        } else {
+          payload = { task_description: taskRecord.prompt, files: [item] };
+        }
+        try {
+          if (idx > 0) {
+            await new Promise((r) => setTimeout(r, 150));
+          }
+          const itemRes = await invokeProviderHandler(winnerEndpoint, payload);
+          results.push(itemRes);
+        } catch (itemErr) {
+          console.error(`Error processing item ${idx + 1} (${item.path || item.url || item.filename}):`, itemErr);
+          results.push({
+            success: false,
+            error: {
+              code: itemErr.code || "ITEM_EXECUTION_FAILED",
+              message: itemErr.message || "Failed to process item"
+            }
+          });
+        }
+      }
+    }
     const actualQuantity = results.length;
     const combinedResult = aggregateResults(category, results);
     const executionTime = Date.now() - startTime;
