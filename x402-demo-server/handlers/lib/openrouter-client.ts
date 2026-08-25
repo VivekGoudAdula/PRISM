@@ -69,15 +69,13 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
     try {
       console.log(`[OpenRouter] Sending request to model: ${model} (Key index ${index + 1}/${keys.length})`);
 
+      // Set a reasonable default max_tokens (e.g., 2500) if unspecified to prevent OpenRouter from reserving 65,536 max tokens on low-credit balances.
       const bodyPayload: Record<string, any> = {
         model,
         messages: options.messages,
         temperature: options.temperature ?? 0.2,
+        max_tokens: options.max_tokens ?? 2500,
       };
-
-      if (options.max_tokens) {
-        bodyPayload.max_tokens = options.max_tokens;
-      }
 
       if (options.response_format) {
         bodyPayload.response_format = options.response_format;
@@ -99,10 +97,17 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
         console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${response.status}: ${errorText}`);
         lastError = new Error(`OpenRouter HTTP ${response.status}: ${errorText}`);
 
-        // If rate limited or payment required on free model, attempt fallback model if possible
-        if (response.status === 402 && !model.endsWith(':free')) {
-          console.warn(`[OpenRouter] HTTP 402 on ${model}, attempting free fallback...`);
-          return await callOpenRouter({ ...options, model: `${model}:free` });
+        // Handle credit limits / 402: try lower max_tokens first, then fall back to an active free model
+        if (response.status === 402) {
+          const currentMaxTokens = bodyPayload.max_tokens || 2500;
+          if (currentMaxTokens > 1200) {
+            console.warn(`[OpenRouter] HTTP 402 on ${model}, retrying with lower max_tokens (1200)...`);
+            return await callOpenRouter({ ...options, model, max_tokens: 1200 });
+          } else if (!model.includes(':free')) {
+            const freeFallbackModel = 'nvidia/nemotron-3.5-lightning:free';
+            console.warn(`[OpenRouter] HTTP 402 on ${model}, attempting free fallback to ${freeFallbackModel}...`);
+            return await callOpenRouter({ ...options, model: freeFallbackModel, max_tokens: 1200 });
+          }
         }
         continue;
       }
