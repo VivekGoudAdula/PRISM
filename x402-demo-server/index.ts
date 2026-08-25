@@ -55,6 +55,7 @@ config();
 
 import bcrypt from 'bcryptjs';
 import { User } from './models/User';
+import { Organization } from './models/Organization';
 
 // Connect to MongoDB
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -87,8 +88,26 @@ mongoose.connect(connectionString)
   .then(async () => {
     console.log('✅ MongoDB connected successfully');
     
-    // Seed Admin User
+    // Seed B2B Organizations & Admin User
     try {
+      const defaultOrgs = [
+        { name: 'Nirvaha Wellness', code: 'NIRVAHA', contactPerson: 'Abhinav Rao', contactEmail: 'abhinav@nirvahawellness.com', industry: 'Healthcare & Wellness' },
+        { name: 'Aurora University', code: 'AURORA', contactPerson: 'Placement Coordinator', contactEmail: 'placement@aurora.edu', industry: 'Education' },
+        { name: 'Acme Enterprise', code: 'ACME', contactPerson: 'Jane Doe', contactEmail: 'jane@acme.com', industry: 'Software & Cloud' },
+        { name: 'PRISM Labs', code: 'PRISM', contactPerson: 'System Admin', contactEmail: 'admin@prism.com', industry: 'AI & Infrastructure' },
+      ];
+
+      for (const orgData of defaultOrgs) {
+        await Organization.findOneAndUpdate(
+          { name: orgData.name },
+          { $setOnInsert: orgData },
+          { upsert: true, new: true }
+        );
+      }
+
+      const prismOrg = await Organization.findOne({ name: 'PRISM Labs' });
+      const nirvahaOrg = await Organization.findOne({ name: 'Nirvaha Wellness' });
+
       const adminEmail = 'admin@prism.com';
       const existingAdmin = await User.findOne({ email: adminEmail });
       if (!existingAdmin) {
@@ -100,12 +119,27 @@ mongoose.connect(connectionString)
           passwordHash,
           role: 'admin',
           subscriptionPlan: 'enterprise',
+          organizationId: prismOrg?._id,
+          organizationName: prismOrg?.name || 'PRISM Labs',
           credits: 999999,
         });
         console.log('✅ Default Admin user seeded successfully');
       }
+
+      // Link any users without organization to an organization
+      const usersWithoutOrg = await User.find({ $or: [{ organizationName: { $exists: false } }, { organizationName: '' }, { organizationName: 'Individual / Default Org' }] });
+      for (const user of usersWithoutOrg) {
+        const targetOrg = user.email.includes('aurora') ? await Organization.findOne({ name: 'Aurora University' })
+          : user.email.includes('nirvaha') ? nirvahaOrg
+          : nirvahaOrg;
+        if (targetOrg) {
+          user.organizationId = targetOrg._id;
+          user.organizationName = targetOrg.name;
+          await user.save();
+        }
+      }
     } catch (err) {
-      console.error('Error seeding admin user:', err);
+      console.error('Error seeding admin/organizations:', err);
     }
   })
   .catch((err) => console.error('❌ MongoDB connection error:', err));
@@ -381,6 +415,11 @@ app.get('/health', (c) => {
     service: 'x402-hackathon-starter',
     uptime: process.uptime(),
   });
+});
+
+app.get('/api/health/groq', async (c) => {
+  const { handleGroqHealthCheck } = await import('./routes/health-groq');
+  return handleGroqHealthCheck(c);
 });
 
 app.post('/classify-task', async (c) => {

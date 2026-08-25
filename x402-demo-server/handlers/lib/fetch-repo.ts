@@ -12,6 +12,12 @@ export interface FetchRepoFilesResult {
   skipped: number;
   capped: boolean;
   total_files_found: number;
+  files_discovered: number;
+  files_eligible: number;
+  files_fetched: number;
+  files_failed: number;
+  files_skipped: number;
+  truncated: boolean;
   owner: string;
   repo: string;
   branch: string;
@@ -54,7 +60,7 @@ function setCached(key: string, result: FetchRepoFilesResult): void {
 // ─── File Filtering Config ───────────────────────────────────────────────────
 
 const EXCLUDED_DIRS = new Set([
-  'node_modules', 'dist', 'build', 'vendor', '.git', '.next', 'out', 'coverage',
+  'node_modules', 'dist', 'build', 'vendor', '.git', '.next', 'out', 'coverage', '.cache', 'tmp', 'temp', '.venv', 'venv',
 ]);
 
 const BINARY_EXTENSIONS = new Set([
@@ -217,11 +223,16 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
     try {
       repoInfoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     } catch (fetchErr) {
-      console.warn(`GitHub metadata fetch failed for ${owner}/${repo}, using default fallback branch main`);
+      console.warn(`GitHub metadata fetch failed for ${owner}/${repo}, trying fallback branch main`);
     }
 
     if (!repoInfoRes || !repoInfoRes.ok) {
-      console.warn(`GitHub API rate limit or error (${repoInfoRes?.status || 'Network'}) for ${owner}/${repo}. Using default branch main.`);
+      if (repoInfoRes?.status === 403 || repoInfoRes?.status === 429) {
+        throw buildRateLimitError(repoInfoRes.headers);
+      }
+      if (repoInfoRes?.status === 404) {
+        throw new Error(`GitHub repository not found: ${owner}/${repo}`);
+      }
       branch = 'main';
     } else {
       const repoInfo: any = await repoInfoRes.json().catch(() => ({}));
@@ -239,39 +250,37 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   try {
     treeRes = await fetch(treeUrl, { headers });
   } catch (err) {
-    console.warn(`GitHub tree fetch failed for ${owner}/${repo}@${branch}`);
+    console.warn(`GitHub tree fetch network error for ${owner}/${repo}@${branch}:`, err);
+    throw new Error(`Network error while fetching repository tree for ${owner}/${repo}@${branch}`);
   }
 
   if (!treeRes || !treeRes.ok) {
-    console.warn(`GitHub API tree rate limit or error (${treeRes?.status || 'Network'}). Returning structured fallback file tree for ${owner}/${repo}`);
-    const fallbackResult: FetchRepoFilesResult = {
-      files: [
-        { path: 'src/main.ts', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/main.ts`, size: 1024 },
-        { path: 'src/index.ts', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/index.ts`, size: 1024 },
-        { path: 'package.json', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/package.json`, size: 512 },
-        { path: 'README.md', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`, size: 2048 },
-      ],
-      skipped: 0,
-      capped: false,
-      total_files_found: 4,
-      owner,
-      repo,
-      branch,
-    };
-    setCached(branchKey, fallbackResult);
-    setCached(partialKey, fallbackResult);
-    return fallbackResult;
+    const status = treeRes?.status || 500;
+    if (status === 403 || status === 429) {
+      throw buildRateLimitError(treeRes.headers);
+    }
+    if (status === 404) {
+      throw new Error(`Repository or branch not found on GitHub: ${owner}/${repo}@${branch}`);
+    }
+    throw new Error(`GitHub API returned error (HTTP ${status}) while fetching repository tree for ${owner}/${repo}@${branch}`);
   }
 
   const treeData: any = await treeRes.json();
   const treeItems: any[] = Array.isArray(treeData.tree) ? treeData.tree : [];
+  const truncated: boolean = Boolean(treeData.truncated);
+
+  if (truncated) {
+    console.warn(`⚠️ GitHub tree response for ${owner}/${repo}@${branch} was truncated by GitHub API (>100k entries or size limit).`);
+  }
 
   // ── Step 3: Filter files ──────────────────────────────────────────────────
   const filtered: RepoFile[] = [];
+  let filesDiscovered = 0;
 
   for (const item of treeItems) {
     // Only process blobs (files), skip directories ('tree')
     if (item.type !== 'blob') continue;
+    filesDiscovered++;
 
     const filePath: string = item.path || '';
 
@@ -284,9 +293,9 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
     const ext = filePath.includes('.') ? filePath.split('.').pop()!.toLowerCase() : '';
     if (BINARY_EXTENSIONS.has(ext)) continue;
 
-    // Exclude very large files (>50 KB)
+    // Exclude very large files (>100 KB for individual static analysis)
     const fileSize: number = item.size ?? 0;
-    if (fileSize > 50 * 1024) continue;
+    if (fileSize > 100 * 1024) continue;
 
     const raw_url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
     filtered.push({ path: filePath, raw_url, size: fileSize });
@@ -301,17 +310,32 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
     return a.path.localeCompare(b.path);
   });
 
-  const total_files_found = filtered.length;
+  const files_eligible = filtered.length;
   const MAX_FILES = 500;
   const files = filtered.slice(0, MAX_FILES);
-  const skipped = Math.max(0, total_files_found - MAX_FILES);
-  const capped = total_files_found > MAX_FILES;
+  const files_fetched = files.length;
+  const files_skipped = Math.max(0, files_eligible - MAX_FILES) + (filesDiscovered - files_eligible);
+  const capped = files_eligible > MAX_FILES;
 
-  const result: FetchRepoFilesResult = { files, skipped, capped, total_files_found, owner, repo, branch };
+  const result: FetchRepoFilesResult = {
+    files,
+    skipped: files_skipped,
+    capped,
+    total_files_found: files_eligible,
+    files_discovered: filesDiscovered,
+    files_eligible,
+    files_fetched,
+    files_failed: 0,
+    files_skipped,
+    truncated,
+    owner,
+    repo,
+    branch,
+  };
 
   // ── Cache under both partial and full branch keys ─────────────────────────
   setCached(branchKey, result);
-  setCached(partialKey, result);  // Also cache under partial key for fast lookup next time
+  setCached(partialKey, result);
 
   return result;
 }

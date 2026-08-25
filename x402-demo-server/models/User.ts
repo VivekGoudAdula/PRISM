@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types } from 'mongoose';
 
 export interface IUser {
   fullName: string;
@@ -8,6 +8,8 @@ export interface IUser {
   avatar?: string;
   role: 'user' | 'admin';
   subscriptionPlan: 'free' | 'pro' | 'enterprise';
+  organizationId?: Types.ObjectId;
+  organizationName?: string;
   credits: number;
   lastLogin?: Date;
   totalTasks: number;
@@ -26,6 +28,8 @@ const UserSchema = new Schema<IUser>({
   avatar: { type: String, default: '' },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
   subscriptionPlan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
+  organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', index: true },
+  organizationName: { type: String, default: 'Individual / Default Org' },
   credits: { type: Number, default: 100 },
   lastLogin: { type: Date },
   totalTasks: { type: Number, default: 0 },

@@ -568,6 +568,18 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
   const renderFormattedResult = (result: any, category: string) => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
 
+    if (result.success === false || result.error) {
+      const errMsg = typeof result.error === 'object' ? result.error?.message : (result.error || 'AI analysis failed');
+      return (
+        <div className="p-4 bg-rose-950/50 border border-rose-500/40 rounded-2xl text-rose-200 text-xs flex flex-col gap-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-300">
+            <span>⚠️ Analysis Failed</span>
+          </div>
+          <p className="text-slate-300">{errMsg}</p>
+        </div>
+      );
+    }
+
     if (category === 'resume_screening' && result.candidates) {
       return (
         <div className="overflow-x-auto w-full">
@@ -1318,16 +1330,32 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
                   {item.error && (
                     <div className="flex justify-start w-full">
                       <div
-                        className={`p-4 rounded-2xl border text-xs max-w-[85%] leading-relaxed flex items-center gap-3 ${
+                        className={`p-4 rounded-2xl border text-xs max-w-[85%] leading-relaxed flex flex-col gap-2.5 ${
                           item.error.includes("I'm not sure what you'd like done")
                             ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
                             : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
                         }`}
                       >
-                        <span className="text-base">
-                          {item.error.includes("I'm not sure what you'd like done") ? '💡' : '⚠️'}
-                        </span>
-                        <div className="flex-1">{item.error}</div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-base">
+                            {item.error.includes("I'm not sure what you'd like done") ? '💡' : '⚠️'}
+                          </span>
+                          <div className="flex-1 font-semibold">{item.error}</div>
+                        </div>
+                        {!item.error.includes("I'm not sure what you'd like done") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (item.prompt) {
+                                setTaskDescription(item.prompt);
+                                runPlanTask(item.prompt, item.files || []);
+                              }
+                            }}
+                            className="btn btn-xs rounded-xl bg-rose-500/20 hover:bg-rose-500/35 border border-rose-500/40 text-rose-200 self-start gap-1 font-bold mt-1"
+                          >
+                            🔄 Retry Analysis
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
