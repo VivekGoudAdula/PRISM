@@ -122,9 +122,9 @@ export async function buildSemanticMap(
 
   if (extracted_text.trim().length > 0) {
     try {
-      const { groqManager } = await import('./groq-manager');
-      const res = await groqManager.chatCompletion({
-        model: 'openai/gpt-oss-20b',
+      const { openrouterManager } = await import('./openrouter-manager');
+      const res = await openrouterManager.chatCompletion({
+        model: 'meta-llama/llama-3.3-70b-instruct',
         responseFormatJson: false,
         messages: [
           { role: 'system', content: promptSystem },

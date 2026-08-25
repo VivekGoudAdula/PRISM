@@ -80,13 +80,13 @@ export async function handleClassifyTaskRequest(c: Context) {
       }
     }
 
-    const { groqManager } = await import('./lib/groq-manager');
+    const { openrouterManager } = await import('./lib/openrouter-manager');
     let category = 'unsupported';
     let success = false;
 
     try {
-      const res = await groqManager.chatCompletion({
-        model: 'openai/gpt-oss-20b',
+      const res = await openrouterManager.chatCompletion({
+        model: 'meta-llama/llama-3.3-70b-instruct',
         responseFormatJson: false,
         messages: [
           {

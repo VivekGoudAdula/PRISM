@@ -102,9 +102,9 @@ INSTRUCTIONS:
 5. Keep your response concise, clear, and under 3-4 sentences.`;
 
   try {
-    const { groqManager } = await import('./lib/groq-manager');
-    const res = await groqManager.chatCompletion({
-      model: 'openai/gpt-oss-20b',
+    const { openrouterManager } = await import('./lib/openrouter-manager');
+    const res = await openrouterManager.chatCompletion({
+      model: 'meta-llama/llama-3.3-70b-instruct',
       responseFormatJson: false,
       messages: [
         {

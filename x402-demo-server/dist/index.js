@@ -86346,6 +86346,334 @@ var init_extract_document = __esm({
   }
 });
 
+// handlers/lib/parse-json-robust.ts
+function parseRobustJson(content) {
+  if (!content || typeof content !== "string") {
+    throw new Error("Empty or invalid content provided for JSON parsing");
+  }
+  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
+  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (!jsonMatch) {
+    throw new Error("No JSON object or array found in text");
+  }
+  let str = jsonMatch[0];
+  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
+    if (stringLiteral) return stringLiteral;
+    return "";
+  });
+  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
+  str = str.replace(/,\s*([\}\]])/g, "$1");
+  try {
+    return JSON.parse(str);
+  } catch (err1) {
+    let fixed = str;
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+    fixed = fixed.replace(/,\s*$/, "");
+    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
+    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
+    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
+    try {
+      return JSON.parse(fixed);
+    } catch (err2) {
+      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
+    }
+  }
+}
+var init_parse_json_robust = __esm({
+  "handlers/lib/parse-json-robust.ts"() {
+    "use strict";
+  }
+});
+
+// handlers/lib/openrouter-manager.ts
+var openrouter_manager_exports = {};
+__export(openrouter_manager_exports, {
+  OpenRouterManagerService: () => OpenRouterManagerService,
+  openrouterManager: () => openrouterManager
+});
+var import_dotenv2, OpenRouterManagerService, openrouterManager;
+var init_openrouter_manager = __esm({
+  "handlers/lib/openrouter-manager.ts"() {
+    "use strict";
+    import_dotenv2 = __toESM(require_main());
+    init_parse_json_robust();
+    (0, import_dotenv2.config)();
+    OpenRouterManagerService = class {
+      keys = [];
+      lastKeyIndex = 0;
+      metrics = {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        parseFailures: 0,
+        emptyResponses: 0,
+        rateLimitedRequests: 0,
+        badRequests: 0
+      };
+      constructor() {
+        this.reloadKeys();
+      }
+      /** Reload keys dynamically from environment variables */
+      reloadKeys() {
+        const rawKeys = [];
+        if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+          rawKeys.push(process.env.OPENROUTER_API_KEY.trim());
+        }
+        for (let i = 1; i <= 20; i++) {
+          const k = process.env[`OPENROUTER_API_KEY_${i}`];
+          if (k && k.trim()) {
+            rawKeys.push(k.trim());
+          }
+        }
+        const uniqueKeys = Array.from(new Set(rawKeys));
+        const existingMap = /* @__PURE__ */ new Map();
+        for (const entry of this.keys) {
+          existingMap.set(entry.key, entry);
+        }
+        this.keys = uniqueKeys.map((key, index) => {
+          const existing = existingMap.get(key);
+          if (existing) return existing;
+          const maskedKey = key.length > 12 ? `${key.slice(0, 10)}...${key.slice(-4)}` : "sk-or-v1-***";
+          return {
+            id: `KEY_${index + 1}`,
+            key,
+            maskedKey,
+            isUnhealthyAuth: false,
+            rateLimitedUntil: 0,
+            totalCalls: 0,
+            successCalls: 0,
+            failedCalls: 0
+          };
+        });
+        if (this.keys.length === 0) {
+          console.warn("\u26A0\uFE0F [OpenRouterManager] No OPENROUTER_API_KEY environment variables found.");
+        }
+      }
+      /** Select an available healthy key using Round-Robin distribution */
+      selectHealthyKey() {
+        const now = Date.now();
+        const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+        if (validKeys.length === 0) return null;
+        const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
+        if (availableKeys.length > 0) {
+          this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
+          return availableKeys[this.lastKeyIndex];
+        }
+        return null;
+      }
+      /**
+       * Chat completion request via OpenRouter API with round-robin key rotation & robust parsing.
+       */
+      async chatCompletion(options) {
+        const model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
+        const temperature = options.temperature ?? 0.1;
+        const maxRetries = options.maxRetriesPerKey ?? 2;
+        const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
+        let attempts = 0;
+        const rotationReasons = [];
+        while (attempts < totalMaxAttempts) {
+          attempts++;
+          this.reloadKeys();
+          let keyEntry = this.selectHealthyKey();
+          if (!keyEntry) {
+            const now = Date.now();
+            const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+            if (validKeys.length > 0) {
+              const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
+              if (minWait > 0 && minWait <= 15e3 && attempts < totalMaxAttempts) {
+                console.warn(`\u23F3 All OpenRouter keys rate-limited. Pausing ${(minWait / 1e3).toFixed(1)}s for window reset...`);
+                await new Promise((r) => setTimeout(r, minWait + 500));
+                keyEntry = this.selectHealthyKey();
+              }
+            }
+          }
+          if (!keyEntry) {
+            this.metrics.failedRequests++;
+            const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
+            if (authCount === this.keys.length && this.keys.length > 0) {
+              throw {
+                code: "OPENROUTER_AUTH_ERROR",
+                message: "All configured OpenRouter API keys returned HTTP 401/403 (Unauthorized). Please check your API keys in environment variables.",
+                status: 401,
+                rotationReasons
+              };
+            }
+            throw {
+              code: "ALL_KEYS_RATE_LIMITED",
+              message: "All OpenRouter API keys are currently rate-limited. Please retry in a few moments.",
+              status: 429,
+              rotationReasons
+            };
+          }
+          this.metrics.totalRequests++;
+          keyEntry.totalCalls++;
+          const startTime = Date.now();
+          console.log(`
+========================================`);
+          console.log(`OPENROUTER AI REQUEST (Attempt ${attempts}/${totalMaxAttempts})`);
+          console.log(`========================================`);
+          console.log(`Key ID:     ${keyEntry.id} (${keyEntry.maskedKey})`);
+          console.log(`Model:      ${model16}`);
+          console.log(`Prompt size:${options.messages.reduce((acc, m) => acc + m.content.length, 0)} chars`);
+          try {
+            const bodyPayload = {
+              model: model16,
+              messages: options.messages,
+              temperature
+            };
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6e4);
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${keyEntry.key}`,
+                "HTTP-Referer": "https://prism.ai",
+                "X-OpenRouter-Title": "PRISM Decentralized AI Router"
+              },
+              body: JSON.stringify(bodyPayload),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const durationMs = Date.now() - startTime;
+            console.log(`========================================`);
+            console.log(`OPENROUTER AI RESPONSE`);
+            console.log(`========================================`);
+            console.log(`Status:     ${response.status} ${response.statusText}`);
+            console.log(`Duration:   ${durationMs} ms`);
+            if (response.ok) {
+              const resData = await response.json().catch(() => null);
+              if (!resData) {
+                this.metrics.emptyResponses++;
+                this.metrics.failedRequests++;
+                keyEntry.failedCalls++;
+                throw {
+                  code: "EMPTY_AI_RESPONSE",
+                  message: "OpenRouter API returned HTTP 200 but response body was unparseable JSON.",
+                  status: 200
+                };
+              }
+              const content = resData.choices?.[0]?.message?.content;
+              const usage = resData.usage;
+              if (content === void 0 || content === null || typeof content === "string" && content.trim() === "") {
+                this.metrics.emptyResponses++;
+                this.metrics.failedRequests++;
+                keyEntry.failedCalls++;
+                console.error(`\u274C Empty response received from OpenRouter model ${model16}`);
+                throw {
+                  code: "EMPTY_AI_RESPONSE",
+                  message: "OpenRouter AI returned an empty response. Analysis could not be completed.",
+                  status: 200
+                };
+              }
+              const trimmedContent = String(content).trim();
+              console.log(`Content len: ${trimmedContent.length}`);
+              let parsedData;
+              if (options.responseFormatJson === false) {
+                parsedData = { reply: trimmedContent };
+              } else {
+                try {
+                  parsedData = parseRobustJson(trimmedContent);
+                  console.log(`JSON parsed: YES`);
+                } catch (parseErr) {
+                  this.metrics.parseFailures++;
+                  this.metrics.failedRequests++;
+                  keyEntry.failedCalls++;
+                  console.error(`\u274C JSON Parsing failed for content: "${trimmedContent.slice(0, 100)}..."`, parseErr.message);
+                  throw {
+                    code: "JSON_PARSE_FAILED",
+                    message: `Failed to parse AI output into structured format: ${parseErr.message}`,
+                    status: 200,
+                    rawContent: trimmedContent
+                  };
+                }
+              }
+              this.metrics.successfulRequests++;
+              keyEntry.successCalls++;
+              return {
+                data: parsedData,
+                rawContent: trimmedContent,
+                model: model16,
+                keyId: keyEntry.id,
+                durationMs,
+                usage
+              };
+            }
+            const status = response.status;
+            keyEntry.failedCalls++;
+            if (status === 400) {
+              this.metrics.badRequests++;
+              const errText2 = await response.text().catch(() => "");
+              console.error(`\u274C Bad Request (400) to OpenRouter: ${errText2}`);
+              throw {
+                code: "BAD_REQUEST",
+                message: `OpenRouter API bad request (HTTP 400): ${errText2}`,
+                status: 400
+              };
+            }
+            if (status === 401 || status === 403) {
+              keyEntry.isUnhealthyAuth = true;
+              const msg2 = `Key ${keyEntry.id} (${keyEntry.maskedKey}) returned HTTP ${status} (Unauthorized/Forbidden) \u2014 marking key unhealthy`;
+              console.warn(`\u26A0\uFE0F ${msg2}`);
+              rotationReasons.push(msg2);
+              continue;
+            }
+            if (status === 429) {
+              this.metrics.rateLimitedRequests++;
+              keyEntry.rateLimitedUntil = Date.now() + 15 * 1e3;
+              const msg2 = `Key ${keyEntry.id} hit rate limit (HTTP 429) \u2014 temporarily rotating key`;
+              console.warn(`\u26A0\uFE0F ${msg2}`);
+              rotationReasons.push(msg2);
+              continue;
+            }
+            const errText = await response.text().catch(() => "");
+            const msg = `Key ${keyEntry.id} failed with HTTP ${status}: ${errText.slice(0, 100)}`;
+            console.warn(`\u26A0\uFE0F ${msg}`);
+            rotationReasons.push(msg);
+          } catch (err2) {
+            if (err2?.code === "BAD_REQUEST" || err2?.code === "JSON_PARSE_FAILED" || err2?.code === "EMPTY_AI_RESPONSE") {
+              throw err2;
+            }
+            console.warn(`\u26A0\uFE0F Request error on key ${keyEntry.id}: ${err2?.message || err2}`);
+            rotationReasons.push(`Key ${keyEntry.id} error: ${err2?.message || String(err2)}`);
+          }
+        }
+        this.metrics.failedRequests++;
+        throw {
+          code: "OPENROUTER_ALL_RETRIES_EXHAUSTED",
+          message: `OpenRouter execution failed after ${attempts} attempt(s) across configured keys.`,
+          status: 502,
+          rotationReasons
+        };
+      }
+      getMetrics() {
+        return {
+          ...this.metrics,
+          totalKeysConfigured: this.keys.length,
+          healthyKeysAvailable: this.keys.filter((k) => !k.isUnhealthyAuth && k.rateLimitedUntil <= Date.now()).length
+        };
+      }
+      getKeyStatuses() {
+        const now = Date.now();
+        return this.keys.map((k) => ({
+          id: k.id,
+          maskedKey: k.maskedKey,
+          isUnhealthyAuth: k.isUnhealthyAuth,
+          isRateLimited: k.rateLimitedUntil > now,
+          rateLimitedSecondsRemaining: Math.max(0, Math.ceil((k.rateLimitedUntil - now) / 1e3)),
+          totalCalls: k.totalCalls,
+          successCalls: k.successCalls,
+          failedCalls: k.failedCalls
+        }));
+      }
+    };
+    openrouterManager = new OpenRouterManagerService();
+  }
+});
+
 // node_modules/dotenv/lib/env-options.js
 var require_env_options = __commonJS({
   "node_modules/dotenv/lib/env-options.js"(exports2, module2) {
@@ -87980,9 +88308,9 @@ async function buildSemanticMap(category, extracted_text, filename = "document")
   }
   if (extracted_text.trim().length > 0) {
     try {
-      const { groqManager: groqManager2 } = await import("./groq-manager");
-      const res = await groqManager2.chatCompletion({
-        model: "openai/gpt-oss-20b",
+      const { openrouterManager: openrouterManager2 } = await Promise.resolve().then(() => (init_openrouter_manager(), openrouter_manager_exports));
+      const res = await openrouterManager2.chatCompletion({
+        model: "meta-llama/llama-3.3-70b-instruct",
         responseFormatJson: false,
         messages: [
           { role: "system", content: promptSystem },
@@ -88217,9 +88545,9 @@ Return ONLY a JSON object with this exact structure:
   "summarizedSections": ["summary descriptions of condensed sections"]
 }`;
       try {
-        const { groqManager: groqManager2 } = await import("../handlers/lib/groq-manager");
-        const res = await groqManager2.chatCompletion({
-          model: "openai/gpt-oss-20b",
+        const { openrouterManager: openrouterManager2 } = await Promise.resolve().then(() => (init_openrouter_manager(), openrouter_manager_exports));
+        const res = await openrouterManager2.chatCompletion({
+          model: "meta-llama/llama-3.3-70b-instruct",
           responseFormatJson: false,
           messages: [
             { role: "system", content: systemInstruction },
@@ -88294,13 +88622,13 @@ ${currentContext}` }
     measurementSource: "estimated"
   };
 }
-var import_dotenv3;
+var import_dotenv4;
 var init_promptOptimizer = __esm({
   "services/promptOptimizer.ts"() {
     "use strict";
-    import_dotenv3 = __toESM(require_main());
+    import_dotenv4 = __toESM(require_main());
     init_tokenAnalytics();
-    (0, import_dotenv3.config)();
+    (0, import_dotenv4.config)();
   }
 });
 
@@ -88957,329 +89285,6 @@ var init_invoice_extract_accurate = __esm({
   }
 });
 
-// handlers/lib/parse-json-robust.ts
-function parseRobustJson(content) {
-  if (!content || typeof content !== "string") {
-    throw new Error("Empty or invalid content provided for JSON parsing");
-  }
-  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
-  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (!jsonMatch) {
-    throw new Error("No JSON object or array found in text");
-  }
-  let str = jsonMatch[0];
-  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
-    if (stringLiteral) return stringLiteral;
-    return "";
-  });
-  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
-  str = str.replace(/,\s*([\}\]])/g, "$1");
-  try {
-    return JSON.parse(str);
-  } catch (err1) {
-    let fixed = str;
-    const openBraces = (fixed.match(/\{/g) || []).length;
-    const closeBraces = (fixed.match(/\}/g) || []).length;
-    const openBrackets = (fixed.match(/\[/g) || []).length;
-    const closeBrackets = (fixed.match(/\]/g) || []).length;
-    fixed = fixed.replace(/,\s*$/, "");
-    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
-    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
-    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
-    try {
-      return JSON.parse(fixed);
-    } catch (err2) {
-      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
-    }
-  }
-}
-var init_parse_json_robust = __esm({
-  "handlers/lib/parse-json-robust.ts"() {
-    "use strict";
-  }
-});
-
-// handlers/lib/openrouter-manager.ts
-var import_dotenv4, OpenRouterManagerService, openrouterManager;
-var init_openrouter_manager = __esm({
-  "handlers/lib/openrouter-manager.ts"() {
-    "use strict";
-    import_dotenv4 = __toESM(require_main());
-    init_parse_json_robust();
-    (0, import_dotenv4.config)();
-    OpenRouterManagerService = class {
-      keys = [];
-      lastKeyIndex = 0;
-      metrics = {
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        parseFailures: 0,
-        emptyResponses: 0,
-        rateLimitedRequests: 0,
-        badRequests: 0
-      };
-      constructor() {
-        this.reloadKeys();
-      }
-      /** Reload keys dynamically from environment variables */
-      reloadKeys() {
-        const rawKeys = [];
-        if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
-          rawKeys.push(process.env.OPENROUTER_API_KEY.trim());
-        }
-        for (let i = 1; i <= 20; i++) {
-          const k = process.env[`OPENROUTER_API_KEY_${i}`];
-          if (k && k.trim()) {
-            rawKeys.push(k.trim());
-          }
-        }
-        const uniqueKeys = Array.from(new Set(rawKeys));
-        const existingMap = /* @__PURE__ */ new Map();
-        for (const entry of this.keys) {
-          existingMap.set(entry.key, entry);
-        }
-        this.keys = uniqueKeys.map((key, index) => {
-          const existing = existingMap.get(key);
-          if (existing) return existing;
-          const maskedKey = key.length > 12 ? `${key.slice(0, 10)}...${key.slice(-4)}` : "sk-or-v1-***";
-          return {
-            id: `KEY_${index + 1}`,
-            key,
-            maskedKey,
-            isUnhealthyAuth: false,
-            rateLimitedUntil: 0,
-            totalCalls: 0,
-            successCalls: 0,
-            failedCalls: 0
-          };
-        });
-        if (this.keys.length === 0) {
-          console.warn("\u26A0\uFE0F [OpenRouterManager] No OPENROUTER_API_KEY environment variables found.");
-        }
-      }
-      /** Select an available healthy key using Round-Robin distribution */
-      selectHealthyKey() {
-        const now = Date.now();
-        const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
-        if (validKeys.length === 0) return null;
-        const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
-        if (availableKeys.length > 0) {
-          this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
-          return availableKeys[this.lastKeyIndex];
-        }
-        return null;
-      }
-      /**
-       * Chat completion request via OpenRouter API with round-robin key rotation & robust parsing.
-       */
-      async chatCompletion(options) {
-        const model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
-        const temperature = options.temperature ?? 0.1;
-        const maxRetries = options.maxRetriesPerKey ?? 2;
-        const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
-        let attempts = 0;
-        const rotationReasons = [];
-        while (attempts < totalMaxAttempts) {
-          attempts++;
-          this.reloadKeys();
-          let keyEntry = this.selectHealthyKey();
-          if (!keyEntry) {
-            const now = Date.now();
-            const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
-            if (validKeys.length > 0) {
-              const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
-              if (minWait > 0 && minWait <= 15e3 && attempts < totalMaxAttempts) {
-                console.warn(`\u23F3 All OpenRouter keys rate-limited. Pausing ${(minWait / 1e3).toFixed(1)}s for window reset...`);
-                await new Promise((r) => setTimeout(r, minWait + 500));
-                keyEntry = this.selectHealthyKey();
-              }
-            }
-          }
-          if (!keyEntry) {
-            this.metrics.failedRequests++;
-            const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
-            if (authCount === this.keys.length && this.keys.length > 0) {
-              throw {
-                code: "OPENROUTER_AUTH_ERROR",
-                message: "All configured OpenRouter API keys returned HTTP 401/403 (Unauthorized). Please check your API keys in environment variables.",
-                status: 401,
-                rotationReasons
-              };
-            }
-            throw {
-              code: "ALL_KEYS_RATE_LIMITED",
-              message: "All OpenRouter API keys are currently rate-limited. Please retry in a few moments.",
-              status: 429,
-              rotationReasons
-            };
-          }
-          this.metrics.totalRequests++;
-          keyEntry.totalCalls++;
-          const startTime = Date.now();
-          console.log(`
-========================================`);
-          console.log(`OPENROUTER AI REQUEST (Attempt ${attempts}/${totalMaxAttempts})`);
-          console.log(`========================================`);
-          console.log(`Key ID:     ${keyEntry.id} (${keyEntry.maskedKey})`);
-          console.log(`Model:      ${model16}`);
-          console.log(`Prompt size:${options.messages.reduce((acc, m) => acc + m.content.length, 0)} chars`);
-          try {
-            const bodyPayload = {
-              model: model16,
-              messages: options.messages,
-              temperature
-            };
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6e4);
-            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${keyEntry.key}`,
-                "HTTP-Referer": "https://prism.ai",
-                "X-OpenRouter-Title": "PRISM Decentralized AI Router"
-              },
-              body: JSON.stringify(bodyPayload),
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            const durationMs = Date.now() - startTime;
-            console.log(`========================================`);
-            console.log(`OPENROUTER AI RESPONSE`);
-            console.log(`========================================`);
-            console.log(`Status:     ${response.status} ${response.statusText}`);
-            console.log(`Duration:   ${durationMs} ms`);
-            if (response.ok) {
-              const resData = await response.json().catch(() => null);
-              if (!resData) {
-                this.metrics.emptyResponses++;
-                this.metrics.failedRequests++;
-                keyEntry.failedCalls++;
-                throw {
-                  code: "EMPTY_AI_RESPONSE",
-                  message: "OpenRouter API returned HTTP 200 but response body was unparseable JSON.",
-                  status: 200
-                };
-              }
-              const content = resData.choices?.[0]?.message?.content;
-              const usage = resData.usage;
-              if (content === void 0 || content === null || typeof content === "string" && content.trim() === "") {
-                this.metrics.emptyResponses++;
-                this.metrics.failedRequests++;
-                keyEntry.failedCalls++;
-                console.error(`\u274C Empty response received from OpenRouter model ${model16}`);
-                throw {
-                  code: "EMPTY_AI_RESPONSE",
-                  message: "OpenRouter AI returned an empty response. Analysis could not be completed.",
-                  status: 200
-                };
-              }
-              const trimmedContent = String(content).trim();
-              console.log(`Content len: ${trimmedContent.length}`);
-              let parsedData;
-              if (options.responseFormatJson === false) {
-                parsedData = { reply: trimmedContent };
-              } else {
-                try {
-                  parsedData = parseRobustJson(trimmedContent);
-                  console.log(`JSON parsed: YES`);
-                } catch (parseErr) {
-                  this.metrics.parseFailures++;
-                  this.metrics.failedRequests++;
-                  keyEntry.failedCalls++;
-                  console.error(`\u274C JSON Parsing failed for content: "${trimmedContent.slice(0, 100)}..."`, parseErr.message);
-                  throw {
-                    code: "JSON_PARSE_FAILED",
-                    message: `Failed to parse AI output into structured format: ${parseErr.message}`,
-                    status: 200,
-                    rawContent: trimmedContent
-                  };
-                }
-              }
-              this.metrics.successfulRequests++;
-              keyEntry.successCalls++;
-              return {
-                data: parsedData,
-                rawContent: trimmedContent,
-                model: model16,
-                keyId: keyEntry.id,
-                durationMs,
-                usage
-              };
-            }
-            const status = response.status;
-            keyEntry.failedCalls++;
-            if (status === 400) {
-              this.metrics.badRequests++;
-              const errText2 = await response.text().catch(() => "");
-              console.error(`\u274C Bad Request (400) to OpenRouter: ${errText2}`);
-              throw {
-                code: "BAD_REQUEST",
-                message: `OpenRouter API bad request (HTTP 400): ${errText2}`,
-                status: 400
-              };
-            }
-            if (status === 401 || status === 403) {
-              keyEntry.isUnhealthyAuth = true;
-              const msg2 = `Key ${keyEntry.id} (${keyEntry.maskedKey}) returned HTTP ${status} (Unauthorized/Forbidden) \u2014 marking key unhealthy`;
-              console.warn(`\u26A0\uFE0F ${msg2}`);
-              rotationReasons.push(msg2);
-              continue;
-            }
-            if (status === 429) {
-              this.metrics.rateLimitedRequests++;
-              keyEntry.rateLimitedUntil = Date.now() + 15 * 1e3;
-              const msg2 = `Key ${keyEntry.id} hit rate limit (HTTP 429) \u2014 temporarily rotating key`;
-              console.warn(`\u26A0\uFE0F ${msg2}`);
-              rotationReasons.push(msg2);
-              continue;
-            }
-            const errText = await response.text().catch(() => "");
-            const msg = `Key ${keyEntry.id} failed with HTTP ${status}: ${errText.slice(0, 100)}`;
-            console.warn(`\u26A0\uFE0F ${msg}`);
-            rotationReasons.push(msg);
-          } catch (err2) {
-            if (err2?.code === "BAD_REQUEST" || err2?.code === "JSON_PARSE_FAILED" || err2?.code === "EMPTY_AI_RESPONSE") {
-              throw err2;
-            }
-            console.warn(`\u26A0\uFE0F Request error on key ${keyEntry.id}: ${err2?.message || err2}`);
-            rotationReasons.push(`Key ${keyEntry.id} error: ${err2?.message || String(err2)}`);
-          }
-        }
-        this.metrics.failedRequests++;
-        throw {
-          code: "OPENROUTER_ALL_RETRIES_EXHAUSTED",
-          message: `OpenRouter execution failed after ${attempts} attempt(s) across configured keys.`,
-          status: 502,
-          rotationReasons
-        };
-      }
-      getMetrics() {
-        return {
-          ...this.metrics,
-          totalKeysConfigured: this.keys.length,
-          healthyKeysAvailable: this.keys.filter((k) => !k.isUnhealthyAuth && k.rateLimitedUntil <= Date.now()).length
-        };
-      }
-      getKeyStatuses() {
-        const now = Date.now();
-        return this.keys.map((k) => ({
-          id: k.id,
-          maskedKey: k.maskedKey,
-          isUnhealthyAuth: k.isUnhealthyAuth,
-          isRateLimited: k.rateLimitedUntil > now,
-          rateLimitedSecondsRemaining: Math.max(0, Math.ceil((k.rateLimitedUntil - now) / 1e3)),
-          totalCalls: k.totalCalls,
-          successCalls: k.successCalls,
-          failedCalls: k.failedCalls
-        }));
-      }
-    };
-    openrouterManager = new OpenRouterManagerService();
-  }
-});
-
 // handlers/code-review-fast.ts
 var code_review_fast_exports = {};
 __export(code_review_fast_exports, {
@@ -89768,12 +89773,12 @@ async function handleClassifyTaskRequest(c) {
         return c.json({ category: "unsupported", raw_input: task_description });
       }
     }
-    const { groqManager: groqManager2 } = await import("./lib/groq-manager");
+    const { openrouterManager: openrouterManager2 } = await Promise.resolve().then(() => (init_openrouter_manager(), openrouter_manager_exports));
     let category = "unsupported";
     let success2 = false;
     try {
-      const res = await groqManager2.chatCompletion({
-        model: "openai/gpt-oss-20b",
+      const res = await openrouterManager2.chatCompletion({
+        model: "meta-llama/llama-3.3-70b-instruct",
         responseFormatJson: false,
         messages: [
           {
@@ -90783,9 +90788,9 @@ INSTRUCTIONS:
 4. If the answer isn't in the provided context, state clearly: "I don't have a previous result to reference \u2014 could you clarify what you'd like me to look at?"
 5. Keep your response concise, clear, and under 3-4 sentences.`;
   try {
-    const { groqManager: groqManager2 } = await import("./lib/groq-manager");
-    const res = await groqManager2.chatCompletion({
-      model: "openai/gpt-oss-20b",
+    const { openrouterManager: openrouterManager2 } = await Promise.resolve().then(() => (init_openrouter_manager(), openrouter_manager_exports));
+    const res = await openrouterManager2.chatCompletion({
+      model: "meta-llama/llama-3.3-70b-instruct",
       responseFormatJson: false,
       messages: [
         {
@@ -102419,10 +102424,10 @@ adminRouter.get("/analytics/tasks/:taskId", async (c) => {
 });
 
 // services/promptTutor.ts
-var import_dotenv2 = __toESM(require_main());
+var import_dotenv3 = __toESM(require_main());
 init_extract_document();
 init_tokenAnalytics();
-(0, import_dotenv2.config)();
+(0, import_dotenv3.config)();
 function getGroqKeys() {
   const keys = [];
   if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
@@ -102510,9 +102515,9 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
     try {
-      const { groqManager: groqManager2 } = await import("../handlers/lib/groq-manager");
-      const res = await groqManager2.chatCompletion({
-        model: "openai/gpt-oss-20b",
+      const { openrouterManager: openrouterManager2 } = await Promise.resolve().then(() => (init_openrouter_manager(), openrouter_manager_exports));
+      const res = await openrouterManager2.chatCompletion({
+        model: "meta-llama/llama-3.3-70b-instruct",
         responseFormatJson: false,
         messages: [
           { role: "system", content: systemInstruction },

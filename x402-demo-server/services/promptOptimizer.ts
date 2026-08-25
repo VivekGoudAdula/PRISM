@@ -329,9 +329,9 @@ Return ONLY a JSON object with this exact structure:
 }`;
 
     try {
-      const { groqManager } = await import('../handlers/lib/groq-manager');
-      const res = await groqManager.chatCompletion({
-        model: 'openai/gpt-oss-20b',
+      const { openrouterManager } = await import('../handlers/lib/openrouter-manager');
+      const res = await openrouterManager.chatCompletion({
+        model: 'meta-llama/llama-3.3-70b-instruct',
         responseFormatJson: false,
         messages: [
           { role: 'system', content: systemInstruction },
