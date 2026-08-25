@@ -113,8 +113,13 @@ export class OpenRouterManagerService {
     durationMs: number;
     usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   }> {
-    // Default model: meta-llama/llama-3.3-70b-instruct or google/gemini-2.5-flash
-    const model = options.model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct';
+    // Default model: meta-llama/llama-3.3-70b-instruct:free or google/gemini-2.5-flash:free
+    let model = options.model || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
+    // Ensure model has :free suffix if no custom environment override is specified
+    if (!process.env.OPENROUTER_MODEL && !model.endsWith(':free') && !model.includes('/')) {
+      model = `${model}:free`;
+    }
+
     const temperature = options.temperature ?? 0.1;
     const maxRetries = options.maxRetriesPerKey ?? 2;
     const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
@@ -175,6 +180,7 @@ export class OpenRouterManagerService {
           model,
           messages: options.messages,
           temperature,
+          max_tokens: 4096,
         };
 
         const controller = new AbortController();
@@ -270,6 +276,15 @@ export class OpenRouterManagerService {
         // ── 2. HTTP Error Handling ───────
         const status = response.status;
         keyEntry.failedCalls++;
+
+        if (status === 402) {
+          const errText = await response.text().catch(() => '');
+          const freeFallbackModel = model.endsWith(':free') ? 'openrouter/auto' : `${model}:free`;
+          console.warn(`⚠️ OpenRouter HTTP 402 (Payment Required) on ${model}. Retrying with free model: ${freeFallbackModel}`);
+          rotationReasons.push(`HTTP 402 on ${model} — switching to ${freeFallbackModel}`);
+          model = freeFallbackModel;
+          continue;
+        }
 
         if (status === 400) {
           this.metrics.badRequests++;

@@ -47,7 +47,7 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
       issues: Array<{ line_estimate?: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }>;
       overall_quality_score?: number;
     }>({
-      model: 'meta-llama/llama-3.3-70b-instruct',
+      model: 'meta-llama/llama-3.3-70b-instruct:free',
       messages: [
         {
           role: 'system',

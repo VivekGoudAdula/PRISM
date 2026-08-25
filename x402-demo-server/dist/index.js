@@ -86468,7 +86468,10 @@ var init_openrouter_manager = __esm({
        * Chat completion request via OpenRouter API with round-robin key rotation & robust parsing.
        */
       async chatCompletion(options) {
-        const model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
+        let model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
+        if (!process.env.OPENROUTER_MODEL && !model16.endsWith(":free") && !model16.includes("/")) {
+          model16 = `${model16}:free`;
+        }
         const temperature = options.temperature ?? 0.1;
         const maxRetries = options.maxRetriesPerKey ?? 2;
         const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
@@ -86522,7 +86525,8 @@ var init_openrouter_manager = __esm({
             const bodyPayload = {
               model: model16,
               messages: options.messages,
-              temperature
+              temperature,
+              max_tokens: 4096
             };
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 6e4);
@@ -86604,6 +86608,14 @@ var init_openrouter_manager = __esm({
             }
             const status = response.status;
             keyEntry.failedCalls++;
+            if (status === 402) {
+              const errText2 = await response.text().catch(() => "");
+              const freeFallbackModel = model16.endsWith(":free") ? "openrouter/auto" : `${model16}:free`;
+              console.warn(`\u26A0\uFE0F OpenRouter HTTP 402 (Payment Required) on ${model16}. Retrying with free model: ${freeFallbackModel}`);
+              rotationReasons.push(`HTTP 402 on ${model16} \u2014 switching to ${freeFallbackModel}`);
+              model16 = freeFallbackModel;
+              continue;
+            }
             if (status === 400) {
               this.metrics.badRequests++;
               const errText2 = await response.text().catch(() => "");
@@ -89323,7 +89335,7 @@ async function handleCodeReviewFastRequest(c) {
       }, 404);
     }
     const aiResult = await openrouterManager.chatCompletion({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash:free",
       messages: [
         {
           role: "system",
@@ -89414,7 +89426,7 @@ async function handleCodeReviewAccurateRequest(c) {
       }, 404);
     }
     const aiResult = await openrouterManager.chatCompletion({
-      model: "meta-llama/llama-3.3-70b-instruct",
+      model: "meta-llama/llama-3.3-70b-instruct:free",
       messages: [
         {
           role: "system",

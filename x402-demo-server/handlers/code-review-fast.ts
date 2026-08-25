@@ -47,7 +47,7 @@ export async function handleCodeReviewFastRequest(c: Context) {
       issues: Array<{ line_estimate?: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }>;
       overall_quality_score?: number;
     }>({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-2.5-flash:free',
       messages: [
         {
           role: 'system',
