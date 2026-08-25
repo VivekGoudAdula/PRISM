@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /contract-analyze-accurate
- * High-precision contract analysis using Groq LLM API
+ * High-precision contract analysis using OpenRouter LLM API
  */
 export async function handleContractAnalyzeAccurateRequest(c: Context) {
   const startTime = Date.now();

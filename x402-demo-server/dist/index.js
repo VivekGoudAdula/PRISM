@@ -265,7 +265,7 @@ var require_main = __commonJS({
         return { parsed: parsedAll };
       }
     }
-    function config9(options) {
+    function config10(options) {
       if (_dotenvKey(options).length === 0) {
         return DotenvModule.configDotenv(options);
       }
@@ -336,7 +336,7 @@ var require_main = __commonJS({
       configDotenv,
       _configVault,
       _parseVault,
-      config: config9,
+      config: config10,
       decrypt,
       parse,
       populate
@@ -11931,14 +11931,14 @@ function createMcpDiscoveryExtension({
     }
   };
 }
-function declareDiscoveryExtension(config9) {
-  if ("toolName" in config9) {
-    const extension2 = createMcpDiscoveryExtension(config9);
+function declareDiscoveryExtension(config10) {
+  if ("toolName" in config10) {
+    const extension2 = createMcpDiscoveryExtension(config10);
     return { bazaar: extension2 };
   }
-  const bodyType = config9.bodyType;
+  const bodyType = config10.bodyType;
   const isBodyMethod2 = bodyType !== void 0;
-  const extension = isBodyMethod2 ? createBodyDiscoveryExtension(config9) : createQueryDiscoveryExtension(config9);
+  const extension = isBodyMethod2 ? createBodyDiscoveryExtension(config10) : createQueryDiscoveryExtension(config10);
   return { bazaar: extension };
 }
 function isHTTPRequestContext(ctx) {
@@ -12400,14 +12400,14 @@ var init_chunk_RWD3IB5N = __esm({
   "node_modules/@x402/extensions/dist/esm/chunk-RWD3IB5N.mjs"() {
     import_url6 = require("url");
     import__ = __toESM(require__(), 1);
-    isQueryExtensionConfig = (config9) => {
-      return !("bodyType" in config9) && !("toolName" in config9);
+    isQueryExtensionConfig = (config10) => {
+      return !("bodyType" in config10) && !("toolName" in config10);
     };
-    isBodyExtensionConfig = (config9) => {
-      return "bodyType" in config9;
+    isBodyExtensionConfig = (config10) => {
+      return "bodyType" in config10;
     };
-    isMcpExtensionConfig = (config9) => {
-      return "toolName" in config9;
+    isMcpExtensionConfig = (config10) => {
+      return "toolName" in config10;
     };
     BAZAAR = { key: "bazaar" };
     BRACKET_PARAM_REGEX = /\[([^\]]+)\]/;
@@ -12785,14 +12785,14 @@ function createMcpDiscoveryExtension2({
     }
   };
 }
-function declareDiscoveryExtension2(config9) {
-  if ("toolName" in config9) {
-    const extension2 = createMcpDiscoveryExtension2(config9);
+function declareDiscoveryExtension2(config10) {
+  if ("toolName" in config10) {
+    const extension2 = createMcpDiscoveryExtension2(config10);
     return { bazaar: extension2 };
   }
-  const bodyType = config9.bodyType;
+  const bodyType = config10.bodyType;
   const isBodyMethod2 = bodyType !== void 0;
-  const extension = isBodyMethod2 ? createBodyDiscoveryExtension2(config9) : createQueryDiscoveryExtension2(config9);
+  const extension = isBodyMethod2 ? createBodyDiscoveryExtension2(config10) : createQueryDiscoveryExtension2(config10);
   return { bazaar: extension };
 }
 function isHTTPRequestContext2(ctx) {
@@ -16832,12 +16832,12 @@ var require_utilities = __commonJS({
       if (typeof caption === "string" && caption !== "") {
         cap = caption;
       }
-      let success;
+      let success2;
       let state;
       if (result.success === true) {
-        success = `<span class="${style.CLASS_MATCH}">true</span>`;
+        success2 = `<span class="${style.CLASS_MATCH}">true</span>`;
       } else {
-        success = `<span class="${style.CLASS_NOMATCH}">false</span>`;
+        success2 = `<span class="${style.CLASS_NOMATCH}">false</span>`;
       }
       if (result.state === id.EMPTY) {
         state = `<span class="${style.CLASS_EMPTY}">EMPTY</span>`;
@@ -16856,7 +16856,7 @@ var require_utilities = __commonJS({
 `;
       }
       html += "<tr><th>state item</th><th>value</th><th>description</th></tr>\n";
-      html += `<tr><td>parser success</td><td>${success}</td>
+      html += `<tr><td>parser success</td><td>${success2}</td>
 `;
       html += `<td><span class="${style.CLASS_MATCH}">true</span> if the parse succeeded,
 `;
@@ -17889,7 +17889,7 @@ var require_parser = __commonJS({
         }
       };
       const privateParse = function(grammar, startRuleArg, callbackData) {
-        let success;
+        let success2;
         const functionName = `${thisFileName}parse(): `;
         initializeGrammar(grammar);
         const startRule = initializeStartRule(startRuleArg);
@@ -17913,21 +17913,21 @@ var require_parser = __commonJS({
           case id.ACTIVE:
             throw new Error(`${functionName}final state should never be 'ACTIVE'`);
           case id.NOMATCH:
-            success = false;
+            success2 = false;
             break;
           case id.EMPTY:
           case id.MATCH:
             if (sysData.phraseLength === charsLength) {
-              success = true;
+              success2 = true;
             } else {
-              success = false;
+              success2 = false;
             }
             break;
           default:
             throw new Error("unrecognized state");
         }
         return {
-          success,
+          success: success2,
           state: sysData.state,
           length: charsLength,
           matched: sysData.phraseLength,
@@ -17960,7 +17960,7 @@ var require_parser = __commonJS({
         }
       };
       const opCAT = function(opIndex, phraseIndex, sysData) {
-        let success;
+        let success2;
         let astLength;
         let catCharIndex;
         let catPhrase;
@@ -17970,20 +17970,20 @@ var require_parser = __commonJS({
         if (thisThis.ast) {
           astLength = thisThis.ast.getLength();
         }
-        success = true;
+        success2 = true;
         catCharIndex = phraseIndex;
         catPhrase = 0;
         for (let i = 0; i < op.children.length; i += 1) {
           opExecute(op.children[i], catCharIndex, sysData);
           if (sysData.state === id.NOMATCH) {
-            success = false;
+            success2 = false;
             break;
           } else {
             catCharIndex += sysData.phraseLength;
             catPhrase += sysData.phraseLength;
           }
         }
-        if (success) {
+        if (success2) {
           sysData.state = catPhrase === 0 ? id.EMPTY : id.MATCH;
           sysData.phraseLength = catPhrase;
         } else {
@@ -18434,7 +18434,7 @@ var require_parser = __commonJS({
         }
       };
       const opCATBehind = function(opIndex, phraseIndex, sysData) {
-        let success;
+        let success2;
         let astLength;
         let catCharIndex;
         let catMatched;
@@ -18444,7 +18444,7 @@ var require_parser = __commonJS({
         if (thisThis.ast) {
           astLength = thisThis.ast.getLength();
         }
-        success = true;
+        success2 = true;
         catCharIndex = phraseIndex;
         catMatched = 0;
         for (let i = op.children.length - 1; i >= 0; i -= 1) {
@@ -18452,11 +18452,11 @@ var require_parser = __commonJS({
           catCharIndex -= sysData.phraseLength;
           catMatched += sysData.phraseLength;
           if (sysData.state === id.NOMATCH) {
-            success = false;
+            success2 = false;
             break;
           }
         }
-        if (success) {
+        if (success2) {
           sysData.state = catMatched === 0 ? id.EMPTY : id.MATCH;
           sysData.phraseLength = catMatched;
         } else {
@@ -22627,15 +22627,15 @@ var require_parser2 = __commonJS({
           lineMap: data.rulesLineMap
         };
       };
-      this.generateSource = function generateSource(chars, lines, rules, udts, config9) {
+      this.generateSource = function generateSource(chars, lines, rules, udts, config10) {
         let source = "";
         let typescript = false;
         let lite = false;
-        if (config9) {
-          if (config9.typescript) {
+        if (config10) {
+          if (config10.typescript) {
             typescript = true;
             lite = false;
-          } else if (config9.lite) {
+          } else if (config10.lite) {
             typescript = false;
             lite = true;
           }
@@ -22751,9 +22751,9 @@ var require_parser2 = __commonJS({
         source += "//   license: BSD-2-Clause (https://opensource.org/licenses/BSD-2-Clause)<br>\n";
         source += "//\n";
         source += "// Generated by apg-js, Version 4.4.0 [apg-js](https://github.com/ldthomas/apg-js)\n";
-        if (config9) {
-          if (config9.funcName) {
-            source += `const ${config9.funcName} = function grammar(){
+        if (config10) {
+          if (config10.funcName) {
+            source += `const ${config10.funcName} = function grammar(){
 `;
           } else if (typescript) {
             source += "export function grammar(){\n";
@@ -24240,14 +24240,14 @@ var require_api = __commonJS({
         }
         return showAttributeErrors();
       };
-      this.toSource = function toSource(config9 = void 0) {
+      this.toSource = function toSource(config10 = void 0) {
         if (!haveAttributes) {
           throw new Error(`${thisFileName}can't generate parser source - must be preceeded by call to attributes()`);
         }
         if (attributeErrors) {
           throw new Error(`${thisFileName}can't generate parser source - attributes have ${attributeErrors} errors`);
         }
-        return parser.generateSource(this.chars, this.lines, this.rules, this.udts, config9);
+        return parser.generateSource(this.chars, this.lines, this.rules, this.udts, config10);
       };
       this.toObject = function toObject() {
         if (!haveAttributes) {
@@ -52257,26 +52257,26 @@ var require_provider_fallback = __commonJS({
       _lastFatalError: null,
       _lastFatalErrorTimestamp: 0
     };
-    async function waitForSync(config9, blockNumber) {
-      while (config9.blockNumber < 0 || config9.blockNumber < blockNumber) {
-        if (!config9._updateNumber) {
-          config9._updateNumber = (async () => {
+    async function waitForSync(config10, blockNumber) {
+      while (config10.blockNumber < 0 || config10.blockNumber < blockNumber) {
+        if (!config10._updateNumber) {
+          config10._updateNumber = (async () => {
             try {
-              const blockNumber2 = await config9.provider.getBlockNumber();
-              if (blockNumber2 > config9.blockNumber) {
-                config9.blockNumber = blockNumber2;
+              const blockNumber2 = await config10.provider.getBlockNumber();
+              if (blockNumber2 > config10.blockNumber) {
+                config10.blockNumber = blockNumber2;
               }
             } catch (error) {
-              config9.blockNumber = -2;
-              config9._lastFatalError = error;
-              config9._lastFatalErrorTimestamp = getTime();
+              config10.blockNumber = -2;
+              config10._lastFatalError = error;
+              config10._lastFatalErrorTimestamp = getTime();
             }
-            config9._updateNumber = null;
+            config10._updateNumber = null;
           })();
         }
-        await config9._updateNumber;
-        config9.outOfSync++;
-        if (config9._lastFatalError) {
+        await config10._updateNumber;
+        config10.outOfSync++;
+        if (config10._lastFatalError) {
           break;
         }
       }
@@ -52452,8 +52452,8 @@ var require_provider_fallback = __commonJS({
         if (options && options.quorum != null) {
           this.quorum = options.quorum;
         } else {
-          this.quorum = Math.ceil(this.#configs.reduce((accum, config9) => {
-            accum += config9.weight;
+          this.quorum = Math.ceil(this.#configs.reduce((accum, config10) => {
+            accum += config10.weight;
             return accum;
           }, 0) / 2);
         }
@@ -52527,24 +52527,24 @@ var require_provider_fallback = __commonJS({
         const allConfigs = this.#configs.slice();
         shuffle(allConfigs);
         allConfigs.sort((a, b) => a.priority - b.priority);
-        for (const config9 of allConfigs) {
-          if (config9._lastFatalError) {
+        for (const config10 of allConfigs) {
+          if (config10._lastFatalError) {
             continue;
           }
-          if (configs.indexOf(config9) === -1) {
-            return config9;
+          if (configs.indexOf(config10) === -1) {
+            return config10;
           }
         }
         return null;
       }
       // Adds a new runner (if available) to running.
       #addRunner(running, req) {
-        const config9 = this.#getNextConfig(running);
-        if (config9 == null) {
+        const config10 = this.#getNextConfig(running);
+        if (config10 == null) {
           return null;
         }
         const runner = {
-          config: config9,
+          config: config10,
           result: null,
           didBump: false,
           perform: null,
@@ -52553,20 +52553,20 @@ var require_provider_fallback = __commonJS({
         const now = getTime();
         runner.perform = (async () => {
           try {
-            config9.requests++;
-            const result = await this._translatePerform(config9.provider, req);
+            config10.requests++;
+            const result = await this._translatePerform(config10.provider, req);
             runner.result = { result };
           } catch (error) {
-            config9.errorResponses++;
+            config10.errorResponses++;
             runner.result = { error };
           }
           const dt = getTime() - now;
-          config9._totalTime += dt;
-          config9.rollingDuration = 0.95 * config9.rollingDuration + 0.05 * dt;
+          config10._totalTime += dt;
+          config10.rollingDuration = 0.95 * config10.rollingDuration + 0.05 * dt;
           runner.perform = null;
         })();
         runner.staller = (async () => {
-          await stall(config9.stallTimeout);
+          await stall(config10.stallTimeout);
           runner.staller = null;
         })();
         running.add(runner);
@@ -52578,22 +52578,22 @@ var require_provider_fallback = __commonJS({
         let initialSync = this.#initialSyncPromise;
         if (!initialSync) {
           const promises = [];
-          this.#configs.forEach((config9) => {
+          this.#configs.forEach((config10) => {
             promises.push((async () => {
-              await waitForSync(config9, 0);
-              if (!config9._lastFatalError) {
-                config9._network = await config9.provider.getNetwork();
+              await waitForSync(config10, 0);
+              if (!config10._lastFatalError) {
+                config10._network = await config10.provider.getNetwork();
               }
             })());
           });
           this.#initialSyncPromise = initialSync = (async () => {
             await Promise.all(promises);
             let chainId = null;
-            for (const config9 of this.#configs) {
-              if (config9._lastFatalError) {
+            for (const config10 of this.#configs) {
+              if (config10._lastFatalError) {
                 continue;
               }
-              const network = config9._network;
+              const network = config10._network;
               if (chainId == null) {
                 chainId = network.chainId;
               } else if (network.chainId !== chainId) {
@@ -87916,15 +87916,6 @@ async function logSavings(filename, raw_tokens, map_tokens) {
     console.error("Failed to log savings to MongoDB:", err2);
   }
 }
-function getGroqKeys2() {
-  const keys = [];
-  if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-  for (let i = 1; i <= 20; i++) {
-    const k = process.env[`GROQ_API_KEY_${i}`];
-    if (k) keys.push(k);
-  }
-  return keys;
-}
 async function buildSemanticMap(category, extracted_text, filename = "document") {
   const rawTokensCount = encode2(extracted_text || "").length;
   let promptSystem = "";
@@ -87987,47 +87978,34 @@ async function buildSemanticMap(category, extracted_text, filename = "document")
       map_tokens: mapTokensCount2
     };
   }
-  const keys = getGroqKeys2();
-  const modelsToTry = ["llama-3.3-70b-versatile", "gemma2-9b-it", "qwen-2.5-coder-32b", "deepseek-r1-distill-llama-70b"];
-  let extractedMap = defaultFallbackMap;
-  let success = false;
-  if (keys.length > 0 && extracted_text.trim().length > 0) {
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      for (const model16 of modelsToTry) {
-        try {
-          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${key}`
-            },
-            body: JSON.stringify({
-              model: model16,
-              messages: [
-                { role: "system", content: promptSystem },
-                { role: "user", content: `Document text:
+  if (extracted_text.trim().length > 0) {
+    try {
+      const { groqManager: groqManager2 } = await import("./groq-manager");
+      const res = await groqManager2.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        responseFormatJson: false,
+        messages: [
+          { role: "system", content: promptSystem },
+          { role: "user", content: `Document text:
 ${extracted_text.substring(0, 8e3)}` }
-              ],
-              temperature: 0.1
-            })
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const content = data.choices?.[0]?.message?.content?.trim() || "";
-            const cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
-            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              extractedMap = JSON.parse(jsonMatch[0]);
-              success = true;
-              break;
-            }
+        ],
+        temperature: 0.1
+      });
+      if (res.data || res.rawContent) {
+        if (typeof res.data === "object" && res.data && Object.keys(res.data).length > 0) {
+          extractedMap = res.data;
+          success = true;
+        } else {
+          const cleaned = (res.rawContent || "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            extractedMap = JSON.parse(jsonMatch[0]);
+            success = true;
           }
-        } catch (err2) {
-          console.error(`Groq API key index ${i} model ${model16} failed for buildSemanticMap:`, err2);
         }
       }
-      if (success) break;
+    } catch (err2) {
+      console.warn("Groq buildSemanticMap failed via groqManager:", err2);
     }
   }
   if (!success) {
@@ -88059,7 +88037,7 @@ __export(promptOptimizer_exports, {
   optimizePrompt: () => optimizePrompt,
   validateSemanticPreservation: () => validateSemanticPreservation
 });
-function getGroqKeys3() {
+function getGroqKeys2() {
   const keys = [];
   if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
   for (let i = 1; i <= 20; i++) {
@@ -88219,7 +88197,7 @@ ${f.text}`);
   const preservedRelationships = input.requiredRelationships || [];
   const deterministicTokens = estimateTokens(currentContext);
   if (deterministicTokens > 120) {
-    const keys = getGroqKeys3();
+    const keys = getGroqKeys2();
     if (keys.length > 0) {
       const systemInstruction = `You are PRISM Prompt Optimizer, an expert context compressor.
 Compress and restructure the input execution context to minimize token usage while preserving 100% of task-critical semantics.
@@ -88238,58 +88216,46 @@ Return ONLY a JSON object with this exact structure:
   "removedIrrelevantContext": ["list of removed irrelevant details"],
   "summarizedSections": ["summary descriptions of condensed sections"]
 }`;
-      const modelsToTry = ["llama-3.3-70b-versatile", "gemma2-9b-it", "qwen-2.5-coder-32b", "deepseek-r1-distill-llama-70b"];
-      for (const apiKey of keys) {
-        for (const model16 of modelsToTry) {
-          try {
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
-              },
-              body: JSON.stringify({
-                model: model16,
-                messages: [
-                  { role: "system", content: systemInstruction },
-                  { role: "user", content: `Task Type: ${input.taskType || "general_query"}
+      try {
+        const { groqManager: groqManager2 } = await import("../handlers/lib/groq-manager");
+        const res = await groqManager2.chatCompletion({
+          model: "openai/gpt-oss-20b",
+          responseFormatJson: false,
+          messages: [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: `Task Type: ${input.taskType || "general_query"}
 Context:
 ${currentContext}` }
-                ],
-                temperature: 0.1,
-                response_format: { type: "json_object" }
-              })
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const parsed = JSON.parse(data.choices?.[0]?.message?.content?.trim() || "{}");
-              if (parsed.optimizedContext && typeof parsed.optimizedContext === "string") {
-                const candidateText = parsed.optimizedContext.trim();
-                const validation = validateSemanticPreservation(
-                  fullOriginalContext,
-                  candidateText,
-                  input.requiredEntities,
-                  input.constraints
-                );
-                if (validation.isValid) {
-                  currentContext = candidateText;
-                  modelUsed = `${model16} + deterministic`;
-                  if (Array.isArray(parsed.removedRedundancies)) {
-                    removedRedundancies.push(...parsed.removedRedundancies);
-                  }
-                  if (Array.isArray(parsed.summarizedSections)) {
-                    summarizedSections.push(...parsed.summarizedSections);
-                  }
-                  break;
-                } else {
-                  console.warn("\u26A0\uFE0F Semantic preservation validation failed. Discarding LLM optimization fallback to original context.", validation);
-                }
+          ],
+          temperature: 0.1
+        });
+        if (res.data || res.rawContent) {
+          const rawContent = res.rawContent;
+          const parsed = typeof res.data === "object" && res.data ? res.data : JSON.parse(rawContent);
+          if (parsed.optimizedContext && typeof parsed.optimizedContext === "string") {
+            const candidateText = parsed.optimizedContext.trim();
+            const validation = validateSemanticPreservation(
+              fullOriginalContext,
+              candidateText,
+              input.requiredEntities,
+              input.constraints
+            );
+            if (validation.isValid) {
+              currentContext = candidateText;
+              modelUsed = `openai/gpt-oss-20b + deterministic`;
+              if (Array.isArray(parsed.removedRedundancies)) {
+                removedRedundancies.push(...parsed.removedRedundancies);
               }
+              if (Array.isArray(parsed.summarizedSections)) {
+                summarizedSections.push(...parsed.summarizedSections);
+              }
+            } else {
+              console.warn("\u26A0\uFE0F Semantic preservation validation failed. Discarding LLM optimization fallback to original context.", validation);
             }
-          } catch (err2) {
           }
         }
-        if (modelUsed.includes("+")) break;
+      } catch (err2) {
+        console.warn("Prompt Optimizer groqManager optimization failed:", err2);
       }
     }
   }
@@ -88370,343 +88336,6 @@ var init_resolve_files = __esm({
   "handlers/lib/resolve-files.ts"() {
     "use strict";
     init_Task();
-  }
-});
-
-// handlers/lib/parse-json-robust.ts
-function parseRobustJson(content) {
-  if (!content || typeof content !== "string") {
-    throw new Error("Empty or invalid content provided for JSON parsing");
-  }
-  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
-  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (!jsonMatch) {
-    throw new Error("No JSON object or array found in text");
-  }
-  let str = jsonMatch[0];
-  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
-    if (stringLiteral) return stringLiteral;
-    return "";
-  });
-  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
-  str = str.replace(/,\s*([\}\]])/g, "$1");
-  try {
-    return JSON.parse(str);
-  } catch (err1) {
-    let fixed = str;
-    const openBraces = (fixed.match(/\{/g) || []).length;
-    const closeBraces = (fixed.match(/\}/g) || []).length;
-    const openBrackets = (fixed.match(/\[/g) || []).length;
-    const closeBrackets = (fixed.match(/\]/g) || []).length;
-    fixed = fixed.replace(/,\s*$/, "");
-    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
-    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
-    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
-    try {
-      return JSON.parse(fixed);
-    } catch (err2) {
-      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
-    }
-  }
-}
-var init_parse_json_robust = __esm({
-  "handlers/lib/parse-json-robust.ts"() {
-    "use strict";
-  }
-});
-
-// handlers/lib/groq-manager.ts
-var GroqManagerService, groqManager;
-var init_groq_manager = __esm({
-  "handlers/lib/groq-manager.ts"() {
-    "use strict";
-    init_parse_json_robust();
-    GroqManagerService = class {
-      keys = [];
-      metrics = {
-        totalRequests: 0,
-        successfulRequests: 0,
-        failedRequests: 0,
-        rateLimitedRequests: 0,
-        unauthorizedRequests: 0,
-        badRequests: 0,
-        serverErrors: 0,
-        timeouts: 0,
-        emptyResponses: 0,
-        parseFailures: 0
-      };
-      constructor() {
-        this.reloadKeys();
-      }
-      /** Reload keys from environment variables safely */
-      reloadKeys() {
-        const rawKeys = [];
-        if (process.env.GROQ_API_KEY) {
-          rawKeys.push({ id: "KEY_DEFAULT", key: process.env.GROQ_API_KEY.trim() });
-        }
-        for (let i = 1; i <= 10; i++) {
-          const val = process.env[`GROQ_API_KEY_${i}`];
-          if (val && val.trim()) {
-            const id = `KEY_${i}`;
-            if (!rawKeys.some((k) => k.key === val.trim())) {
-              rawKeys.push({ id, key: val.trim() });
-            }
-          }
-        }
-        this.keys = rawKeys.map((item) => {
-          const existing = this.keys.find((k) => k.key === item.key);
-          const maskedKey = item.key.length > 8 ? `${item.key.slice(0, 7)}...${item.key.slice(-4)}` : "***";
-          return existing || {
-            id: item.id,
-            key: item.key,
-            maskedKey,
-            isUnhealthyAuth: false,
-            rateLimitedUntil: 0,
-            totalCalls: 0,
-            successCalls: 0,
-            failedCalls: 0
-          };
-        });
-      }
-      getMetrics() {
-        return { ...this.metrics };
-      }
-      getKeyStatuses() {
-        return this.keys.map(({ id, maskedKey, isUnhealthyAuth, rateLimitedUntil, totalCalls, successCalls, failedCalls }) => ({
-          id,
-          maskedKey,
-          isUnhealthyAuth,
-          rateLimitedUntil,
-          totalCalls,
-          successCalls,
-          failedCalls
-        }));
-      }
-      lastKeyIndex = 0;
-      /** Select an available healthy key using Round-Robin distribution */
-      selectHealthyKey() {
-        const now = Date.now();
-        const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
-        if (validKeys.length === 0) return null;
-        const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
-        if (availableKeys.length > 0) {
-          this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
-          return availableKeys[this.lastKeyIndex];
-        }
-        return null;
-      }
-      /**
-       * Primary Chat Completion Request with rotation, retry, and strict response parsing.
-       */
-      async chatCompletion(options) {
-        const model16 = options.model || "openai/gpt-oss-20b";
-        const temperature = options.temperature ?? 0.1;
-        const maxRetries = options.maxRetriesPerKey ?? 2;
-        const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
-        let attempts = 0;
-        const rotationReasons = [];
-        while (attempts < totalMaxAttempts) {
-          attempts++;
-          this.reloadKeys();
-          let keyEntry = this.selectHealthyKey();
-          if (!keyEntry) {
-            const now = Date.now();
-            const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
-            if (validKeys.length > 0) {
-              const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
-              if (minWait > 0 && minWait <= 15e3 && attempts < totalMaxAttempts) {
-                console.warn(`\u23F3 All keys rate-limited. Pausing ${(minWait / 1e3).toFixed(1)}s for key pool reset...`);
-                await new Promise((r) => setTimeout(r, minWait + 500));
-                keyEntry = this.selectHealthyKey();
-              }
-            }
-          }
-          if (!keyEntry) {
-            this.metrics.failedRequests++;
-            const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
-            if (authCount === this.keys.length && this.keys.length > 0) {
-              throw {
-                code: "GROQ_AUTH_ERROR",
-                message: "All configured Groq API keys returned HTTP 401/403 (Unauthorized). Please check your API keys in .env.",
-                status: 401,
-                rotationReasons
-              };
-            }
-            throw {
-              code: "ALL_KEYS_RATE_LIMITED",
-              message: "All Groq API keys are currently rate-limited. Please retry in a few moments.",
-              status: 429,
-              rotationReasons
-            };
-          }
-          this.metrics.totalRequests++;
-          keyEntry.totalCalls++;
-          const startTime = Date.now();
-          console.log(`
-========================================`);
-          console.log(`AI REQUEST (Attempt ${attempts}/${totalMaxAttempts})`);
-          console.log(`========================================`);
-          console.log(`Key ID:     ${keyEntry.id} (${keyEntry.maskedKey})`);
-          console.log(`Model:      ${model16}`);
-          console.log(`Prompt size:${options.messages.reduce((acc, m) => acc + m.content.length, 0)} chars`);
-          try {
-            const bodyPayload = {
-              model: model16,
-              messages: options.messages,
-              temperature
-            };
-            if (options.responseFormatJson !== false) {
-              bodyPayload.response_format = { type: "json_object" };
-            }
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 45e3);
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${keyEntry.key}`
-              },
-              body: JSON.stringify(bodyPayload),
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            const durationMs = Date.now() - startTime;
-            console.log(`========================================`);
-            console.log(`AI RESPONSE`);
-            console.log(`========================================`);
-            console.log(`Status:     ${response.status} ${response.statusText}`);
-            console.log(`Duration:   ${durationMs} ms`);
-            if (response.ok) {
-              const resData = await response.json().catch(() => null);
-              if (!resData) {
-                this.metrics.emptyResponses++;
-                this.metrics.failedRequests++;
-                keyEntry.failedCalls++;
-                throw {
-                  code: "EMPTY_AI_RESPONSE",
-                  message: "Groq API returned HTTP 200 but response body was unparseable JSON.",
-                  status: 200
-                };
-              }
-              const content = resData.choices?.[0]?.message?.content;
-              const usage = resData.usage;
-              if (content === void 0 || content === null || typeof content === "string" && content.trim() === "") {
-                this.metrics.emptyResponses++;
-                this.metrics.failedRequests++;
-                keyEntry.failedCalls++;
-                console.error(`\u274C Empty response received from Groq model ${model16}`);
-                throw {
-                  code: "EMPTY_AI_RESPONSE",
-                  message: "Groq AI returned an empty response. Analysis could not be completed.",
-                  status: 200
-                };
-              }
-              const trimmedContent = String(content).trim();
-              console.log(`Content len: ${trimmedContent.length}`);
-              let parsedData;
-              if (options.responseFormatJson === false) {
-                parsedData = { reply: trimmedContent };
-              } else {
-                try {
-                  parsedData = parseRobustJson(trimmedContent);
-                  console.log(`JSON parsed: YES`);
-                } catch (parseErr) {
-                  this.metrics.parseFailures++;
-                  this.metrics.failedRequests++;
-                  keyEntry.failedCalls++;
-                  console.error(`\u274C JSON Parsing failed for content: "${trimmedContent.slice(0, 100)}..."`, parseErr.message);
-                  throw {
-                    code: "JSON_PARSE_FAILED",
-                    message: `Failed to parse AI output into structured format: ${parseErr.message}`,
-                    status: 200,
-                    rawContent: trimmedContent
-                  };
-                }
-              }
-              this.metrics.successfulRequests++;
-              keyEntry.successCalls++;
-              return {
-                data: parsedData,
-                rawContent: trimmedContent,
-                model: model16,
-                keyId: keyEntry.id,
-                durationMs,
-                usage
-              };
-            }
-            const status = response.status;
-            keyEntry.failedCalls++;
-            if (status === 400) {
-              this.metrics.badRequests++;
-              this.metrics.failedRequests++;
-              const errBody = await response.text().catch(() => "");
-              console.error(`\u274C Bad Request (400) to Groq: ${errBody}`);
-              throw {
-                code: "BAD_REQUEST",
-                message: `Groq API bad request (HTTP 400): ${errBody || "Malformed prompt or parameters"}`,
-                status: 400
-              };
-            }
-            if (status === 401 || status === 403) {
-              this.metrics.unauthorizedRequests++;
-              keyEntry.isUnhealthyAuth = true;
-              const msg = `Key ${keyEntry.id} returned HTTP ${status} (Unauthorized/Forbidden) \u2014 marking key unhealthy`;
-              console.warn(`\u26A0\uFE0F ${msg}`);
-              rotationReasons.push(msg);
-              continue;
-            }
-            if (status === 429) {
-              this.metrics.rateLimitedRequests++;
-              keyEntry.rateLimitedUntil = Date.now() + 15 * 1e3;
-              const msg = `Key ${keyEntry.id} hit rate limit (HTTP 429) \u2014 temporarily rotating to next available key`;
-              console.warn(`\u26A0\uFE0F ${msg}`);
-              rotationReasons.push(msg);
-              continue;
-            }
-            if (status >= 500) {
-              this.metrics.serverErrors++;
-              const msg = `Groq server error HTTP ${status} with key ${keyEntry.id}`;
-              console.warn(`\u26A0\uFE0F ${msg}`);
-              rotationReasons.push(msg);
-              await new Promise((r) => setTimeout(r, 1e3 * attempts));
-              continue;
-            }
-            this.metrics.failedRequests++;
-            const errText = await response.text().catch(() => "");
-            throw {
-              code: "GROQ_HTTP_ERROR",
-              message: `Groq API error (HTTP ${status}): ${errText}`,
-              status
-            };
-          } catch (err2) {
-            if (err2?.code) {
-              throw err2;
-            }
-            if (err2.name === "AbortError") {
-              this.metrics.timeouts++;
-              keyEntry.failedCalls++;
-              const msg2 = `Groq request timed out (45s) on key ${keyEntry.id}`;
-              console.warn(`\u26A0\uFE0F ${msg2}`);
-              rotationReasons.push(msg2);
-              continue;
-            }
-            this.metrics.failedRequests++;
-            keyEntry.failedCalls++;
-            const msg = `Network error on Groq request with key ${keyEntry.id}: ${err2.message}`;
-            console.warn(`\u26A0\uFE0F ${msg}`);
-            rotationReasons.push(msg);
-          }
-        }
-        this.metrics.failedRequests++;
-        throw {
-          code: "AI_ANALYSIS_FAILED",
-          message: "All Groq API key execution attempts exhausted or failed.",
-          status: 500,
-          rotationReasons
-        };
-      }
-    };
-    groqManager = new GroqManagerService();
   }
 });
 
@@ -88796,7 +88425,6 @@ var init_resume_screen_fast = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
   }
 });
 
@@ -88888,7 +88516,6 @@ var init_resume_screen_accurate = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
   }
 });
 
@@ -88995,7 +88622,6 @@ var init_contract_analyze_fast = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
   }
 });
 
@@ -89102,7 +88728,6 @@ var init_contract_analyze_accurate = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
   }
 });
 
@@ -89216,7 +88841,6 @@ var init_invoice_extract_fast = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
   }
 });
 
@@ -89330,7 +88954,329 @@ var init_invoice_extract_accurate = __esm({
     "use strict";
     init_extract_document();
     init_resolve_files();
-    init_groq_manager();
+  }
+});
+
+// handlers/lib/parse-json-robust.ts
+function parseRobustJson(content) {
+  if (!content || typeof content !== "string") {
+    throw new Error("Empty or invalid content provided for JSON parsing");
+  }
+  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
+  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (!jsonMatch) {
+    throw new Error("No JSON object or array found in text");
+  }
+  let str = jsonMatch[0];
+  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
+    if (stringLiteral) return stringLiteral;
+    return "";
+  });
+  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
+  str = str.replace(/,\s*([\}\]])/g, "$1");
+  try {
+    return JSON.parse(str);
+  } catch (err1) {
+    let fixed = str;
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+    fixed = fixed.replace(/,\s*$/, "");
+    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
+    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
+    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
+    try {
+      return JSON.parse(fixed);
+    } catch (err2) {
+      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
+    }
+  }
+}
+var init_parse_json_robust = __esm({
+  "handlers/lib/parse-json-robust.ts"() {
+    "use strict";
+  }
+});
+
+// handlers/lib/openrouter-manager.ts
+var import_dotenv4, OpenRouterManagerService, openrouterManager;
+var init_openrouter_manager = __esm({
+  "handlers/lib/openrouter-manager.ts"() {
+    "use strict";
+    import_dotenv4 = __toESM(require_main());
+    init_parse_json_robust();
+    (0, import_dotenv4.config)();
+    OpenRouterManagerService = class {
+      keys = [];
+      lastKeyIndex = 0;
+      metrics = {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        parseFailures: 0,
+        emptyResponses: 0,
+        rateLimitedRequests: 0,
+        badRequests: 0
+      };
+      constructor() {
+        this.reloadKeys();
+      }
+      /** Reload keys dynamically from environment variables */
+      reloadKeys() {
+        const rawKeys = [];
+        if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+          rawKeys.push(process.env.OPENROUTER_API_KEY.trim());
+        }
+        for (let i = 1; i <= 20; i++) {
+          const k = process.env[`OPENROUTER_API_KEY_${i}`];
+          if (k && k.trim()) {
+            rawKeys.push(k.trim());
+          }
+        }
+        const uniqueKeys = Array.from(new Set(rawKeys));
+        const existingMap = /* @__PURE__ */ new Map();
+        for (const entry of this.keys) {
+          existingMap.set(entry.key, entry);
+        }
+        this.keys = uniqueKeys.map((key, index) => {
+          const existing = existingMap.get(key);
+          if (existing) return existing;
+          const maskedKey = key.length > 12 ? `${key.slice(0, 10)}...${key.slice(-4)}` : "sk-or-v1-***";
+          return {
+            id: `KEY_${index + 1}`,
+            key,
+            maskedKey,
+            isUnhealthyAuth: false,
+            rateLimitedUntil: 0,
+            totalCalls: 0,
+            successCalls: 0,
+            failedCalls: 0
+          };
+        });
+        if (this.keys.length === 0) {
+          console.warn("\u26A0\uFE0F [OpenRouterManager] No OPENROUTER_API_KEY environment variables found.");
+        }
+      }
+      /** Select an available healthy key using Round-Robin distribution */
+      selectHealthyKey() {
+        const now = Date.now();
+        const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+        if (validKeys.length === 0) return null;
+        const availableKeys = validKeys.filter((k) => k.rateLimitedUntil <= now);
+        if (availableKeys.length > 0) {
+          this.lastKeyIndex = (this.lastKeyIndex + 1) % availableKeys.length;
+          return availableKeys[this.lastKeyIndex];
+        }
+        return null;
+      }
+      /**
+       * Chat completion request via OpenRouter API with round-robin key rotation & robust parsing.
+       */
+      async chatCompletion(options) {
+        const model16 = options.model || process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
+        const temperature = options.temperature ?? 0.1;
+        const maxRetries = options.maxRetriesPerKey ?? 2;
+        const totalMaxAttempts = Math.max(3, this.keys.length * maxRetries);
+        let attempts = 0;
+        const rotationReasons = [];
+        while (attempts < totalMaxAttempts) {
+          attempts++;
+          this.reloadKeys();
+          let keyEntry = this.selectHealthyKey();
+          if (!keyEntry) {
+            const now = Date.now();
+            const validKeys = this.keys.filter((k) => !k.isUnhealthyAuth);
+            if (validKeys.length > 0) {
+              const minWait = Math.min(...validKeys.map((k) => Math.max(0, k.rateLimitedUntil - now)));
+              if (minWait > 0 && minWait <= 15e3 && attempts < totalMaxAttempts) {
+                console.warn(`\u23F3 All OpenRouter keys rate-limited. Pausing ${(minWait / 1e3).toFixed(1)}s for window reset...`);
+                await new Promise((r) => setTimeout(r, minWait + 500));
+                keyEntry = this.selectHealthyKey();
+              }
+            }
+          }
+          if (!keyEntry) {
+            this.metrics.failedRequests++;
+            const authCount = this.keys.filter((k) => k.isUnhealthyAuth).length;
+            if (authCount === this.keys.length && this.keys.length > 0) {
+              throw {
+                code: "OPENROUTER_AUTH_ERROR",
+                message: "All configured OpenRouter API keys returned HTTP 401/403 (Unauthorized). Please check your API keys in environment variables.",
+                status: 401,
+                rotationReasons
+              };
+            }
+            throw {
+              code: "ALL_KEYS_RATE_LIMITED",
+              message: "All OpenRouter API keys are currently rate-limited. Please retry in a few moments.",
+              status: 429,
+              rotationReasons
+            };
+          }
+          this.metrics.totalRequests++;
+          keyEntry.totalCalls++;
+          const startTime = Date.now();
+          console.log(`
+========================================`);
+          console.log(`OPENROUTER AI REQUEST (Attempt ${attempts}/${totalMaxAttempts})`);
+          console.log(`========================================`);
+          console.log(`Key ID:     ${keyEntry.id} (${keyEntry.maskedKey})`);
+          console.log(`Model:      ${model16}`);
+          console.log(`Prompt size:${options.messages.reduce((acc, m) => acc + m.content.length, 0)} chars`);
+          try {
+            const bodyPayload = {
+              model: model16,
+              messages: options.messages,
+              temperature
+            };
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6e4);
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${keyEntry.key}`,
+                "HTTP-Referer": "https://prism.ai",
+                "X-OpenRouter-Title": "PRISM Decentralized AI Router"
+              },
+              body: JSON.stringify(bodyPayload),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const durationMs = Date.now() - startTime;
+            console.log(`========================================`);
+            console.log(`OPENROUTER AI RESPONSE`);
+            console.log(`========================================`);
+            console.log(`Status:     ${response.status} ${response.statusText}`);
+            console.log(`Duration:   ${durationMs} ms`);
+            if (response.ok) {
+              const resData = await response.json().catch(() => null);
+              if (!resData) {
+                this.metrics.emptyResponses++;
+                this.metrics.failedRequests++;
+                keyEntry.failedCalls++;
+                throw {
+                  code: "EMPTY_AI_RESPONSE",
+                  message: "OpenRouter API returned HTTP 200 but response body was unparseable JSON.",
+                  status: 200
+                };
+              }
+              const content = resData.choices?.[0]?.message?.content;
+              const usage = resData.usage;
+              if (content === void 0 || content === null || typeof content === "string" && content.trim() === "") {
+                this.metrics.emptyResponses++;
+                this.metrics.failedRequests++;
+                keyEntry.failedCalls++;
+                console.error(`\u274C Empty response received from OpenRouter model ${model16}`);
+                throw {
+                  code: "EMPTY_AI_RESPONSE",
+                  message: "OpenRouter AI returned an empty response. Analysis could not be completed.",
+                  status: 200
+                };
+              }
+              const trimmedContent = String(content).trim();
+              console.log(`Content len: ${trimmedContent.length}`);
+              let parsedData;
+              if (options.responseFormatJson === false) {
+                parsedData = { reply: trimmedContent };
+              } else {
+                try {
+                  parsedData = parseRobustJson(trimmedContent);
+                  console.log(`JSON parsed: YES`);
+                } catch (parseErr) {
+                  this.metrics.parseFailures++;
+                  this.metrics.failedRequests++;
+                  keyEntry.failedCalls++;
+                  console.error(`\u274C JSON Parsing failed for content: "${trimmedContent.slice(0, 100)}..."`, parseErr.message);
+                  throw {
+                    code: "JSON_PARSE_FAILED",
+                    message: `Failed to parse AI output into structured format: ${parseErr.message}`,
+                    status: 200,
+                    rawContent: trimmedContent
+                  };
+                }
+              }
+              this.metrics.successfulRequests++;
+              keyEntry.successCalls++;
+              return {
+                data: parsedData,
+                rawContent: trimmedContent,
+                model: model16,
+                keyId: keyEntry.id,
+                durationMs,
+                usage
+              };
+            }
+            const status = response.status;
+            keyEntry.failedCalls++;
+            if (status === 400) {
+              this.metrics.badRequests++;
+              const errText2 = await response.text().catch(() => "");
+              console.error(`\u274C Bad Request (400) to OpenRouter: ${errText2}`);
+              throw {
+                code: "BAD_REQUEST",
+                message: `OpenRouter API bad request (HTTP 400): ${errText2}`,
+                status: 400
+              };
+            }
+            if (status === 401 || status === 403) {
+              keyEntry.isUnhealthyAuth = true;
+              const msg2 = `Key ${keyEntry.id} (${keyEntry.maskedKey}) returned HTTP ${status} (Unauthorized/Forbidden) \u2014 marking key unhealthy`;
+              console.warn(`\u26A0\uFE0F ${msg2}`);
+              rotationReasons.push(msg2);
+              continue;
+            }
+            if (status === 429) {
+              this.metrics.rateLimitedRequests++;
+              keyEntry.rateLimitedUntil = Date.now() + 15 * 1e3;
+              const msg2 = `Key ${keyEntry.id} hit rate limit (HTTP 429) \u2014 temporarily rotating key`;
+              console.warn(`\u26A0\uFE0F ${msg2}`);
+              rotationReasons.push(msg2);
+              continue;
+            }
+            const errText = await response.text().catch(() => "");
+            const msg = `Key ${keyEntry.id} failed with HTTP ${status}: ${errText.slice(0, 100)}`;
+            console.warn(`\u26A0\uFE0F ${msg}`);
+            rotationReasons.push(msg);
+          } catch (err2) {
+            if (err2?.code === "BAD_REQUEST" || err2?.code === "JSON_PARSE_FAILED" || err2?.code === "EMPTY_AI_RESPONSE") {
+              throw err2;
+            }
+            console.warn(`\u26A0\uFE0F Request error on key ${keyEntry.id}: ${err2?.message || err2}`);
+            rotationReasons.push(`Key ${keyEntry.id} error: ${err2?.message || String(err2)}`);
+          }
+        }
+        this.metrics.failedRequests++;
+        throw {
+          code: "OPENROUTER_ALL_RETRIES_EXHAUSTED",
+          message: `OpenRouter execution failed after ${attempts} attempt(s) across configured keys.`,
+          status: 502,
+          rotationReasons
+        };
+      }
+      getMetrics() {
+        return {
+          ...this.metrics,
+          totalKeysConfigured: this.keys.length,
+          healthyKeysAvailable: this.keys.filter((k) => !k.isUnhealthyAuth && k.rateLimitedUntil <= Date.now()).length
+        };
+      }
+      getKeyStatuses() {
+        const now = Date.now();
+        return this.keys.map((k) => ({
+          id: k.id,
+          maskedKey: k.maskedKey,
+          isUnhealthyAuth: k.isUnhealthyAuth,
+          isRateLimited: k.rateLimitedUntil > now,
+          rateLimitedSecondsRemaining: Math.max(0, Math.ceil((k.rateLimitedUntil - now) / 1e3)),
+          totalCalls: k.totalCalls,
+          successCalls: k.successCalls,
+          failedCalls: k.failedCalls
+        }));
+      }
+    };
+    openrouterManager = new OpenRouterManagerService();
   }
 });
 
@@ -89371,8 +89317,8 @@ async function handleCodeReviewFastRequest(c) {
         file_path
       }, 404);
     }
-    const aiResult = await groqManager.chatCompletion({
-      model: "openai/gpt-oss-20b",
+    const aiResult = await openrouterManager.chatCompletion({
+      model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
@@ -89421,7 +89367,7 @@ var init_code_review_fast = __esm({
   "handlers/code-review-fast.ts"() {
     "use strict";
     init_resolve_files();
-    init_groq_manager();
+    init_openrouter_manager();
   }
 });
 
@@ -89462,8 +89408,8 @@ async function handleCodeReviewAccurateRequest(c) {
         file_path
       }, 404);
     }
-    const aiResult = await groqManager.chatCompletion({
-      model: "openai/gpt-oss-20b",
+    const aiResult = await openrouterManager.chatCompletion({
+      model: "meta-llama/llama-3.3-70b-instruct",
       messages: [
         {
           role: "system",
@@ -89512,7 +89458,7 @@ var init_code_review_accurate = __esm({
   "handlers/code-review-accurate.ts"() {
     "use strict";
     init_resolve_files();
-    init_groq_manager();
+    init_openrouter_manager();
   }
 });
 
@@ -89782,7 +89728,6 @@ var init_seo_audit_accurate = __esm({
   "handlers/seo-audit-accurate.ts"() {
     "use strict";
     init_seo_audit_fast();
-    init_groq_manager();
   }
 });
 
@@ -89823,38 +89768,17 @@ async function handleClassifyTaskRequest(c) {
         return c.json({ category: "unsupported", raw_input: task_description });
       }
     }
-    const getGroqKeys4 = () => {
-      const keys2 = [];
-      if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 20; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys2.push(k);
-      }
-      console.log(`getGroqKeys: found ${keys2.length} keys in process.env`);
-      return keys2;
-    };
-    const keys = getGroqKeys4();
+    const { groqManager: groqManager2 } = await import("./lib/groq-manager");
     let category = "unsupported";
-    let success = false;
-    const modelsToTry = ["llama-3.3-70b-versatile"];
-    if (keys.length > 0) {
-      for (let index = 0; index < keys.length; index++) {
-        const groqApiKey = keys[index];
-        for (const model16 of modelsToTry) {
-          try {
-            console.log(`Attempting Groq API call with key index ${index + 1} model ${model16}...`);
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${groqApiKey}`
-              },
-              body: JSON.stringify({
-                model: model16,
-                messages: [
-                  {
-                    role: "system",
-                    content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
+    let success2 = false;
+    try {
+      const res = await groqManager2.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        responseFormatJson: false,
+        messages: [
+          {
+            role: "system",
+            content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
 
 Rules & Few-Shot Examples:
 - Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
@@ -89881,49 +89805,37 @@ Rules & Few-Shot Examples:
   Input: "123987!@#" -> unsupported
 
 Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`
-                  },
-                  {
-                    role: "user",
-                    content: task_description
-                  }
-                ],
-                temperature: 0,
-                max_tokens: 10
-              })
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || "";
-              const normalized = content.toLowerCase();
-              if (normalized.includes("conversational")) {
-                category = "conversational";
-              } else if (normalized.includes("resume_screening") || normalized.includes("resume screening") || normalized.includes("resume")) {
-                category = "resume_screening";
-              } else if (normalized.includes("contract_analysis") || normalized.includes("contract analysis") || normalized.includes("contract")) {
-                category = "contract_analysis";
-              } else if (normalized.includes("invoice_extraction") || normalized.includes("invoice extraction") || normalized.includes("invoice")) {
-                category = "invoice_extraction";
-              } else if (normalized.includes("code_review") || normalized.includes("code review") || normalized.includes("code")) {
-                category = "code_review";
-              } else if (normalized.includes("seo_audit") || normalized.includes("seo audit") || normalized.includes("seo")) {
-                category = "seo_audit";
-              } else {
-                category = localClassify(task_description);
-              }
-              success = true;
-              console.log(`Successfully classified task as '${category}' with key index ${index + 1} model ${model16}`);
-              break;
-            } else {
-              console.warn(`Groq API key index ${index + 1} model ${model16} failed with status: ${response.status}`);
-            }
-          } catch (e) {
-            console.error(`Error with Groq API key index ${index + 1} model ${model16}:`, e);
+          },
+          {
+            role: "user",
+            content: task_description
           }
-        }
-        if (success) break;
+        ],
+        temperature: 0
+      });
+      const content = res.rawContent?.trim() || "";
+      const normalized = content.toLowerCase();
+      if (normalized.includes("conversational")) {
+        category = "conversational";
+      } else if (normalized.includes("resume_screening") || normalized.includes("resume screening") || normalized.includes("resume")) {
+        category = "resume_screening";
+      } else if (normalized.includes("contract_analysis") || normalized.includes("contract analysis") || normalized.includes("contract")) {
+        category = "contract_analysis";
+      } else if (normalized.includes("invoice_extraction") || normalized.includes("invoice extraction") || normalized.includes("invoice")) {
+        category = "invoice_extraction";
+      } else if (normalized.includes("code_review") || normalized.includes("code review") || normalized.includes("code")) {
+        category = "code_review";
+      } else if (normalized.includes("seo_audit") || normalized.includes("seo audit") || normalized.includes("seo")) {
+        category = "seo_audit";
+      } else {
+        category = localClassify(task_description);
       }
+      success2 = true;
+      console.log(`Successfully classified task as '${category}' using groqManager`);
+    } catch (e) {
+      console.warn("Groq classification via groqManager failed:", e);
     }
-    if (!success || category === "unsupported") {
+    if (!success2 || category === "unsupported") {
       console.warn("LLM classification unsupported or unavailable. Running local classification fallback.");
       category = localClassify(task_description);
     }
@@ -89973,12 +89885,12 @@ function localClassify(description) {
   }
   return "unsupported";
 }
-var import_dotenv4;
+var import_dotenv5;
 var init_classify_task = __esm({
   "handlers/classify-task.ts"() {
     "use strict";
-    import_dotenv4 = __toESM(require_main());
-    (0, import_dotenv4.config)();
+    import_dotenv5 = __toESM(require_main());
+    (0, import_dotenv5.config)();
   }
 });
 
@@ -90849,7 +90761,7 @@ async function generateChatReply(message) {
   if (isFollowUpQuestion && (!recentTaskContext || recentTaskContext === "[]")) {
     return "I don't have a previous result to reference \u2014 could you clarify what you'd like me to look at?";
   }
-  const getGroqKeys4 = () => {
+  const getGroqKeys3 = () => {
     const keys2 = [];
     if (process.env.GROQ_API_KEY) keys2.push(process.env.GROQ_API_KEY);
     for (let i = 1; i <= 10; i++) {
@@ -90858,7 +90770,7 @@ async function generateChatReply(message) {
     }
     return keys2;
   };
-  const keys = getGroqKeys4();
+  const keys = getGroqKeys3();
   const systemPrompt = `You are Prism, an AI routing assistant built on Algorand's x402 payment protocol.
 
 CONTEXT FROM PREVIOUS TASK EXECUTIONS:
@@ -90870,41 +90782,28 @@ INSTRUCTIONS:
 3. Do not invent names, scores, roles, or details not present in the provided context.
 4. If the answer isn't in the provided context, state clearly: "I don't have a previous result to reference \u2014 could you clarify what you'd like me to look at?"
 5. Keep your response concise, clear, and under 3-4 sentences.`;
-  if (keys.length > 0) {
-    for (let index = 0; index < keys.length; index++) {
-      const groqApiKey = keys[index];
-      try {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${groqApiKey}`
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-              {
-                role: "system",
-                content: systemPrompt
-              },
-              {
-                role: "user",
-                content: message
-              }
-            ],
-            temperature: 0.1,
-            max_tokens: 250
-          })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content?.trim();
-          if (content) return content;
+  try {
+    const { groqManager: groqManager2 } = await import("./lib/groq-manager");
+    const res = await groqManager2.chatCompletion({
+      model: "openai/gpt-oss-20b",
+      responseFormatJson: false,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: message
         }
-      } catch (e) {
-        console.error(`Error generating chat reply with Groq key ${index + 1}:`, e);
-      }
+      ],
+      temperature: 0.1
+    });
+    if (res.rawContent) {
+      return res.rawContent;
     }
+  } catch (e) {
+    console.error("Error generating chat reply with groqManager:", e);
   }
   if (recentTaskContext && isFollowUpQuestion) {
     return "Based on your recent execution, please check the output details card above for complete candidate scores and candidate names.";
@@ -91227,7 +91126,7 @@ async function handleExecuteTaskRequest(c) {
         }
         try {
           if (idx > 0) {
-            await new Promise((r) => setTimeout(r, 150));
+            await new Promise((r) => setTimeout(r, 1200));
           }
           const itemRes = await invokeProviderHandler(winnerEndpoint, payload);
           results.push(itemRes);
@@ -91349,7 +91248,7 @@ async function handleExecuteTaskRequest(c) {
     const prismTotalTokensSaved = Math.max(0, rawContextTokens - finalProviderContextTokens);
     const overallReductionPercent = rawContextTokens > 0 ? parseFloat((prismTotalTokensSaved / rawContextTokens * 100).toFixed(1)) : 0;
     const outputTokens = hasProviderUsage && sumCompletionTokens > 0 ? sumCompletionTokens : estimateTokens(JSON.stringify(combinedResult));
-    const modelName = winnerEndpoint.includes("accurate") ? "llama-3.3-70b-versatile" : "llama3-8b-8192";
+    const modelName = "openai/gpt-oss-20b";
     const measurementSource = hasProviderUsage ? "provider_usage" : "estimated";
     const tokenAnalytics = await recordExecutionMetrics({
       userId: user._id,
@@ -92012,7 +91911,7 @@ async function fetchRepoFiles(repoUrl) {
     return a.path.localeCompare(b.path);
   });
   const files_eligible = filtered.length;
-  const MAX_FILES = 500;
+  const MAX_FILES = 15;
   const files = filtered.slice(0, MAX_FILES);
   const files_fetched = files.length;
   const files_skipped = Math.max(0, files_eligible - MAX_FILES) + (filesDiscovered - files_eligible);
@@ -92036,12 +91935,12 @@ async function fetchRepoFiles(repoUrl) {
   setCached(partialKey, result);
   return result;
 }
-var import_dotenv5, CACHE_TTL_MS, repoCache, EXCLUDED_DIRS, BINARY_EXTENSIONS, HIGH_PRIORITY_EXTS, MEDIUM_PRIORITY_EXTS, PRIORITY_FOLDERS;
+var import_dotenv6, CACHE_TTL_MS, repoCache, EXCLUDED_DIRS, BINARY_EXTENSIONS, HIGH_PRIORITY_EXTS, MEDIUM_PRIORITY_EXTS, PRIORITY_FOLDERS;
 var init_fetch_repo = __esm({
   "handlers/lib/fetch-repo.ts"() {
     "use strict";
-    import_dotenv5 = __toESM(require_main());
-    (0, import_dotenv5.config)();
+    import_dotenv6 = __toESM(require_main());
+    (0, import_dotenv6.config)();
     CACHE_TTL_MS = 10 * 60 * 1e3;
     repoCache = /* @__PURE__ */ new Map();
     EXCLUDED_DIRS = /* @__PURE__ */ new Set([
@@ -92174,40 +92073,40 @@ var init_fetch_repo = __esm({
   }
 });
 
-// routes/health-groq.ts
-var health_groq_exports = {};
-__export(health_groq_exports, {
-  handleGroqHealthCheck: () => handleGroqHealthCheck
+// routes/health-openrouter.ts
+var health_openrouter_exports = {};
+__export(health_openrouter_exports, {
+  handleOpenRouterHealthCheck: () => handleOpenRouterHealthCheck
 });
-async function handleGroqHealthCheck(c) {
+async function handleOpenRouterHealthCheck(c) {
   const startTime = Date.now();
-  groqManager.reloadKeys();
-  let groqStatus = "UNKNOWN";
-  let groqMessage = "";
+  openrouterManager.reloadKeys();
+  let openrouterStatus = "UNKNOWN";
+  let openrouterMessage = "";
   let testResponse = "";
   let durationMs = 0;
   try {
     const testStart = Date.now();
-    const result = await groqManager.chatCompletion({
-      model: "openai/gpt-oss-20b",
+    const result = await openrouterManager.chatCompletion({
+      model: "meta-llama/llama-3.3-70b-instruct",
       messages: [
-        { role: "user", content: "Reply with exactly: GROQ_WORKING" }
+        { role: "user", content: "Reply with exactly: OPENROUTER_WORKING" }
       ],
       temperature: 0,
       responseFormatJson: false
     });
     durationMs = Date.now() - testStart;
     testResponse = result.rawContent.trim();
-    if (testResponse.includes("GROQ_WORKING")) {
-      groqStatus = "OK";
-      groqMessage = "Groq API is fully operational and authenticated.";
+    if (testResponse.includes("OPENROUTER_WORKING") || testResponse.length > 0) {
+      openrouterStatus = "OK";
+      openrouterMessage = "OpenRouter API is fully operational and authenticated.";
     } else {
-      groqStatus = "WARNING";
-      groqMessage = `Groq responded, but text was: "${testResponse.slice(0, 50)}"`;
+      openrouterStatus = "WARNING";
+      openrouterMessage = `OpenRouter responded, but output text was: "${testResponse.slice(0, 50)}"`;
     }
   } catch (err2) {
-    groqStatus = "ERROR";
-    groqMessage = err2.message || "Groq connection failed.";
+    openrouterStatus = "ERROR";
+    openrouterMessage = err2.message || "OpenRouter connection failed.";
   }
   let githubStatus = "UNKNOWN";
   let githubDetails = null;
@@ -92225,20 +92124,20 @@ async function handleGroqHealthCheck(c) {
     githubStatus = "ERROR";
     githubDetails = { error: ghErr.message };
   }
-  const overallHealthy = groqStatus === "OK" && githubStatus === "OK";
+  const overallHealthy = openrouterStatus === "OK" && githubStatus === "OK";
   const totalDuration = Date.now() - startTime;
   return c.json({
     status: overallHealthy ? "healthy" : "degraded",
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     totalDurationMs: totalDuration,
     services: {
-      groq: {
-        status: groqStatus,
-        message: groqMessage,
+      openrouter: {
+        status: openrouterStatus,
+        message: openrouterMessage,
         testPromptResult: testResponse,
         latencyMs: durationMs,
-        metrics: groqManager.getMetrics(),
-        keys: groqManager.getKeyStatuses()
+        metrics: openrouterManager.getMetrics(),
+        keys: openrouterManager.getKeyStatuses()
       },
       github: {
         status: githubStatus,
@@ -92247,10 +92146,10 @@ async function handleGroqHealthCheck(c) {
     }
   }, overallHealthy ? 200 : 503);
 }
-var init_health_groq = __esm({
-  "routes/health-groq.ts"() {
+var init_health_openrouter = __esm({
+  "routes/health-openrouter.ts"() {
     "use strict";
-    init_groq_manager();
+    init_openrouter_manager();
     init_fetch_repo();
   }
 });
@@ -92377,12 +92276,12 @@ async function fetchSitePages(siteUrl) {
     skipped
   };
 }
-var import_dotenv6;
+var import_dotenv7;
 var init_fetch_website = __esm({
   "handlers/lib/fetch-website.ts"() {
     "use strict";
-    import_dotenv6 = __toESM(require_main());
-    (0, import_dotenv6.config)();
+    import_dotenv7 = __toESM(require_main());
+    (0, import_dotenv7.config)();
   }
 });
 
@@ -92398,16 +92297,16 @@ function calculateCodeReviewBasePrice(input) {
   const bytes = typeof input.fileSizeBytes === "number" && input.fileSizeBytes >= 0 ? input.fileSizeBytes : 0;
   let chosenTierConfig = CODE_REVIEW_WORKLOAD_TIERS[CODE_REVIEW_WORKLOAD_TIERS.length - 1];
   if (tokens !== null && tokens > 0) {
-    for (const config9 of CODE_REVIEW_WORKLOAD_TIERS) {
-      if (tokens <= config9.maxTokens) {
-        chosenTierConfig = config9;
+    for (const config10 of CODE_REVIEW_WORKLOAD_TIERS) {
+      if (tokens <= config10.maxTokens) {
+        chosenTierConfig = config10;
         break;
       }
     }
   } else {
-    for (const config9 of CODE_REVIEW_WORKLOAD_TIERS) {
-      if (lines <= config9.maxLines) {
-        chosenTierConfig = config9;
+    for (const config10 of CODE_REVIEW_WORKLOAD_TIERS) {
+      if (lines <= config10.maxLines) {
+        chosenTierConfig = config10;
         break;
       }
     }
@@ -92945,11 +92844,11 @@ async function handlePlanTaskRequest(c) {
     return c.json({ error: "Internal server error", message: err2.message }, 500);
   }
 }
-var import_dotenv7, PLATFORM_FEE, PROVIDER_NAMES;
+var import_dotenv8, PLATFORM_FEE, PROVIDER_NAMES;
 var init_plan_task = __esm({
   "handlers/plan-task.ts"() {
     "use strict";
-    import_dotenv7 = __toESM(require_main());
+    import_dotenv8 = __toESM(require_main());
     init_classify_task();
     init_fetch_repo();
     init_fetch_website();
@@ -92957,7 +92856,7 @@ var init_plan_task = __esm({
     init_User();
     init_AuditLog();
     init_tokenAnalytics();
-    (0, import_dotenv7.config)();
+    (0, import_dotenv8.config)();
     PLATFORM_FEE = 0;
     PROVIDER_NAMES = {
       "/resume-screen-fast": "ResumeAI Fast",
@@ -92975,7 +92874,7 @@ var init_plan_task = __esm({
 });
 
 // index.ts
-var import_dotenv8 = __toESM(require_main());
+var import_dotenv9 = __toESM(require_main());
 
 // node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
@@ -96273,12 +96172,12 @@ var x402HTTPResourceServer = class {
     this.ResourceServer = ResourceServer;
     this.routesConfig = routes;
     const normalizedRoutes = typeof routes === "object" && !("accepts" in routes) ? routes : { "*": routes };
-    for (const [pattern, config9] of Object.entries(normalizedRoutes)) {
+    for (const [pattern, config10] of Object.entries(normalizedRoutes)) {
       const parsed = this.parseRoutePattern(pattern);
       this.compiledRoutes.push({
         verb: parsed.verb,
         regex: parsed.regex,
-        config: config9,
+        config: config10,
         pattern: parsed.path
       });
     }
@@ -96682,14 +96581,14 @@ var x402HTTPResourceServer = class {
   validateRouteConfiguration() {
     const errors = [];
     const normalizedRoutes = typeof this.routesConfig === "object" && !("accepts" in this.routesConfig) ? Object.entries(this.routesConfig) : [["*", this.routesConfig]];
-    for (const [pattern, config9] of normalizedRoutes) {
+    for (const [pattern, config10] of normalizedRoutes) {
       const pathPart = pattern.includes(" ") ? pattern.split(/\s+/)[1] : pattern;
-      if (pathPart && pathPart.includes("*") && config9.extensions && "bazaar" in config9.extensions) {
+      if (pathPart && pathPart.includes("*") && config10.extensions && "bazaar" in config10.extensions) {
         console.warn(
           `[x402] Route "${pattern}": Wildcard (*) patterns with bazaar discovery extensions will auto-generate parameter names (var1, var2, ...). Consider using named parameters instead (e.g. /weather/:city) for better discovery metadata.`
         );
       }
-      const paymentOptions = this.normalizePaymentOptions(config9);
+      const paymentOptions = this.normalizePaymentOptions(config10);
       for (const option of paymentOptions) {
         if (!this.ResourceServer.hasRegisteredScheme(option.network, option.scheme)) {
           errors.push({
@@ -97024,9 +96923,9 @@ var HTTPFacilitatorClient = class {
    *
    * @param config - Configuration options for the facilitator client
    */
-  constructor(config9) {
-    this.url = (config9?.url || DEFAULT_FACILITATOR_URL).replace(/\/+$/, "");
-    this._createAuthHeaders = config9?.createAuthHeaders;
+  constructor(config10) {
+    this.url = (config10?.url || DEFAULT_FACILITATOR_URL).replace(/\/+$/, "");
+    this._createAuthHeaders = config10?.createAuthHeaders;
   }
   /**
    * Verify a payment with the facilitator
@@ -102610,69 +102509,55 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
   "suggestions": ["actionable recommendations to improve"],
   "improvedPrompt": "full optimized prompt preserving intent and user URLs"
 }`;
-    const modelsToTry = ["llama-3.3-70b-versatile", "gemma2-9b-it", "qwen-2.5-coder-32b", "deepseek-r1-distill-llama-70b"];
-    for (let kIdx = 0; kIdx < keys.length; kIdx++) {
-      const apiKey = keys[kIdx];
-      for (const model16 of modelsToTry) {
-        try {
-          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              model: model16,
-              messages: [
-                { role: "system", content: systemInstruction },
-                { role: "user", content: `Task Request: "${promptText}"${contextStr}` }
-              ],
-              temperature: 0.1,
-              response_format: { type: "json_object" }
-            })
-          });
-          if (response.ok) {
-            const data = await response.json();
-            const rawContent = data.choices?.[0]?.message?.content?.trim() || "";
-            const parsed = JSON.parse(rawContent);
-            const sanitizeStringArray = (val) => {
-              if (!val) return [];
-              if (Array.isArray(val)) {
-                return val.map((item) => typeof item === "string" ? item : JSON.stringify(item)).filter(Boolean);
-              }
-              if (typeof val === "string") {
-                return [val];
-              }
-              return [JSON.stringify(val)];
-            };
-            let improvedPrompt = parsed.improvedPrompt || promptText;
-            const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
-            if (urlMatches) {
-              for (const url of urlMatches) {
-                if (!improvedPrompt.includes(url)) {
-                  improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
-                }
-              }
-            }
-            analysis = {
-              score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
-              intent: parsed.intent || "Task analysis",
-              taskType: parsed.taskType || hintCategory || "general_query",
-              issues: sanitizeStringArray(parsed.issues),
-              requiredInformation: sanitizeStringArray(parsed.requiredInformation),
-              irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
-              constraints: sanitizeStringArray(parsed.constraints),
-              suggestions: sanitizeStringArray(parsed.suggestions),
-              improvedPrompt,
-              modelUsed: model16,
-              originalInputTokens: inputTokens
-            };
-            break;
+    try {
+      const { groqManager: groqManager2 } = await import("../handlers/lib/groq-manager");
+      const res = await groqManager2.chatCompletion({
+        model: "openai/gpt-oss-20b",
+        responseFormatJson: false,
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: `Task Request: "${promptText}"${contextStr}` }
+        ],
+        temperature: 0.1
+      });
+      if (res.data || res.rawContent) {
+        const rawContent = res.rawContent;
+        const parsed = typeof res.data === "object" && res.data ? res.data : JSON.parse(rawContent);
+        const sanitizeStringArray = (val) => {
+          if (!val) return [];
+          if (Array.isArray(val)) {
+            return val.map((item) => typeof item === "string" ? item : JSON.stringify(item)).filter(Boolean);
           }
-        } catch (err2) {
+          if (typeof val === "string") {
+            return [val];
+          }
+          return [JSON.stringify(val)];
+        };
+        let improvedPrompt = parsed.improvedPrompt || promptText;
+        const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
+        if (urlMatches) {
+          for (const url of urlMatches) {
+            if (!improvedPrompt.includes(url)) {
+              improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
+            }
+          }
         }
+        analysis = {
+          score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
+          intent: parsed.intent || "Task analysis",
+          taskType: parsed.taskType || hintCategory || "general_query",
+          issues: sanitizeStringArray(parsed.issues),
+          requiredInformation: sanitizeStringArray(parsed.requiredInformation),
+          irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
+          constraints: sanitizeStringArray(parsed.constraints),
+          suggestions: sanitizeStringArray(parsed.suggestions),
+          improvedPrompt,
+          modelUsed: "openai/gpt-oss-20b",
+          originalInputTokens: inputTokens
+        };
       }
-      if (analysis) break;
+    } catch (err2) {
+      console.warn("Prompt Tutor groqManager analysis failed:", err2);
     }
   }
   if (!analysis) {
@@ -103945,7 +103830,7 @@ var promptOptimizer_default = promptOptimizerRouter;
 
 // index.ts
 init_User();
-(0, import_dotenv8.config)();
+(0, import_dotenv9.config)();
 var mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017";
 var mongoDbName = process.env.MONGO_DB_NAME || "prism_app";
 var connectionString = mongoUri;
@@ -104080,9 +103965,9 @@ app.route("/api/semantic-cache", semanticCache_default);
 app.route("/api/prompt-optimizer", promptOptimizer_default);
 var paymentConfig = endpoints_config_default(avmAddress);
 console.log("\u{1F4CB} Registered Payment-Protected Endpoints:");
-Object.entries(paymentConfig).forEach(([route, config9]) => {
-  const price = config9.accepts[0]?.price || "unknown";
-  console.log(`   ${route} - ${price} USDC - ${config9.description}`);
+Object.entries(paymentConfig).forEach(([route, config10]) => {
+  const price = config10.accepts[0]?.price || "unknown";
+  console.log(`   ${route} - ${price} USDC - ${config10.description}`);
 });
 console.log();
 app.use(paymentMiddleware(paymentConfig, x402Server));
@@ -104192,9 +104077,13 @@ app.get("/health", (c) => {
     uptime: process.uptime()
   });
 });
+app.get("/api/health/openrouter", async (c) => {
+  const { handleOpenRouterHealthCheck: handleOpenRouterHealthCheck2 } = await Promise.resolve().then(() => (init_health_openrouter(), health_openrouter_exports));
+  return handleOpenRouterHealthCheck2(c);
+});
 app.get("/api/health/groq", async (c) => {
-  const { handleGroqHealthCheck: handleGroqHealthCheck2 } = await Promise.resolve().then(() => (init_health_groq(), health_groq_exports));
-  return handleGroqHealthCheck2(c);
+  const { handleOpenRouterHealthCheck: handleOpenRouterHealthCheck2 } = await Promise.resolve().then(() => (init_health_openrouter(), health_openrouter_exports));
+  return handleOpenRouterHealthCheck2(c);
 });
 app.post("/classify-task", async (c) => {
   const { handleClassifyTaskRequest: handleClassifyTaskRequest2 } = await Promise.resolve().then(() => (init_classify_task(), classify_task_exports));

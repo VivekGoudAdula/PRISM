@@ -412,7 +412,7 @@ export async function handleExecuteTaskRequest(c: Context) {
 
         try {
           if (idx > 0) {
-            await new Promise((r) => setTimeout(r, 150));
+            await new Promise((r) => setTimeout(r, 1200));
           }
           const itemRes = await invokeProviderHandler(winnerEndpoint, payload);
           results.push(itemRes);
@@ -580,7 +580,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       ? sumCompletionTokens 
       : estimateTokens(JSON.stringify(combinedResult));
 
-    const modelName = winnerEndpoint.includes('accurate') ? 'llama-3.3-70b-versatile' : 'llama3-8b-8192';
+    const modelName = 'openai/gpt-oss-20b';
     const measurementSource = hasProviderUsage ? 'provider_usage' : 'estimated';
 
     const tokenAnalytics = await recordExecutionMetrics({

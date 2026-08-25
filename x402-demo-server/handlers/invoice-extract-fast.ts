@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /invoice-extract-fast
- * Fast invoice data extraction using Groq LLM API
+ * Fast invoice data extraction using OpenRouter LLM API
  */
 export async function handleInvoiceExtractFastRequest(c: Context) {
   const startTime = Date.now();

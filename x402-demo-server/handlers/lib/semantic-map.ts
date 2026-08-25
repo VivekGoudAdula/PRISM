@@ -120,48 +120,34 @@ export async function buildSemanticMap(
     };
   }
 
-  const keys = getGroqKeys();
-  const modelsToTry = ['llama-3.3-70b-versatile', 'gemma2-9b-it', 'qwen-2.5-coder-32b', 'deepseek-r1-distill-llama-70b'];
-  let extractedMap = defaultFallbackMap;
-  let success = false;
+  if (extracted_text.trim().length > 0) {
+    try {
+      const { groqManager } = await import('./groq-manager');
+      const res = await groqManager.chatCompletion({
+        model: 'openai/gpt-oss-20b',
+        responseFormatJson: false,
+        messages: [
+          { role: 'system', content: promptSystem },
+          { role: 'user', content: `Document text:\n${extracted_text.substring(0, 8000)}` }
+        ],
+        temperature: 0.1,
+      });
 
-  if (keys.length > 0 && extracted_text.trim().length > 0) {
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      for (const model of modelsToTry) {
-        try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${key}`,
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: 'system', content: promptSystem },
-                { role: 'user', content: `Document text:\n${extracted_text.substring(0, 8000)}` }
-              ],
-              temperature: 0.1,
-            }),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const content = data.choices?.[0]?.message?.content?.trim() || '';
-            const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              extractedMap = JSON.parse(jsonMatch[0]);
-              success = true;
-              break;
-            }
+      if (res.data || res.rawContent) {
+        if (typeof res.data === 'object' && res.data && Object.keys(res.data).length > 0) {
+          extractedMap = res.data;
+          success = true;
+        } else {
+          const cleaned = (res.rawContent || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            extractedMap = JSON.parse(jsonMatch[0]);
+            success = true;
           }
-        } catch (err) {
-          console.error(`Groq API key index ${i} model ${model} failed for buildSemanticMap:`, err);
         }
       }
-      if (success) break;
+    } catch (err) {
+      console.warn('Groq buildSemanticMap failed via groqManager:', err);
     }
   }
 

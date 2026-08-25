@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /resume-screen-fast
- * Fast candidate resume screening using Groq LLM API
+ * Fast candidate resume screening using OpenRouter LLM API
  */
 export async function handleResumeScreenFastRequest(c: Context) {
   const startTime = Date.now();

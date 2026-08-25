@@ -311,7 +311,8 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   });
 
   const files_eligible = filtered.length;
-  const MAX_FILES = 500;
+  // Cap at top 15 highest-priority architectural files to prevent redundant AI API cost overhead
+  const MAX_FILES = 15;
   const files = filtered.slice(0, MAX_FILES);
   const files_fetched = files.length;
   const files_skipped = Math.max(0, files_eligible - MAX_FILES) + (filesDiscovered - files_eligible);

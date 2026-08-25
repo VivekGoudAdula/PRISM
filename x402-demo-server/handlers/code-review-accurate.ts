@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /code-review-accurate
- * High-precision senior-engineer code review for a single file using Groq LLM API (Llama 3.3 70B)
+ * High-precision senior-engineer code review for a single file using OpenRouter API
  */
 export async function handleCodeReviewAccurateRequest(c: Context) {
   const startTime = Date.now();
@@ -43,11 +43,11 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
       }, 404);
     }
 
-    const aiResult = await groqManager.chatCompletion<{
+    const aiResult = await openrouterManager.chatCompletion<{
       issues: Array<{ line_estimate?: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }>;
       overall_quality_score?: number;
     }>({
-      model: 'openai/gpt-oss-20b',
+      model: 'meta-llama/llama-3.3-70b-instruct',
       messages: [
         {
           role: 'system',

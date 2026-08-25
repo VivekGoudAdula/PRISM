@@ -1,11 +1,11 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /resume-screen-accurate
- * High-precision candidate resume screening using Groq LLM API
+ * High-precision candidate resume screening using OpenRouter LLM API
  */
 export async function handleResumeScreenAccurateRequest(c: Context) {
   const startTime = Date.now();

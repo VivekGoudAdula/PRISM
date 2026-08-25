@@ -328,63 +328,48 @@ Return ONLY a JSON object with this exact structure:
   "summarizedSections": ["summary descriptions of condensed sections"]
 }`;
 
-      const modelsToTry = ['llama-3.3-70b-versatile', 'gemma2-9b-it', 'qwen-2.5-coder-32b', 'deepseek-r1-distill-llama-70b'];
+    try {
+      const { groqManager } = await import('../handlers/lib/groq-manager');
+      const res = await groqManager.chatCompletion({
+        model: 'openai/gpt-oss-20b',
+        responseFormatJson: false,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
+        ],
+        temperature: 0.1,
+      });
 
-      for (const apiKey of keys) {
-        for (const model of modelsToTry) {
-          try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  { role: 'system', content: systemInstruction },
-                  { role: 'user', content: `Task Type: ${input.taskType || 'general_query'}\nContext:\n${currentContext}` },
-                ],
-                temperature: 0.1,
-                response_format: { type: 'json_object' },
-              }),
-            });
+      if (res.data || res.rawContent) {
+        const rawContent = res.rawContent;
+        const parsed = typeof res.data === 'object' && res.data ? res.data : JSON.parse(rawContent);
+        if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
+          const candidateText = parsed.optimizedContext.trim();
 
-            if (response.ok) {
-              const data = await response.json();
-              const parsed = JSON.parse(data.choices?.[0]?.message?.content?.trim() || '{}');
-              if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
-                const candidateText = parsed.optimizedContext.trim();
+          const validation = validateSemanticPreservation(
+            fullOriginalContext,
+            candidateText,
+            input.requiredEntities,
+            input.constraints
+          );
 
-                // Semantic preservation check
-                const validation = validateSemanticPreservation(
-                  fullOriginalContext,
-                  candidateText,
-                  input.requiredEntities,
-                  input.constraints
-                );
-
-                if (validation.isValid) {
-                  currentContext = candidateText;
-                  modelUsed = `${model} + deterministic`;
-                  if (Array.isArray(parsed.removedRedundancies)) {
-                    removedRedundancies.push(...parsed.removedRedundancies);
-                  }
-                  if (Array.isArray(parsed.summarizedSections)) {
-                    summarizedSections.push(...parsed.summarizedSections);
-                  }
-                  break;
-                } else {
-                  console.warn('⚠️ Semantic preservation validation failed. Discarding LLM optimization fallback to original context.', validation);
-                }
-              }
+          if (validation.isValid) {
+            currentContext = candidateText;
+            modelUsed = `openai/gpt-oss-20b + deterministic`;
+            if (Array.isArray(parsed.removedRedundancies)) {
+              removedRedundancies.push(...parsed.removedRedundancies);
             }
-          } catch (err) {
-            // Continue to next model/key
+            if (Array.isArray(parsed.summarizedSections)) {
+              summarizedSections.push(...parsed.summarizedSections);
+            }
+          } else {
+            console.warn('⚠️ Semantic preservation validation failed. Discarding LLM optimization fallback to original context.', validation);
           }
         }
-        if (modelUsed.includes('+')) break;
       }
+    } catch (err) {
+      console.warn('Prompt Optimizer groqManager optimization failed:', err);
+    }
     }
   }
 

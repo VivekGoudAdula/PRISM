@@ -80,43 +80,18 @@ export async function handleClassifyTaskRequest(c: Context) {
       }
     }
 
-    // ── LLM Classification ───────────────────────────────────────────────────
-
-    const getGroqKeys = () => {
-      const keys = [];
-      if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
-      for (let i = 1; i <= 20; i++) {
-        const k = process.env[`GROQ_API_KEY_${i}`];
-        if (k) keys.push(k);
-      }
-      console.log(`getGroqKeys: found ${keys.length} keys in process.env`);
-      return keys;
-    };
-
-    const keys = getGroqKeys();
+    const { groqManager } = await import('./lib/groq-manager');
     let category = 'unsupported';
     let success = false;
 
-    const modelsToTry = ['llama-3.3-70b-versatile'];
-
-    if (keys.length > 0) {
-      for (let index = 0; index < keys.length; index++) {
-        const groqApiKey = keys[index];
-        for (const model of modelsToTry) {
-          try {
-            console.log(`Attempting Groq API call with key index ${index + 1} model ${model}...`);
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${groqApiKey}`,
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  {
-                    role: 'system',
-                    content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
+    try {
+      const res = await groqManager.chatCompletion({
+        model: 'openai/gpt-oss-20b',
+        responseFormatJson: false,
+        messages: [
+          {
+            role: 'system',
+            content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
 
 Rules & Few-Shot Examples:
 - Conversational chat, greetings, questions about Prism, pricing, or small talk MUST be classified as conversational:
@@ -143,48 +118,36 @@ Rules & Few-Shot Examples:
   Input: "123987!@#" -> unsupported
 
 Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`,
-                  },
-                  {
-                    role: 'user',
-                    content: task_description,
-                  },
-                ],
-                temperature: 0,
-                max_tokens: 10,
-              }),
-            });
+          },
+          {
+            role: 'user',
+            content: task_description,
+          },
+        ],
+        temperature: 0,
+      });
 
-            if (response.ok) {
-              const data = await response.json();
-              const content = data.choices?.[0]?.message?.content?.trim() || '';
-              const normalized = content.toLowerCase();
-              if (normalized.includes('conversational')) {
-                category = 'conversational';
-              } else if (normalized.includes('resume_screening') || normalized.includes('resume screening') || normalized.includes('resume')) {
-                category = 'resume_screening';
-              } else if (normalized.includes('contract_analysis') || normalized.includes('contract analysis') || normalized.includes('contract')) {
-                category = 'contract_analysis';
-              } else if (normalized.includes('invoice_extraction') || normalized.includes('invoice extraction') || normalized.includes('invoice')) {
-                category = 'invoice_extraction';
-              } else if (normalized.includes('code_review') || normalized.includes('code review') || normalized.includes('code')) {
-                category = 'code_review';
-              } else if (normalized.includes('seo_audit') || normalized.includes('seo audit') || normalized.includes('seo')) {
-                category = 'seo_audit';
-              } else {
-                category = localClassify(task_description);
-              }
-              success = true;
-              console.log(`Successfully classified task as '${category}' with key index ${index + 1} model ${model}`);
-              break;
-            } else {
-              console.warn(`Groq API key index ${index + 1} model ${model} failed with status: ${response.status}`);
-            }
-          } catch (e) {
-            console.error(`Error with Groq API key index ${index + 1} model ${model}:`, e);
-          }
-        }
-        if (success) break;
+      const content = res.rawContent?.trim() || '';
+      const normalized = content.toLowerCase();
+      if (normalized.includes('conversational')) {
+        category = 'conversational';
+      } else if (normalized.includes('resume_screening') || normalized.includes('resume screening') || normalized.includes('resume')) {
+        category = 'resume_screening';
+      } else if (normalized.includes('contract_analysis') || normalized.includes('contract analysis') || normalized.includes('contract')) {
+        category = 'contract_analysis';
+      } else if (normalized.includes('invoice_extraction') || normalized.includes('invoice extraction') || normalized.includes('invoice')) {
+        category = 'invoice_extraction';
+      } else if (normalized.includes('code_review') || normalized.includes('code review') || normalized.includes('code')) {
+        category = 'code_review';
+      } else if (normalized.includes('seo_audit') || normalized.includes('seo audit') || normalized.includes('seo')) {
+        category = 'seo_audit';
+      } else {
+        category = localClassify(task_description);
       }
+      success = true;
+      console.log(`Successfully classified task as '${category}' using groqManager`);
+    } catch (e) {
+      console.warn('Groq classification via groqManager failed:', e);
     }
 
     if (!success || category === 'unsupported') {

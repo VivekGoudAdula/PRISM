@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
 import { resolveFiles } from './lib/resolve-files';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /code-review-fast
- * Fast single-file code review using Groq LLM API (Llama 3.1 8B / Llama 3.3 70B)
+ * Fast single-file code review using OpenRouter API
  */
 export async function handleCodeReviewFastRequest(c: Context) {
   const startTime = Date.now();
@@ -43,11 +43,11 @@ export async function handleCodeReviewFastRequest(c: Context) {
       }, 404);
     }
 
-    const aiResult = await groqManager.chatCompletion<{
+    const aiResult = await openrouterManager.chatCompletion<{
       issues: Array<{ line_estimate?: number; severity: 'low' | 'medium' | 'high'; description: string; suggestion: string }>;
       overall_quality_score?: number;
     }>({
-      model: 'openai/gpt-oss-20b',
+      model: 'google/gemini-2.5-flash',
       messages: [
         {
           role: 'system',

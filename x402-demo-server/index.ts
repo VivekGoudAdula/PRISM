@@ -417,9 +417,14 @@ app.get('/health', (c) => {
   });
 });
 
+app.get('/api/health/openrouter', async (c) => {
+  const { handleOpenRouterHealthCheck } = await import('./routes/health-openrouter');
+  return handleOpenRouterHealthCheck(c);
+});
+
 app.get('/api/health/groq', async (c) => {
-  const { handleGroqHealthCheck } = await import('./routes/health-groq');
-  return handleGroqHealthCheck(c);
+  const { handleOpenRouterHealthCheck } = await import('./routes/health-openrouter');
+  return handleOpenRouterHealthCheck(c);
 });
 
 app.post('/classify-task', async (c) => {

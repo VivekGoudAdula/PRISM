@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { analyzeHtmlSeoRules, SeoIssue } from './seo-audit-fast';
-import { groqManager } from './lib/groq-manager';
+import { openrouterManager } from './lib/openrouter-manager';
 
 /**
  * POST /seo-audit-accurate

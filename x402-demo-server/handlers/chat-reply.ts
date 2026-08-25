@@ -101,42 +101,28 @@ INSTRUCTIONS:
 4. If the answer isn't in the provided context, state clearly: "I don't have a previous result to reference — could you clarify what you'd like me to look at?"
 5. Keep your response concise, clear, and under 3-4 sentences.`;
 
-  if (keys.length > 0) {
-    for (let index = 0; index < keys.length; index++) {
-      const groqApiKey = keys[index];
-      try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${groqApiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              {
-                role: 'system',
-                content: systemPrompt,
-              },
-              {
-                role: 'user',
-                content: message,
-              },
-            ],
-            temperature: 0.1,
-            max_tokens: 250,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content?.trim();
-          if (content) return content;
-        }
-      } catch (e) {
-        console.error(`Error generating chat reply with Groq key ${index + 1}:`, e);
-      }
+  try {
+    const { groqManager } = await import('./lib/groq-manager');
+    const res = await groqManager.chatCompletion({
+      model: 'openai/gpt-oss-20b',
+      responseFormatJson: false,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: message,
+        },
+      ],
+      temperature: 0.1,
+    });
+    if (res.rawContent) {
+      return res.rawContent;
     }
+  } catch (e) {
+    console.error('Error generating chat reply with groqManager:', e);
   }
 
   // Local fallback response
