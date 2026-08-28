@@ -5,7 +5,7 @@ import { User } from '../models/User';
 import { UserSession } from '../models/UserSession';
 import { AuditLog } from '../models/AuditLog';
 import { validateAuthBody } from '../middleware/common';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'prism_default_secret_key_12345';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'prism_default_refresh_secret_key_12345';
@@ -238,34 +238,78 @@ authRouter.get('/me', requireAuth, async (c) => {
 });
 
 /**
- * UPDATE WALLET CONNECTION
+ * UPDATE WALLET CONNECTION (Auto-authenticates wallet users if no JWT session exists)
  */
-authRouter.post('/connect-wallet', requireAuth, async (c) => {
+authRouter.post('/connect-wallet', optionalAuth, async (c) => {
   try {
     const tokenUser = (c as any).get('user');
     const { walletAddress } = await c.req.json().catch(() => ({}));
 
-    if (!walletAddress) {
+    if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.trim().length === 0) {
       return c.json({ error: 'Wallet address is required.' }, 400);
     }
 
-    const user = await User.findById(tokenUser.userId);
-    if (!user) {
-      return c.json({ error: 'User not found.' }, 404);
+    const cleanWallet = walletAddress.trim();
+    let user = null;
+
+    if (tokenUser && tokenUser.userId) {
+      user = await User.findById(tokenUser.userId);
     }
 
-    user.walletAddress = walletAddress;
+    if (!user) {
+      user = await User.findOne({ walletAddress: cleanWallet });
+      if (!user) {
+        const dummyEmail = `wallet_${cleanWallet.slice(0, 10).toLowerCase()}@prism.ai`;
+        user = await User.findOne({ email: dummyEmail });
+        if (!user) {
+          user = await User.create({
+            fullName: `Wallet User (${cleanWallet.slice(0, 6)}...${cleanWallet.slice(-4)})`,
+            email: dummyEmail,
+            passwordHash: 'wallet_connected_auth',
+            role: 'user',
+            walletAddress: cleanWallet,
+            subscriptionPlan: 'free',
+            credits: 100,
+          });
+        }
+      }
+    }
+
+    user.walletAddress = cleanWallet;
+    user.lastLogin = new Date();
     await user.save();
 
-    // Audit Log
+    const { accessToken, refreshToken } = generateTokens(user);
+
+    await UserSession.create({
+      userId: user._id,
+      refreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+      ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
+      browser: c.req.header('user-agent') || 'Unknown Browser',
+    }).catch(() => {});
+
     await AuditLog.create({
       userId: user._id,
       action: 'Wallet Connected',
-      details: { walletAddress },
+      details: { walletAddress: cleanWallet },
       ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
-    });
+    }).catch(() => {});
 
-    return c.json({ success: true, walletAddress });
+    return c.json({
+      success: true,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        credits: user.credits,
+        walletAddress: user.walletAddress,
+        subscriptionPlan: user.subscriptionPlan,
+      },
+    });
   } catch (error: any) {
     console.error('Connect Wallet API Error:', error);
     return c.json({ error: 'Failed to update wallet address.' }, 500);

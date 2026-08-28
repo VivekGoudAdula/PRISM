@@ -205,8 +205,10 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     try {
       const { data } = await api.get('/api/analytics/tasks');
       setTasks(data);
-    } catch (err) {
-      console.error('Error fetching task history:', err);
+    } catch (err: any) {
+      if (err.response?.status !== 401) {
+        console.error('Error fetching task history:', err);
+      }
     }
   };
 
@@ -214,8 +216,10 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     try {
       const { data } = await api.get('/api/chat/conversations');
       setConversations(data);
-    } catch (err) {
-      console.error('Error loading conversations:', err);
+    } catch (err: any) {
+      if (err.response?.status !== 401) {
+        console.error('Error loading conversations:', err);
+      }
     }
   };
 

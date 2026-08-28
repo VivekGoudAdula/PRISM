@@ -30,9 +30,27 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
                 data-test-id={`${wallet.id}-connect`}
                 className="btn m-2 flex items-center justify-center gap-4 text-white"
                 key={`provider-${wallet.id}`}
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.preventDefault()
-                  wallet.connect()
+                  try {
+                    await wallet.connect()
+                  } catch (err: any) {
+                    console.warn(`[WalletConnect] Failed to connect ${wallet.id}:`, err)
+                    try {
+                      await wallet.disconnect()
+                    } catch {}
+                    // Clear stale Pera/WalletConnect keys from localStorage if session is expired
+                    Object.keys(localStorage).forEach((key) => {
+                      if (
+                        key.includes('pera') ||
+                        key.includes('walletconnect') ||
+                        key.includes('wc@2') ||
+                        key.includes('PeraWallet')
+                      ) {
+                        localStorage.removeItem(key)
+                      }
+                    })
+                  }
                 }}
               >
                 {!isKmd(wallet) && (
@@ -47,37 +65,61 @@ const ConnectWallet = ({ openModal, closeModal }: ConnectWalletInterface) => {
             ))}
         </div>
 
-        <div className="modal-action mt-6">
-          <button
-            data-test-id="close-wallet-modal"
-            className="btn px-6 text-white font-medium"
-            onClick={(e) => {
-              e.preventDefault()
-              closeModal()
-            }}
-          >
-            Close
-          </button>
-          {activeAddress && (
+        <div className="modal-action mt-6 flex items-center justify-between">
+          {!activeAddress && (
             <button
-              className="btn btn-warning px-6 font-semibold"
-              data-test-id="logout"
-              onClick={async (e) => {
-                e.preventDefault()
-                if (wallets) {
-                  const activeWallet = wallets.find((w) => w.isActive)
-                  if (activeWallet) {
-                    await activeWallet.disconnect()
-                  } else {
-                    localStorage.removeItem('@txnlab/use-wallet:v3')
-                    window.location.reload()
+              type="button"
+              className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
+              onClick={() => {
+                Object.keys(localStorage).forEach((key) => {
+                  if (
+                    key.includes('pera') ||
+                    key.includes('walletconnect') ||
+                    key.includes('wc@2') ||
+                    key.includes('@txnlab') ||
+                    key.includes('PeraWallet')
+                  ) {
+                    localStorage.removeItem(key)
                   }
-                }
+                })
+                window.location.reload()
               }}
             >
-              Logout
+              Reset Wallet Sessions
             </button>
           )}
+          <div className="flex items-center gap-2">
+            <button
+              data-test-id="close-wallet-modal"
+              className="btn px-6 text-white font-medium"
+              onClick={(e) => {
+                e.preventDefault()
+                closeModal()
+              }}
+            >
+              Close
+            </button>
+            {activeAddress && (
+              <button
+                className="btn btn-warning px-6 font-semibold"
+                data-test-id="logout"
+                onClick={async (e) => {
+                  e.preventDefault()
+                  if (wallets) {
+                    const activeWallet = wallets.find((w) => w.isActive)
+                    if (activeWallet) {
+                      await activeWallet.disconnect()
+                    } else {
+                      localStorage.removeItem('@txnlab/use-wallet:v3')
+                      window.location.reload()
+                    }
+                  }
+                }}
+              >
+                Logout
+              </button>
+            )}
+          </div>
         </div>
       </form>
     </dialog>

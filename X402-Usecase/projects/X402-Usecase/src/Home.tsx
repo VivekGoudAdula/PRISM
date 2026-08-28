@@ -457,14 +457,33 @@ const Home: React.FC<HomeProps> = () => {
     }
   }, [viewState, currentUser, userRole])
 
-  // Sync wallet address to backend when activeAddress changes
+  // Sync wallet address to backend when activeAddress changes & auto-authenticate wallet connections
   useEffect(() => {
-    if (activeAddress && currentUser) {
+    if (activeAddress) {
       api.post('/api/auth/connect-wallet', { walletAddress: activeAddress })
-        .then(() => console.log('Wallet address synced to backend'))
+        .then(({ data }) => {
+          if (data?.accessToken) {
+            setAccessToken(data.accessToken);
+            if (data.refreshToken) localStorage.setItem('prism_refresh_token', data.refreshToken);
+            if (data.user?.fullName) localStorage.setItem('prism_logged_in_user', data.user.fullName);
+            if (data.user?.role) localStorage.setItem('prism_user_role', data.user.role);
+            if (data.user?.email) localStorage.setItem('prism_user_email', data.user.email);
+            if (data.user?.credits !== undefined) localStorage.setItem('prism_user_credits', data.user.credits.toString());
+            if (data.user?.subscriptionPlan) localStorage.setItem('prism_user_plan', data.user.subscriptionPlan);
+
+            setCurrentUser(data.user?.fullName || 'Wallet User');
+            setUserRole(data.user?.role || 'user');
+            setProfileData({
+              email: data.user?.email || '',
+              credits: data.user?.credits ?? 100,
+              plan: data.user?.subscriptionPlan || 'free',
+            });
+            fetchTasks();
+          }
+        })
         .catch(err => console.error('Failed to sync wallet address', err));
     }
-  }, [activeAddress, currentUser])
+  }, [activeAddress])
 
   const toggleWalletModal = () => {
     setOpenWalletModal(!openWalletModal)

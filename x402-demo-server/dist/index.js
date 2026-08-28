@@ -100453,26 +100453,69 @@ authRouter.get("/me", requireAuth, async (c) => {
   }
   return c.json({ user });
 });
-authRouter.post("/connect-wallet", requireAuth, async (c) => {
+authRouter.post("/connect-wallet", optionalAuth, async (c) => {
   try {
     const tokenUser = c.get("user");
     const { walletAddress } = await c.req.json().catch(() => ({}));
-    if (!walletAddress) {
+    if (!walletAddress || typeof walletAddress !== "string" || walletAddress.trim().length === 0) {
       return c.json({ error: "Wallet address is required." }, 400);
     }
-    const user = await User.findById(tokenUser.userId);
-    if (!user) {
-      return c.json({ error: "User not found." }, 404);
+    const cleanWallet = walletAddress.trim();
+    let user = null;
+    if (tokenUser && tokenUser.userId) {
+      user = await User.findById(tokenUser.userId);
     }
-    user.walletAddress = walletAddress;
+    if (!user) {
+      user = await User.findOne({ walletAddress: cleanWallet });
+      if (!user) {
+        const dummyEmail = `wallet_${cleanWallet.slice(0, 10).toLowerCase()}@prism.ai`;
+        user = await User.findOne({ email: dummyEmail });
+        if (!user) {
+          user = await User.create({
+            fullName: `Wallet User (${cleanWallet.slice(0, 6)}...${cleanWallet.slice(-4)})`,
+            email: dummyEmail,
+            passwordHash: "wallet_connected_auth",
+            role: "user",
+            walletAddress: cleanWallet,
+            subscriptionPlan: "free",
+            credits: 100
+          });
+        }
+      }
+    }
+    user.walletAddress = cleanWallet;
+    user.lastLogin = /* @__PURE__ */ new Date();
     await user.save();
+    const { accessToken, refreshToken } = generateTokens(user);
+    await UserSession.create({
+      userId: user._id,
+      refreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1e3),
+      ipAddress: c.req.header("x-forwarded-for") || "127.0.0.1",
+      browser: c.req.header("user-agent") || "Unknown Browser"
+    }).catch(() => {
+    });
     await AuditLog.create({
       userId: user._id,
       action: "Wallet Connected",
-      details: { walletAddress },
+      details: { walletAddress: cleanWallet },
       ipAddress: c.req.header("x-forwarded-for") || "127.0.0.1"
+    }).catch(() => {
     });
-    return c.json({ success: true, walletAddress });
+    return c.json({
+      success: true,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        credits: user.credits,
+        walletAddress: user.walletAddress,
+        subscriptionPlan: user.subscriptionPlan
+      }
+    });
   } catch (error) {
     console.error("Connect Wallet API Error:", error);
     return c.json({ error: "Failed to update wallet address." }, 500);
