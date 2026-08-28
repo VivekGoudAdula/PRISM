@@ -52,8 +52,67 @@ export function getOpenRouterKeys(): string[] {
 }
 
 /**
+ * Fallback free models to attempt sequentially when credit limit (402) is hit.
+ */
+export const FREE_FALLBACK_MODELS = [
+  'google/gemma-2-9b-it:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
+  'qwen/qwen-2.5-7b-instruct:free',
+  'mistralai/mistral-7b-instruct:free',
+];
+
+/**
+ * Executes a single fetch attempt to OpenRouter with a timeout.
+ */
+async function fetchOpenRouterSingle(
+  apiKey: string,
+  model: string,
+  options: OpenRouterOptions,
+  maxTokens: number
+): Promise<{ status: number; text: string; content?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second timeout per request
+
+  try {
+    const bodyPayload: Record<string, any> = {
+      model,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.2,
+      max_tokens: maxTokens,
+    };
+
+    if (options.response_format) {
+      bodyPayload.response_format = options.response_format;
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://prism.ai',
+        'X-OpenRouter-Title': 'PRISM AI Router',
+      },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { status: response.status, text: errorText };
+    }
+
+    const data = (await response.json()) as OpenRouterResponse;
+    const content = data.choices?.[0]?.message?.content;
+    return { status: 200, text: '', content: content ?? undefined };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Direct OpenRouter API client to perform chat completion requests.
- * Uses rotation over configured keys and standard OpenRouter headers.
+ * Uses rotation over configured keys, timeout protection, and free model fallback on 402.
  */
 export async function callOpenRouter(options: OpenRouterOptions): Promise<string> {
   const keys = getOpenRouterKeys();
@@ -62,71 +121,62 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
   }
 
   const model = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+  const requestedMaxTokens = options.max_tokens ?? 2500;
   let lastError: Error | null = null;
+  let isCreditError = false;
 
   for (let index = 0; index < keys.length; index++) {
     const apiKey = keys[index];
     try {
       console.log(`[OpenRouter] Sending request to model: ${model} (Key index ${index + 1}/${keys.length})`);
+      const result = await fetchOpenRouterSingle(apiKey, model, options, requestedMaxTokens);
 
-      // Set a reasonable default max_tokens (e.g., 2500) if unspecified to prevent OpenRouter from reserving 65,536 max tokens on low-credit balances.
-      const bodyPayload: Record<string, any> = {
-        model,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500,
-      };
-
-      if (options.response_format) {
-        bodyPayload.response_format = options.response_format;
+      if (result.status === 402) {
+        console.warn(`[OpenRouter] Key index ${index + 1} HTTP 402 (Insufficient Credits): ${result.text}`);
+        isCreditError = true;
+        lastError = new Error(`OpenRouter HTTP 402: ${result.text}`);
+        break; // Stop testing other keys for paid model if credits are exhausted
       }
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://prism.ai',
-          'X-OpenRouter-Title': 'PRISM AI Router',
-        },
-        body: JSON.stringify(bodyPayload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${response.status}: ${errorText}`);
-        lastError = new Error(`OpenRouter HTTP ${response.status}: ${errorText}`);
-
-        // Handle credit limits / 402: try lower max_tokens first, then fall back to an active free model
-        if (response.status === 402) {
-          const currentMaxTokens = bodyPayload.max_tokens || 2500;
-          if (currentMaxTokens > 1200) {
-            console.warn(`[OpenRouter] HTTP 402 on ${model}, retrying with lower max_tokens (1200)...`);
-            return await callOpenRouter({ ...options, model, max_tokens: 1200 });
-          } else if (!model.includes(':free')) {
-            const freeFallbackModel = 'nvidia/nemotron-3.5-lightning:free';
-            console.warn(`[OpenRouter] HTTP 402 on ${model}, attempting free fallback to ${freeFallbackModel}...`);
-            return await callOpenRouter({ ...options, model: freeFallbackModel, max_tokens: 1200 });
-          }
-        }
+      if (result.status !== 200) {
+        console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${result.status}: ${result.text}`);
+        lastError = new Error(`OpenRouter HTTP ${result.status}: ${result.text}`);
         continue;
       }
 
-      const data = (await response.json()) as OpenRouterResponse;
-      const content = data.choices?.[0]?.message?.content;
-
-      if (content === undefined || content === null) {
+      if (!result.content || !result.content.trim()) {
         console.warn(`[OpenRouter] Empty content returned from model ${model}`);
         lastError = new Error(`OpenRouter returned empty message content.`);
         continue;
       }
 
-      return content;
+      return result.content;
     } catch (err: any) {
-      console.error(`[OpenRouter] Request failed with key index ${index + 1}:`, err);
+      console.error(`[OpenRouter] Request failed on ${model} with key index ${index + 1}:`, err);
       lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  // Fallback path: If credit error or model attempt failed and requested model wasn't already a free model
+  if (!model.includes(':free')) {
+    console.warn(`[OpenRouter] Primary model ${model} failed (Credit error: ${isCreditError}). Attempting free fallback models...`);
+    const apiKey = keys[0];
+
+    for (const freeModel of FREE_FALLBACK_MODELS) {
+      try {
+        console.log(`[OpenRouter] Attempting free fallback model: ${freeModel}`);
+        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, Math.min(requestedMaxTokens, 1200));
+
+        if (freeResult.status === 200 && freeResult.content && freeResult.content.trim()) {
+          console.log(`[OpenRouter] Free fallback model ${freeModel} succeeded.`);
+          return freeResult.content;
+        }
+      } catch (freeErr) {
+        console.warn(`[OpenRouter] Free fallback model ${freeModel} failed:`, freeErr);
+      }
     }
   }
 
   throw lastError || new Error('All OpenRouter API attempts failed.');
 }
+

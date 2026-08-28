@@ -86486,74 +86486,107 @@ function getOpenRouterKeys() {
   }
   return keys;
 }
+async function fetchOpenRouterSingle(apiKey, model16, options, maxTokens) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12e3);
+  try {
+    const bodyPayload = {
+      model: model16,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.2,
+      max_tokens: maxTokens
+    };
+    if (options.response_format) {
+      bodyPayload.response_format = options.response_format;
+    }
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://prism.ai",
+        "X-OpenRouter-Title": "PRISM AI Router"
+      },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { status: response.status, text: errorText };
+    }
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    return { status: 200, text: "", content: content ?? void 0 };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 async function callOpenRouter(options) {
   const keys = getOpenRouterKeys();
   if (keys.length === 0) {
     throw new Error("No OPENROUTER_API_KEY found in environment variables.");
   }
   const model16 = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+  const requestedMaxTokens = options.max_tokens ?? 2500;
   let lastError = null;
+  let isCreditError = false;
   for (let index = 0; index < keys.length; index++) {
     const apiKey = keys[index];
     try {
       console.log(`[OpenRouter] Sending request to model: ${model16} (Key index ${index + 1}/${keys.length})`);
-      const bodyPayload = {
-        model: model16,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500
-      };
-      if (options.response_format) {
-        bodyPayload.response_format = options.response_format;
+      const result = await fetchOpenRouterSingle(apiKey, model16, options, requestedMaxTokens);
+      if (result.status === 402) {
+        console.warn(`[OpenRouter] Key index ${index + 1} HTTP 402 (Insufficient Credits): ${result.text}`);
+        isCreditError = true;
+        lastError = new Error(`OpenRouter HTTP 402: ${result.text}`);
+        break;
       }
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://prism.ai",
-          "X-OpenRouter-Title": "PRISM AI Router"
-        },
-        body: JSON.stringify(bodyPayload)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${response.status}: ${errorText}`);
-        lastError = new Error(`OpenRouter HTTP ${response.status}: ${errorText}`);
-        if (response.status === 402) {
-          const currentMaxTokens = bodyPayload.max_tokens || 2500;
-          if (currentMaxTokens > 1200) {
-            console.warn(`[OpenRouter] HTTP 402 on ${model16}, retrying with lower max_tokens (1200)...`);
-            return await callOpenRouter({ ...options, model: model16, max_tokens: 1200 });
-          } else if (!model16.includes(":free")) {
-            const freeFallbackModel = "nvidia/nemotron-3.5-lightning:free";
-            console.warn(`[OpenRouter] HTTP 402 on ${model16}, attempting free fallback to ${freeFallbackModel}...`);
-            return await callOpenRouter({ ...options, model: freeFallbackModel, max_tokens: 1200 });
-          }
-        }
+      if (result.status !== 200) {
+        console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${result.status}: ${result.text}`);
+        lastError = new Error(`OpenRouter HTTP ${result.status}: ${result.text}`);
         continue;
       }
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (content === void 0 || content === null) {
+      if (!result.content || !result.content.trim()) {
         console.warn(`[OpenRouter] Empty content returned from model ${model16}`);
         lastError = new Error(`OpenRouter returned empty message content.`);
         continue;
       }
-      return content;
+      return result.content;
     } catch (err2) {
-      console.error(`[OpenRouter] Request failed with key index ${index + 1}:`, err2);
+      console.error(`[OpenRouter] Request failed on ${model16} with key index ${index + 1}:`, err2);
       lastError = err2 instanceof Error ? err2 : new Error(String(err2));
+    }
+  }
+  if (!model16.includes(":free")) {
+    console.warn(`[OpenRouter] Primary model ${model16} failed (Credit error: ${isCreditError}). Attempting free fallback models...`);
+    const apiKey = keys[0];
+    for (const freeModel of FREE_FALLBACK_MODELS) {
+      try {
+        console.log(`[OpenRouter] Attempting free fallback model: ${freeModel}`);
+        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, Math.min(requestedMaxTokens, 1200));
+        if (freeResult.status === 200 && freeResult.content && freeResult.content.trim()) {
+          console.log(`[OpenRouter] Free fallback model ${freeModel} succeeded.`);
+          return freeResult.content;
+        }
+      } catch (freeErr) {
+        console.warn(`[OpenRouter] Free fallback model ${freeModel} failed:`, freeErr);
+      }
     }
   }
   throw lastError || new Error("All OpenRouter API attempts failed.");
 }
-var FAST_MODEL, ACCURATE_MODEL;
+var FAST_MODEL, ACCURATE_MODEL, FREE_FALLBACK_MODELS;
 var init_openrouter_client = __esm({
   "handlers/lib/openrouter-client.ts"() {
     "use strict";
     FAST_MODEL = process.env.FAST_MODEL || "google/gemini-2.5-flash";
     ACCURATE_MODEL = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
+    FREE_FALLBACK_MODELS = [
+      "google/gemma-2-9b-it:free",
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "qwen/qwen-2.5-7b-instruct:free",
+      "mistralai/mistral-7b-instruct:free"
+    ];
   }
 });
 
