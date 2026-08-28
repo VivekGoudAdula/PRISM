@@ -54,11 +54,16 @@ export function getOpenRouterKeys(): string[] {
 /**
  * Fallback free models to attempt sequentially when credit limit (402) is hit.
  */
+/**
+ * Fallback free models to attempt sequentially when credit limit (402) is hit.
+ */
 export const FREE_FALLBACK_MODELS = [
   'google/gemma-2-9b-it:free',
-  'meta-llama/llama-3.1-8b-instruct:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
   'qwen/qwen-2.5-7b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
   'mistralai/mistral-7b-instruct:free',
+  'deepseek/deepseek-r1:free',
 ];
 
 /**
@@ -68,7 +73,8 @@ async function fetchOpenRouterSingle(
   apiKey: string,
   model: string,
   options: OpenRouterOptions,
-  maxTokens: number
+  maxTokens?: number,
+  isFreeFallback: boolean = false
 ): Promise<{ status: number; text: string; content?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second timeout per request
@@ -78,10 +84,15 @@ async function fetchOpenRouterSingle(
       model,
       messages: options.messages,
       temperature: options.temperature ?? 0.2,
-      max_tokens: maxTokens,
     };
 
-    if (options.response_format) {
+    // Only set max_tokens for paid models or if explicitly provided for free models
+    if (maxTokens !== undefined) {
+      bodyPayload.max_tokens = maxTokens;
+    }
+
+    // Omit response_format for free fallback models to prevent OpenRouter 400/402 payload rejections on free models
+    if (options.response_format && !isFreeFallback) {
       bodyPayload.response_format = options.response_format;
     }
 
@@ -129,7 +140,7 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
     const apiKey = keys[index];
     try {
       console.log(`[OpenRouter] Sending request to model: ${model} (Key index ${index + 1}/${keys.length})`);
-      const result = await fetchOpenRouterSingle(apiKey, model, options, requestedMaxTokens);
+      const result = await fetchOpenRouterSingle(apiKey, model, options, requestedMaxTokens, false);
 
       if (result.status === 402) {
         console.warn(`[OpenRouter] Key index ${index + 1} HTTP 402 (Insufficient Credits): ${result.text}`);
@@ -165,11 +176,13 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
     for (const freeModel of FREE_FALLBACK_MODELS) {
       try {
         console.log(`[OpenRouter] Attempting free fallback model: ${freeModel}`);
-        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, Math.min(requestedMaxTokens, 1200));
+        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, undefined, true);
 
         if (freeResult.status === 200 && freeResult.content && freeResult.content.trim()) {
           console.log(`[OpenRouter] Free fallback model ${freeModel} succeeded.`);
           return freeResult.content;
+        } else {
+          console.warn(`[OpenRouter] Free fallback model ${freeModel} status ${freeResult.status}: ${freeResult.text}`);
         }
       } catch (freeErr) {
         console.warn(`[OpenRouter] Free fallback model ${freeModel} failed:`, freeErr);

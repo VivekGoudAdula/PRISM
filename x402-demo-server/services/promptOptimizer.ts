@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { estimateTokens, calculateTokenSavings } from './tokenAnalytics';
 import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
+import { parseRobustJson } from '../handlers/lib/parse-json-robust';
 
 config();
 
@@ -318,7 +319,7 @@ Return ONLY a JSON object with this exact structure:
         response_format: { type: 'json_object' },
       });
 
-      const parsed = JSON.parse(rawContent);
+      const parsed = parseRobustJson(rawContent);
       if (parsed.optimizedContext && typeof parsed.optimizedContext === 'string') {
         const candidateText = parsed.optimizedContext.trim();
         const validation = validateSemanticPreservation(

@@ -86486,17 +86486,19 @@ function getOpenRouterKeys() {
   }
   return keys;
 }
-async function fetchOpenRouterSingle(apiKey, model16, options, maxTokens) {
+async function fetchOpenRouterSingle(apiKey, model16, options, maxTokens, isFreeFallback = false) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12e3);
   try {
     const bodyPayload = {
       model: model16,
       messages: options.messages,
-      temperature: options.temperature ?? 0.2,
-      max_tokens: maxTokens
+      temperature: options.temperature ?? 0.2
     };
-    if (options.response_format) {
+    if (maxTokens !== void 0) {
+      bodyPayload.max_tokens = maxTokens;
+    }
+    if (options.response_format && !isFreeFallback) {
       bodyPayload.response_format = options.response_format;
     }
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -86534,7 +86536,7 @@ async function callOpenRouter(options) {
     const apiKey = keys[index];
     try {
       console.log(`[OpenRouter] Sending request to model: ${model16} (Key index ${index + 1}/${keys.length})`);
-      const result = await fetchOpenRouterSingle(apiKey, model16, options, requestedMaxTokens);
+      const result = await fetchOpenRouterSingle(apiKey, model16, options, requestedMaxTokens, false);
       if (result.status === 402) {
         console.warn(`[OpenRouter] Key index ${index + 1} HTTP 402 (Insufficient Credits): ${result.text}`);
         isCreditError = true;
@@ -86563,10 +86565,12 @@ async function callOpenRouter(options) {
     for (const freeModel of FREE_FALLBACK_MODELS) {
       try {
         console.log(`[OpenRouter] Attempting free fallback model: ${freeModel}`);
-        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, Math.min(requestedMaxTokens, 1200));
+        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, void 0, true);
         if (freeResult.status === 200 && freeResult.content && freeResult.content.trim()) {
           console.log(`[OpenRouter] Free fallback model ${freeModel} succeeded.`);
           return freeResult.content;
+        } else {
+          console.warn(`[OpenRouter] Free fallback model ${freeModel} status ${freeResult.status}: ${freeResult.text}`);
         }
       } catch (freeErr) {
         console.warn(`[OpenRouter] Free fallback model ${freeModel} failed:`, freeErr);
@@ -86583,10 +86587,54 @@ var init_openrouter_client = __esm({
     ACCURATE_MODEL = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
     FREE_FALLBACK_MODELS = [
       "google/gemma-2-9b-it:free",
-      "meta-llama/llama-3.1-8b-instruct:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
       "qwen/qwen-2.5-7b-instruct:free",
-      "mistralai/mistral-7b-instruct:free"
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
+      "deepseek/deepseek-r1:free"
     ];
+  }
+});
+
+// handlers/lib/parse-json-robust.ts
+function parseRobustJson(content) {
+  if (!content || typeof content !== "string") {
+    throw new Error("Empty or invalid content provided for JSON parsing");
+  }
+  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
+  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (!jsonMatch) {
+    throw new Error("No JSON object or array found in text");
+  }
+  let str = jsonMatch[0];
+  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
+    if (stringLiteral) return stringLiteral;
+    return "";
+  });
+  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
+  str = str.replace(/,\s*([\}\]])/g, "$1");
+  try {
+    return JSON.parse(str);
+  } catch (err1) {
+    let fixed = str;
+    const openBraces = (fixed.match(/\{/g) || []).length;
+    const closeBraces = (fixed.match(/\}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/\]/g) || []).length;
+    fixed = fixed.replace(/,\s*$/, "");
+    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
+    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
+    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
+    try {
+      return JSON.parse(fixed);
+    } catch (err2) {
+      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
+    }
+  }
+}
+var init_parse_json_robust = __esm({
+  "handlers/lib/parse-json-robust.ts"() {
+    "use strict";
   }
 });
 
@@ -88454,7 +88502,7 @@ ${currentContext}` }
         temperature: 0.1,
         response_format: { type: "json_object" }
       });
-      const parsed = JSON.parse(rawContent);
+      const parsed = parseRobustJson(rawContent);
       if (parsed.optimizedContext && typeof parsed.optimizedContext === "string") {
         const candidateText = parsed.optimizedContext.trim();
         const validation = validateSemanticPreservation(
@@ -88520,6 +88568,7 @@ var init_promptOptimizer = __esm({
     import_dotenv3 = __toESM(require_main());
     init_tokenAnalytics();
     init_openrouter_client();
+    init_parse_json_robust();
     (0, import_dotenv3.config)();
   }
 });
@@ -88788,48 +88837,6 @@ var init_resume_screen_accurate = __esm({
     init_extract_document();
     init_resolve_files();
     init_openrouter_client();
-  }
-});
-
-// handlers/lib/parse-json-robust.ts
-function parseRobustJson(content) {
-  if (!content || typeof content !== "string") {
-    throw new Error("Empty or invalid content provided for JSON parsing");
-  }
-  let cleaned = content.replace(/^```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
-  const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (!jsonMatch) {
-    throw new Error("No JSON object or array found in text");
-  }
-  let str = jsonMatch[0];
-  str = str.replace(/("(?:\\.|[^"\\])*")|(\/\/[^\r\n]*)/g, (match2, stringLiteral, comment) => {
-    if (stringLiteral) return stringLiteral;
-    return "";
-  });
-  str = str.replace(/\/\*[\s\S]*?\*\//g, "");
-  str = str.replace(/,\s*([\}\]])/g, "$1");
-  try {
-    return JSON.parse(str);
-  } catch (err1) {
-    let fixed = str;
-    const openBraces = (fixed.match(/\{/g) || []).length;
-    const closeBraces = (fixed.match(/\}/g) || []).length;
-    const openBrackets = (fixed.match(/\[/g) || []).length;
-    const closeBrackets = (fixed.match(/\]/g) || []).length;
-    fixed = fixed.replace(/,\s*$/, "");
-    fixed = fixed.replace(/,\s*"[^"]*"$/s, "");
-    for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += "]";
-    for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
-    try {
-      return JSON.parse(fixed);
-    } catch (err2) {
-      throw new Error(`Failed to parse JSON even after robust cleanup: ${err1.message}`);
-    }
-  }
-}
-var init_parse_json_robust = __esm({
-  "handlers/lib/parse-json-robust.ts"() {
-    "use strict";
   }
 });
 
@@ -102146,6 +102153,7 @@ var import_dotenv2 = __toESM(require_main());
 init_extract_document();
 init_tokenAnalytics();
 init_openrouter_client();
+init_parse_json_robust();
 (0, import_dotenv2.config)();
 async function analyzePromptWithLLM(originalPrompt, files = [], hintCategory) {
   const promptText = (originalPrompt || "").trim();
@@ -102232,7 +102240,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
       temperature: 0.1,
       response_format: { type: "json_object" }
     });
-    const parsed = JSON.parse(rawContent);
+    const parsed = parseRobustJson(rawContent);
     const sanitizeStringArray = (val) => {
       if (!val) return [];
       if (Array.isArray(val)) {

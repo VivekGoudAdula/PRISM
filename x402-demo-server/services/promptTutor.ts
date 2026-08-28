@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { extractText } from '../handlers/lib/extract-document';
 import { estimateTokens } from './tokenAnalytics';
 import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
+import { parseRobustJson } from '../handlers/lib/parse-json-robust';
 
 config();
 
@@ -124,7 +125,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
       response_format: { type: 'json_object' },
     });
 
-    const parsed = JSON.parse(rawContent);
+    const parsed = parseRobustJson(rawContent);
     const sanitizeStringArray = (val: any): string[] => {
       if (!val) return [];
       if (Array.isArray(val)) {
