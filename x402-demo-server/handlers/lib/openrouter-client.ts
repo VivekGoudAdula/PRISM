@@ -54,16 +54,11 @@ export function getOpenRouterKeys(): string[] {
 /**
  * Fallback free models to attempt sequentially when credit limit (402) is hit.
  */
-/**
- * Fallback free models to attempt sequentially when credit limit (402) is hit.
- */
 export const FREE_FALLBACK_MODELS = [
-  'google/gemma-2-9b-it:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'qwen/qwen-2.5-7b-instruct:free',
-  'meta-llama/llama-3.1-8b-instruct:free',
-  'mistralai/mistral-7b-instruct:free',
-  'deepseek/deepseek-r1:free',
+  'openrouter/auto',
+  'qwen/qwen-2-7b-instruct:free',
+  'meta-llama/llama-3-8b-instruct:free',
+  'google/gemma-7b-it:free',
 ];
 
 /**
