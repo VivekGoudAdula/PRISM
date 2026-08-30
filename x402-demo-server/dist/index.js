@@ -86591,15 +86591,66 @@ var init_puter_client = __esm({
 });
 
 // handlers/lib/openrouter-client.ts
+function getOpenRouterKeys() {
+  const keys = [];
+  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+    keys.push(process.env.OPENROUTER_API_KEY.trim());
+  }
+  return keys;
+}
 async function callOpenRouter(options) {
-  console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
-  return callPuterAI({
-    model: options.model,
-    messages: options.messages,
-    temperature: options.temperature,
-    max_tokens: options.max_tokens,
-    response_format: options.response_format
-  });
+  const keys = getOpenRouterKeys();
+  const requestedModel = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL2;
+  if (keys.length > 0) {
+    const apiKey = keys[0];
+    try {
+      console.log(`[AI Router] Attempting OpenRouter completion with model: ${requestedModel}`);
+      const bodyPayload = {
+        model: requestedModel,
+        messages: options.messages,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.max_tokens ?? 2500
+      };
+      if (options.response_format) {
+        bodyPayload.response_format = options.response_format;
+      }
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://prism.ai",
+          "X-OpenRouter-Title": "PRISM AI Router"
+        },
+        body: JSON.stringify(bodyPayload)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content && content.trim()) {
+          return content.trim();
+        }
+      } else {
+        const errText = await response.text();
+        console.warn(`[AI Router] OpenRouter returned status ${response.status}: ${errText}`);
+      }
+    } catch (err2) {
+      console.warn(`[AI Router] OpenRouter attempt failed:`, err2);
+    }
+  }
+  try {
+    console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
+    return await callPuterAI({
+      model: options.model,
+      messages: options.messages,
+      temperature: options.temperature,
+      max_tokens: options.max_tokens,
+      response_format: options.response_format
+    });
+  } catch (puterErr) {
+    console.warn(`[AI Router] Puter AI attempt unavailable in server mode:`, puterErr);
+    throw new Error("All external AI model providers (OpenRouter / Puter AI) unavailable. Local PRISM engine active.");
+  }
 }
 var FAST_MODEL2, ACCURATE_MODEL2;
 var init_openrouter_client = __esm({

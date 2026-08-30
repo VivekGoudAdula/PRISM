@@ -16,46 +16,78 @@ export interface OpenRouterOptions {
   response_format?: { type: string };
 }
 
-export interface OpenRouterResponse {
-  id?: string;
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason?: string;
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
 /**
- * Returns keys (kept for backwards compatibility).
+ * Returns keys from environment variables.
  */
 export function getOpenRouterKeys(): string[] {
-  return ['puter-ai-key'];
+  const keys: string[] = [];
+  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+    keys.push(process.env.OPENROUTER_API_KEY.trim());
+  }
+  return keys;
 }
 
-export const FREE_FALLBACK_MODELS = [
-  'gpt-4o-mini',
-  'claude-3-5-sonnet',
-  'deepseek-chat',
-];
-
 /**
- * Delegated OpenRouter API client to perform completions via Puter AI.
- * Replaces OpenRouter credit requirements with Puter AI zero-credit models.
+ * Primary AI Chat Router.
+ * Attempts OpenRouter first if key is present; falls back to Puter AI and local engine.
  */
 export async function callOpenRouter(options: OpenRouterOptions): Promise<string> {
-  console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
-  return callPuterAI({
-    model: options.model,
-    messages: options.messages,
-    temperature: options.temperature,
-    max_tokens: options.max_tokens,
-    response_format: options.response_format,
-  });
+  const keys = getOpenRouterKeys();
+  const requestedModel = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+
+  if (keys.length > 0) {
+    const apiKey = keys[0];
+    try {
+      console.log(`[AI Router] Attempting OpenRouter completion with model: ${requestedModel}`);
+      const bodyPayload: Record<string, any> = {
+        model: requestedModel,
+        messages: options.messages,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.max_tokens ?? 2500,
+      };
+
+      if (options.response_format) {
+        bodyPayload.response_format = options.response_format;
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://prism.ai',
+          'X-OpenRouter-Title': 'PRISM AI Router',
+        },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content && content.trim()) {
+          return content.trim();
+        }
+      } else {
+        const errText = await response.text();
+        console.warn(`[AI Router] OpenRouter returned status ${response.status}: ${errText}`);
+      }
+    } catch (err) {
+      console.warn(`[AI Router] OpenRouter attempt failed:`, err);
+    }
+  }
+
+  // Fallback to Puter AI completion engine
+  try {
+    console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
+    return await callPuterAI({
+      model: options.model,
+      messages: options.messages,
+      temperature: options.temperature,
+      max_tokens: options.max_tokens,
+      response_format: options.response_format,
+    });
+  } catch (puterErr) {
+    console.warn(`[AI Router] Puter AI attempt unavailable in server mode:`, puterErr);
+    throw new Error('All external AI model providers (OpenRouter / Puter AI) unavailable. Local PRISM engine active.');
+  }
 }
