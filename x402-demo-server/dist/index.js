@@ -86473,85 +86473,120 @@ var init_extract_document = __esm({
 });
 
 // handlers/lib/puter-client.ts
-async function callPuterAI(options) {
-  const model16 = options.model || process.env.PUTER_MODEL || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
-  const prompt = options.messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15e3);
-  try {
-    console.log(`[PuterAI] Sending request to model: ${model16}`);
-    const response = await fetch("https://api.puter.com/v2/ai/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: model16,
-        messages: options.messages,
-        prompt,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500,
-        stream: false
-      }),
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[PuterAI] HTTP ${response.status} from Puter API: ${errText}`);
-      const driverRes = await fetch("https://api.puter.com/v2/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          interface: "puter-driver-openai-completion",
-          driver: "openai-completion",
-          testMode: false,
-          method: "complete",
-          args: {
-            model: model16,
-            messages: options.messages,
-            temperature: options.temperature ?? 0.2
-          }
-        })
-      });
-      if (driverRes.ok) {
-        const driverData = await driverRes.json();
-        const content2 = driverData?.message?.content || driverData?.text || driverData?.result;
-        if (content2 && typeof content2 === "string") {
-          return content2.trim();
-        }
-      }
-      throw new Error(`Puter AI returned status ${response.status}: ${errText}`);
-    }
-    const data = await response.json();
-    let content = void 0;
-    if (typeof data === "string") {
-      content = data;
-    } else if (data.message && typeof data.message.content === "string") {
-      content = data.message.content;
-    } else if (data.choices?.[0]?.message?.content) {
-      content = data.choices[0].message.content;
-    } else if (data.text) {
-      content = data.text;
-    } else if (data.result) {
-      content = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
-    }
-    if (!content || !content.trim()) {
-      throw new Error("Puter AI returned empty response content.");
-    }
-    return content.trim();
-  } catch (err2) {
-    console.error(`[PuterAI] Request failed on model ${model16}:`, err2);
-    throw err2;
-  } finally {
-    clearTimeout(timeoutId);
+function sanitizePuterModel(rawModel) {
+  if (!rawModel) return ACCURATE_MODEL;
+  if (rawModel.includes("llama") || rawModel.includes("70b") || rawModel.includes("accurate")) {
+    return "gpt-4o";
   }
+  if (rawModel.includes("flash") || rawModel.includes("fast") || rawModel.includes("mini")) {
+    return "gpt-4o-mini";
+  }
+  if (rawModel.includes("claude")) {
+    return "claude-3-5-sonnet";
+  }
+  if (rawModel.includes("deepseek")) {
+    return "deepseek-chat";
+  }
+  if (rawModel.includes("/") || !PUTER_MODELS.includes(rawModel)) {
+    return "gpt-4o";
+  }
+  return rawModel;
 }
-var FAST_MODEL, ACCURATE_MODEL;
+async function callPuterAI(options) {
+  const rawRequested = options.model || process.env.PUTER_MODEL || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+  const primaryModel = sanitizePuterModel(rawRequested);
+  const prompt = options.messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
+  const modelsToAttempt = [primaryModel, ...PUTER_MODELS.filter((m) => m !== primaryModel)];
+  let lastError = null;
+  for (const model16 of modelsToAttempt) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15e3);
+    try {
+      console.log(`[PuterAI] Sending request to model: ${model16}`);
+      const response = await fetch("https://api.puter.com/v2/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model16,
+          messages: options.messages,
+          prompt,
+          temperature: options.temperature ?? 0.2,
+          max_tokens: options.max_tokens ?? 2500,
+          stream: false
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[PuterAI] HTTP ${response.status} from Puter API for model ${model16}: ${errText}`);
+        const driverRes = await fetch("https://api.puter.com/v2/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            interface: "puter-driver-openai-completion",
+            driver: "openai-completion",
+            testMode: false,
+            method: "complete",
+            args: {
+              model: model16,
+              messages: options.messages,
+              temperature: options.temperature ?? 0.2
+            }
+          })
+        });
+        if (driverRes.ok) {
+          const driverData = await driverRes.json();
+          const content2 = driverData?.message?.content || driverData?.text || driverData?.result;
+          if (content2 && typeof content2 === "string" && content2.trim()) {
+            return content2.trim();
+          }
+        }
+        lastError = new Error(`Puter AI returned status ${response.status}: ${errText}`);
+        continue;
+      }
+      const data = await response.json();
+      let content = void 0;
+      if (typeof data === "string") {
+        content = data;
+      } else if (data.message && typeof data.message.content === "string") {
+        content = data.message.content;
+      } else if (data.choices?.[0]?.message?.content) {
+        content = data.choices[0].message.content;
+      } else if (data.text) {
+        content = data.text;
+      } else if (data.result) {
+        content = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+      }
+      if (!content || !content.trim()) {
+        lastError = new Error(`Puter AI returned empty response content for model ${model16}.`);
+        continue;
+      }
+      return content.trim();
+    } catch (err2) {
+      console.error(`[PuterAI] Request failed on model ${model16}:`, err2);
+      lastError = err2 instanceof Error ? err2 : new Error(String(err2));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw lastError || new Error("All Puter AI model attempts failed.");
+}
+var FAST_MODEL, ACCURATE_MODEL, PUTER_MODELS;
 var init_puter_client = __esm({
   "handlers/lib/puter-client.ts"() {
     "use strict";
     FAST_MODEL = process.env.FAST_MODEL || "gpt-4o-mini";
     ACCURATE_MODEL = process.env.ACCURATE_MODEL || "gpt-4o";
+    PUTER_MODELS = [
+      "gpt-4o",
+      "gpt-4o-mini",
+      "claude-3-5-sonnet",
+      "deepseek-chat",
+      "deepseek-reasoner",
+      "gpt-5.6-luna"
+    ];
   }
 });
 
