@@ -89338,6 +89338,74 @@ var code_review_fast_exports = {};
 __export(code_review_fast_exports, {
   handleCodeReviewFastRequest: () => handleCodeReviewFastRequest
 });
+function analyzeCodeStatically(filePath, codeContent) {
+  const lines = codeContent.split("\n");
+  const issues = [];
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
+    const trimmed = line.trim();
+    if (/(api[_-]?key|secret|password|bearer|token)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "high",
+        description: "Hardcoded secret or credential detected in source code.",
+        suggestion: "Move sensitive credentials to environment variables (.env / process.env)."
+      });
+    }
+    if (/\b(eval|exec)\s*\(/.test(line)) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "high",
+        description: "Use of eval() or exec() introduces dynamic code execution vulnerability.",
+        suggestion: "Avoid dynamic evaluation; use safer parsing or standard execution structures."
+      });
+    }
+    if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "medium",
+        description: "Promise chain without explicit .catch() block.",
+        suggestion: "Add a .catch() handler or wrap in a try/catch block to handle async errors."
+      });
+    }
+    if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
+      if (/:\s*any\b/.test(line) || /as\s+any\b/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: 'Explicit use of "any" type bypasses TypeScript type safety.',
+          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+        });
+      }
+    }
+    if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "low",
+        description: "Production code contains active console logging statement.",
+        suggestion: "Remove console log or use a structured logging framework."
+      });
+    }
+    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line)) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "low",
+        description: `Unresolved comment tag found: ${trimmed}`,
+        suggestion: "Address leftover task or track in project issue tracker."
+      });
+    }
+  });
+  let score = 0.9;
+  issues.forEach((issue) => {
+    if (issue.severity === "high") score -= 0.15;
+    else if (issue.severity === "medium") score -= 0.08;
+    else score -= 0.03;
+  });
+  return {
+    issues,
+    overall_quality_score: Math.max(0.4, Math.min(0.98, parseFloat(score.toFixed(2))))
+  };
+}
 async function handleCodeReviewFastRequest(c) {
   const startTime = Date.now();
   try {
@@ -89394,7 +89462,10 @@ ${codeContent.slice(0, 12e3)}`
         overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
       }
     } catch (err2) {
-      console.warn(`Fallback active for fast code review of file ${file_path}:`, err2);
+      console.warn(`Static Code Review Engine Fallback active for fast code review of ${file_path}:`, err2);
+      const staticResult = analyzeCodeStatically(file_path, codeContent);
+      issues = staticResult.issues;
+      overall_quality_score = staticResult.overall_quality_score;
       llmLatency = Date.now() - startTime;
     }
     return c.json({
@@ -89424,6 +89495,74 @@ var code_review_accurate_exports = {};
 __export(code_review_accurate_exports, {
   handleCodeReviewAccurateRequest: () => handleCodeReviewAccurateRequest
 });
+function analyzeCodeStatically2(filePath, codeContent) {
+  const lines = codeContent.split("\n");
+  const issues = [];
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
+    const trimmed = line.trim();
+    if (/(api[_-]?key|secret|password|bearer|token)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "high",
+        description: "Hardcoded secret or credential detected in source code.",
+        suggestion: "Move sensitive credentials to environment variables (.env / process.env)."
+      });
+    }
+    if (/\b(eval|exec)\s*\(/.test(line)) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "high",
+        description: "Use of eval() or exec() introduces dynamic code execution vulnerability.",
+        suggestion: "Avoid dynamic evaluation; use safer parsing or standard execution structures."
+      });
+    }
+    if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "medium",
+        description: "Promise chain without explicit .catch() block.",
+        suggestion: "Add a .catch() handler or wrap in a try/catch block to handle async errors."
+      });
+    }
+    if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
+      if (/:\s*any\b/.test(line) || /as\s+any\b/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: 'Explicit use of "any" type bypasses TypeScript type safety.',
+          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+        });
+      }
+    }
+    if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "low",
+        description: "Production code contains active console logging statement.",
+        suggestion: "Remove console log or use a structured logging framework."
+      });
+    }
+    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line)) {
+      issues.push({
+        line_estimate: lineNum,
+        severity: "low",
+        description: `Unresolved comment tag found: ${trimmed}`,
+        suggestion: "Address leftover task or track in project issue tracker."
+      });
+    }
+  });
+  let score = 0.95;
+  issues.forEach((issue) => {
+    if (issue.severity === "high") score -= 0.15;
+    else if (issue.severity === "medium") score -= 0.08;
+    else score -= 0.03;
+  });
+  return {
+    issues,
+    overall_quality_score: Math.max(0.4, Math.min(0.98, parseFloat(score.toFixed(2))))
+  };
+}
 async function handleCodeReviewAccurateRequest(c) {
   const startTime = Date.now();
   try {
@@ -89480,7 +89619,10 @@ ${codeContent.slice(0, 15e3)}`
         overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
       }
     } catch (err2) {
-      console.warn(`Fallback active for code review of file ${file_path}:`, err2);
+      console.warn(`Static Code Review Engine Fallback active for ${file_path}:`, err2);
+      const staticResult = analyzeCodeStatically2(file_path, codeContent);
+      issues = staticResult.issues;
+      overall_quality_score = staticResult.overall_quality_score;
       llmLatency = Date.now() - startTime;
     }
     return c.json({
