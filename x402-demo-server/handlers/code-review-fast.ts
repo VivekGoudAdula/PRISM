@@ -15,7 +15,7 @@ function analyzeCodeStatically(filePath: string, codeContent: string) {
     const trimmed = line.trim();
 
     // 1. Hardcoded API keys / Secrets
-    if (/(api[_-]?key|secret|password|bearer|token)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes('process.env')) {
+    if (/(api[_-]?key|secret|password|bearer|private[_-]?key)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes('process.env') && !line.includes('os.getenv')) {
       issues.push({
         line_estimate: lineNum,
         severity: 'high',
@@ -34,60 +34,126 @@ function analyzeCodeStatically(filePath: string, codeContent: string) {
       });
     }
 
-    // 3. Unhandled promises / missing error catches
-    if (/\.then\s*\(/.test(line) && !codeContent.includes('.catch(')) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: 'medium',
-        description: 'Promise chain without explicit .catch() block.',
-        suggestion: 'Add a .catch() handler or wrap in a try/catch block to handle async errors.',
-      });
-    }
+    // 3. Python specific checks
+    if (filePath.endsWith('.py')) {
+      // Bare except clause
+      if (/^\s*except\s*:/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'medium',
+          description: 'Bare except: clause catches all exceptions including SystemExit and KeyboardInterrupt.',
+          suggestion: 'Specify explicit exception types (e.g., except Exception as e:).',
+        });
+      }
 
-    // 4. Any type usage in TypeScript
-    if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
-      if (/:\s*any\b/.test(line) || /as\s+any\b/.test(line)) {
+      // Wildcard imports
+      if (/^\s*from\s+[\w\.]+\s+import\s+\*/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'medium',
+          description: 'Wildcard import pollutes module namespace and obscures dependencies.',
+          suggestion: 'Import specific functions or classes explicitly.',
+        });
+      }
+
+      // Print statements in backend production code
+      if (/^\s*print\s*\(/.test(line) && !filePath.includes('cli') && !filePath.includes('test')) {
         issues.push({
           line_estimate: lineNum,
           severity: 'low',
-          description: 'Explicit use of "any" type bypasses TypeScript type safety.',
-          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".',
+          description: 'Production Python module uses raw print() instead of standard logging.',
+          suggestion: 'Replace print() with Python logging module (logger.info / logger.error).',
+        });
+      }
+
+      // Unhandled file open without context manager
+      if (/=\s*open\s*\(/.test(line) && !line.includes('with ')) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'medium',
+          description: 'File opened without "with" context manager may leak file descriptors.',
+          suggestion: 'Use "with open(...) as f:" context manager for automatic resource cleanup.',
         });
       }
     }
 
-    // 5. Console statements in production code
-    if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes('test')) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: 'low',
-        description: 'Production code contains active console logging statement.',
-        suggestion: 'Remove console log or use a structured logging framework.',
-      });
+    // 4. JS / TS / React specific checks
+    if (filePath.endsWith('.js') || filePath.endsWith('.jsx') || filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
+      // Unhandled promise chains
+      if (/\.then\s*\(/.test(line) && !codeContent.includes('.catch(')) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'medium',
+          description: 'Promise chain without explicit .catch() error handler.',
+          suggestion: 'Add a .catch() handler or wrap in a try/catch block.',
+        });
+      }
+
+      // Any type usage in TS
+      if ((filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && (/: \s*any\b/.test(line) || /as \s*any\b/.test(line))) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'low',
+          description: 'Explicit use of "any" type bypasses TypeScript type safety checks.',
+          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".',
+        });
+      }
+
+      // React map missing key prop
+      if ((filePath.endsWith('.jsx') || filePath.endsWith('.tsx')) && /\.map\s*\(/.test(line) && !line.includes('key=')) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'low',
+          description: 'React array mapping without explicit unique key prop.',
+          suggestion: 'Pass a unique key prop to mapped JSX element (e.g. key={item.id}).',
+        });
+      }
+
+      // Console logging in production code
+      if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes('test')) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: 'low',
+          description: 'Active console statement found in production source file.',
+          suggestion: 'Remove debug console logging or replace with structured logger.',
+        });
+      }
     }
 
-    // 6. Leftover TODO / FIXME comments
-    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line)) {
+    // 5. Leftover TODO / FIXME comments
+    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line) || /#\s*(TODO|FIXME|HACK):/i.test(line)) {
       issues.push({
         line_estimate: lineNum,
         severity: 'low',
-        description: `Unresolved comment tag found: ${trimmed}`,
-        suggestion: 'Address leftover task or track in project issue tracker.',
+        description: `Unresolved task tag found: ${trimmed}`,
+        suggestion: 'Address leftover TODO task or move to project issue tracker.',
       });
     }
   });
 
+  // Default module design review for small files or files without code smells
+  if (issues.length === 0 && lines.length > 5) {
+    if (!codeContent.includes('"""') && !codeContent.includes('/**')) {
+      issues.push({
+        line_estimate: 1,
+        severity: 'low',
+        description: 'Module is missing top-level docstring or documentation header.',
+        suggestion: 'Add module docstring describing file purpose and exported functions.',
+      });
+    }
+  }
+
   // Calculate quality score based on detected issue severities
-  let score = 0.90;
+  let score = 0.92;
   issues.forEach((issue) => {
-    if (issue.severity === 'high') score -= 0.15;
+    if (issue.severity === 'high') score -= 0.18;
     else if (issue.severity === 'medium') score -= 0.08;
-    else score -= 0.03;
+    else score -= 0.04;
   });
 
   return {
     issues,
-    overall_quality_score: Math.max(0.40, Math.min(0.98, parseFloat(score.toFixed(2)))),
+    overall_quality_score: Math.max(0.45, Math.min(0.98, parseFloat(score.toFixed(2)))),
   };
 }
 
@@ -154,7 +220,6 @@ export async function handleCodeReviewFastRequest(c: Context) {
         overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
       }
     } catch (err) {
-      console.warn(`Static Code Review Engine Fallback active for fast code review of ${file_path}:`, err);
       const staticResult = analyzeCodeStatically(file_path, codeContent);
       issues = staticResult.issues;
       overall_quality_score = staticResult.overall_quality_score;

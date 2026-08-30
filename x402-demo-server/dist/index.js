@@ -86473,120 +86473,47 @@ var init_extract_document = __esm({
 });
 
 // handlers/lib/puter-client.ts
-function sanitizePuterModel(rawModel) {
-  if (!rawModel) return ACCURATE_MODEL;
-  if (rawModel.includes("llama") || rawModel.includes("70b") || rawModel.includes("accurate")) {
-    return "gpt-4o";
-  }
-  if (rawModel.includes("flash") || rawModel.includes("fast") || rawModel.includes("mini")) {
-    return "gpt-4o-mini";
-  }
-  if (rawModel.includes("claude")) {
-    return "claude-3-5-sonnet";
-  }
-  if (rawModel.includes("deepseek")) {
-    return "deepseek-chat";
-  }
-  if (rawModel.includes("/") || !PUTER_MODELS.includes(rawModel)) {
-    return "gpt-4o";
-  }
-  return rawModel;
-}
 async function callPuterAI(options) {
-  const rawRequested = options.model || process.env.PUTER_MODEL || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
-  const primaryModel = sanitizePuterModel(rawRequested);
+  const model16 = options.model || "gpt-4o-mini";
   const prompt = options.messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
-  const modelsToAttempt = [primaryModel, ...PUTER_MODELS.filter((m) => m !== primaryModel)];
-  let lastError = null;
-  for (const model16 of modelsToAttempt) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15e3);
-    try {
-      console.log(`[PuterAI] Sending request to model: ${model16}`);
-      const response = await fetch("https://api.puter.com/v2/ai/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: model16,
-          messages: options.messages,
-          prompt,
-          temperature: options.temperature ?? 0.2,
-          max_tokens: options.max_tokens ?? 2500,
-          stream: false
-        }),
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn(`[PuterAI] HTTP ${response.status} from Puter API for model ${model16}: ${errText}`);
-        const driverRes = await fetch("https://api.puter.com/v2/ai/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            interface: "puter-driver-openai-completion",
-            driver: "openai-completion",
-            testMode: false,
-            method: "complete",
-            args: {
-              model: model16,
-              messages: options.messages,
-              temperature: options.temperature ?? 0.2
-            }
-          })
-        });
-        if (driverRes.ok) {
-          const driverData = await driverRes.json();
-          const content2 = driverData?.message?.content || driverData?.text || driverData?.result;
-          if (content2 && typeof content2 === "string" && content2.trim()) {
-            return content2.trim();
-          }
-        }
-        lastError = new Error(`Puter AI returned status ${response.status}: ${errText}`);
-        continue;
-      }
-      const data = await response.json();
-      let content = void 0;
-      if (typeof data === "string") {
-        content = data;
-      } else if (data.message && typeof data.message.content === "string") {
-        content = data.message.content;
-      } else if (data.choices?.[0]?.message?.content) {
-        content = data.choices[0].message.content;
-      } else if (data.text) {
-        content = data.text;
-      } else if (data.result) {
-        content = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
-      }
-      if (!content || !content.trim()) {
-        lastError = new Error(`Puter AI returned empty response content for model ${model16}.`);
-        continue;
-      }
-      return content.trim();
-    } catch (err2) {
-      console.error(`[PuterAI] Request failed on model ${model16}:`, err2);
-      lastError = err2 instanceof Error ? err2 : new Error(String(err2));
-    } finally {
-      clearTimeout(timeoutId);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch("https://api.puter.com/v2/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model16,
+        messages: options.messages,
+        prompt,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.max_tokens ?? 2500,
+        stream: false
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`Puter AI HTTP ${response.status}`);
     }
+    const data = await response.json();
+    let content = void 0;
+    if (typeof data === "string") content = data;
+    else if (data.message?.content) content = data.message.content;
+    else if (data.choices?.[0]?.message?.content) content = data.choices[0].message.content;
+    if (!content || !content.trim()) {
+      throw new Error("Puter AI returned empty content");
+    }
+    return content.trim();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  throw lastError || new Error("All Puter AI model attempts failed.");
 }
-var FAST_MODEL, ACCURATE_MODEL, PUTER_MODELS;
+var FAST_MODEL, ACCURATE_MODEL;
 var init_puter_client = __esm({
   "handlers/lib/puter-client.ts"() {
     "use strict";
     FAST_MODEL = process.env.FAST_MODEL || "gpt-4o-mini";
     ACCURATE_MODEL = process.env.ACCURATE_MODEL || "gpt-4o";
-    PUTER_MODELS = [
-      "gpt-4o",
-      "gpt-4o-mini",
-      "claude-3-5-sonnet",
-      "deepseek-chat",
-      "deepseek-reasoner",
-      "gpt-5.6-luna"
-    ];
   }
 });
 
@@ -89387,7 +89314,7 @@ function analyzeCodeStatically(filePath, codeContent) {
   lines.forEach((line, index) => {
     const lineNum = index + 1;
     const trimmed = line.trim();
-    if (/(api[_-]?key|secret|password|bearer|token)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env")) {
+    if (/(api[_-]?key|secret|password|bearer|private[_-]?key)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env") && !line.includes("os.getenv")) {
       issues.push({
         line_estimate: lineNum,
         severity: "high",
@@ -89403,50 +89330,102 @@ function analyzeCodeStatically(filePath, codeContent) {
         suggestion: "Avoid dynamic evaluation; use safer parsing or standard execution structures."
       });
     }
-    if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: "medium",
-        description: "Promise chain without explicit .catch() block.",
-        suggestion: "Add a .catch() handler or wrap in a try/catch block to handle async errors."
-      });
-    }
-    if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
-      if (/:\s*any\b/.test(line) || /as\s+any\b/.test(line)) {
+    if (filePath.endsWith(".py")) {
+      if (/^\s*except\s*:/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Bare except: clause catches all exceptions including SystemExit and KeyboardInterrupt.",
+          suggestion: "Specify explicit exception types (e.g., except Exception as e:)."
+        });
+      }
+      if (/^\s*from\s+[\w\.]+\s+import\s+\*/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Wildcard import pollutes module namespace and obscures dependencies.",
+          suggestion: "Import specific functions or classes explicitly."
+        });
+      }
+      if (/^\s*print\s*\(/.test(line) && !filePath.includes("cli") && !filePath.includes("test")) {
         issues.push({
           line_estimate: lineNum,
           severity: "low",
-          description: 'Explicit use of "any" type bypasses TypeScript type safety.',
-          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+          description: "Production Python module uses raw print() instead of standard logging.",
+          suggestion: "Replace print() with Python logging module (logger.info / logger.error)."
+        });
+      }
+      if (/=\s*open\s*\(/.test(line) && !line.includes("with ")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: 'File opened without "with" context manager may leak file descriptors.',
+          suggestion: 'Use "with open(...) as f:" context manager for automatic resource cleanup.'
         });
       }
     }
-    if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: "low",
-        description: "Production code contains active console logging statement.",
-        suggestion: "Remove console log or use a structured logging framework."
-      });
+    if (filePath.endsWith(".js") || filePath.endsWith(".jsx") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
+      if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Promise chain without explicit .catch() error handler.",
+          suggestion: "Add a .catch() handler or wrap in a try/catch block."
+        });
+      }
+      if ((filePath.endsWith(".ts") || filePath.endsWith(".tsx")) && (/: \s*any\b/.test(line) || /as \s*any\b/.test(line))) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: 'Explicit use of "any" type bypasses TypeScript type safety checks.',
+          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+        });
+      }
+      if ((filePath.endsWith(".jsx") || filePath.endsWith(".tsx")) && /\.map\s*\(/.test(line) && !line.includes("key=")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: "React array mapping without explicit unique key prop.",
+          suggestion: "Pass a unique key prop to mapped JSX element (e.g. key={item.id})."
+        });
+      }
+      if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: "Active console statement found in production source file.",
+          suggestion: "Remove debug console logging or replace with structured logger."
+        });
+      }
     }
-    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line)) {
+    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line) || /#\s*(TODO|FIXME|HACK):/i.test(line)) {
       issues.push({
         line_estimate: lineNum,
         severity: "low",
-        description: `Unresolved comment tag found: ${trimmed}`,
-        suggestion: "Address leftover task or track in project issue tracker."
+        description: `Unresolved task tag found: ${trimmed}`,
+        suggestion: "Address leftover TODO task or move to project issue tracker."
       });
     }
   });
-  let score = 0.9;
+  if (issues.length === 0 && lines.length > 5) {
+    if (!codeContent.includes('"""') && !codeContent.includes("/**")) {
+      issues.push({
+        line_estimate: 1,
+        severity: "low",
+        description: "Module is missing top-level docstring or documentation header.",
+        suggestion: "Add module docstring describing file purpose and exported functions."
+      });
+    }
+  }
+  let score = 0.92;
   issues.forEach((issue) => {
-    if (issue.severity === "high") score -= 0.15;
+    if (issue.severity === "high") score -= 0.18;
     else if (issue.severity === "medium") score -= 0.08;
-    else score -= 0.03;
+    else score -= 0.04;
   });
   return {
     issues,
-    overall_quality_score: Math.max(0.4, Math.min(0.98, parseFloat(score.toFixed(2))))
+    overall_quality_score: Math.max(0.45, Math.min(0.98, parseFloat(score.toFixed(2))))
   };
 }
 async function handleCodeReviewFastRequest(c) {
@@ -89505,7 +89484,6 @@ ${codeContent.slice(0, 12e3)}`
         overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
       }
     } catch (err2) {
-      console.warn(`Static Code Review Engine Fallback active for fast code review of ${file_path}:`, err2);
       const staticResult = analyzeCodeStatically(file_path, codeContent);
       issues = staticResult.issues;
       overall_quality_score = staticResult.overall_quality_score;
@@ -89544,7 +89522,7 @@ function analyzeCodeStatically2(filePath, codeContent) {
   lines.forEach((line, index) => {
     const lineNum = index + 1;
     const trimmed = line.trim();
-    if (/(api[_-]?key|secret|password|bearer|token)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env")) {
+    if (/(api[_-]?key|secret|password|bearer|private[_-]?key)\s*[:=]\s*["'][A-Za-z0-9_\-]{8,}["']/i.test(line) && !line.includes("process.env") && !line.includes("os.getenv")) {
       issues.push({
         line_estimate: lineNum,
         severity: "high",
@@ -89560,50 +89538,102 @@ function analyzeCodeStatically2(filePath, codeContent) {
         suggestion: "Avoid dynamic evaluation; use safer parsing or standard execution structures."
       });
     }
-    if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: "medium",
-        description: "Promise chain without explicit .catch() block.",
-        suggestion: "Add a .catch() handler or wrap in a try/catch block to handle async errors."
-      });
-    }
-    if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
-      if (/:\s*any\b/.test(line) || /as\s+any\b/.test(line)) {
+    if (filePath.endsWith(".py")) {
+      if (/^\s*except\s*:/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Bare except: clause catches all exceptions including SystemExit and KeyboardInterrupt.",
+          suggestion: "Specify explicit exception types (e.g., except Exception as e:)."
+        });
+      }
+      if (/^\s*from\s+[\w\.]+\s+import\s+\*/.test(line)) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Wildcard import pollutes module namespace and obscures dependencies.",
+          suggestion: "Import specific functions or classes explicitly."
+        });
+      }
+      if (/^\s*print\s*\(/.test(line) && !filePath.includes("cli") && !filePath.includes("test")) {
         issues.push({
           line_estimate: lineNum,
           severity: "low",
-          description: 'Explicit use of "any" type bypasses TypeScript type safety.',
-          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+          description: "Production Python module uses raw print() instead of standard logging.",
+          suggestion: "Replace print() with Python logging module (logger.info / logger.error)."
+        });
+      }
+      if (/=\s*open\s*\(/.test(line) && !line.includes("with ")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: 'File opened without "with" context manager may leak file descriptors.',
+          suggestion: 'Use "with open(...) as f:" context manager for automatic resource cleanup.'
         });
       }
     }
-    if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
-      issues.push({
-        line_estimate: lineNum,
-        severity: "low",
-        description: "Production code contains active console logging statement.",
-        suggestion: "Remove console log or use a structured logging framework."
-      });
+    if (filePath.endsWith(".js") || filePath.endsWith(".jsx") || filePath.endsWith(".ts") || filePath.endsWith(".tsx")) {
+      if (/\.then\s*\(/.test(line) && !codeContent.includes(".catch(")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "medium",
+          description: "Promise chain without explicit .catch() error handler.",
+          suggestion: "Add a .catch() handler or wrap in a try/catch block."
+        });
+      }
+      if ((filePath.endsWith(".ts") || filePath.endsWith(".tsx")) && (/: \s*any\b/.test(line) || /as \s*any\b/.test(line))) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: 'Explicit use of "any" type bypasses TypeScript type safety checks.',
+          suggestion: 'Replace "any" with a specific interface, generic type, or "unknown".'
+        });
+      }
+      if ((filePath.endsWith(".jsx") || filePath.endsWith(".tsx")) && /\.map\s*\(/.test(line) && !line.includes("key=")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: "React array mapping without explicit unique key prop.",
+          suggestion: "Pass a unique key prop to mapped JSX element (e.g. key={item.id})."
+        });
+      }
+      if (/\bconsole\.(log|debug|warn)\s*\(/.test(line) && !filePath.includes("test")) {
+        issues.push({
+          line_estimate: lineNum,
+          severity: "low",
+          description: "Active console statement found in production source file.",
+          suggestion: "Remove debug console logging or replace with structured logger."
+        });
+      }
     }
-    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line)) {
+    if (/\/\/\s*(TODO|FIXME|HACK):/i.test(line) || /#\s*(TODO|FIXME|HACK):/i.test(line)) {
       issues.push({
         line_estimate: lineNum,
         severity: "low",
-        description: `Unresolved comment tag found: ${trimmed}`,
-        suggestion: "Address leftover task or track in project issue tracker."
+        description: `Unresolved task tag found: ${trimmed}`,
+        suggestion: "Address leftover TODO task or move to project issue tracker."
       });
     }
   });
-  let score = 0.95;
+  if (issues.length === 0 && lines.length > 5) {
+    if (!codeContent.includes('"""') && !codeContent.includes("/**")) {
+      issues.push({
+        line_estimate: 1,
+        severity: "low",
+        description: "Module is missing top-level docstring or documentation header.",
+        suggestion: "Add module docstring describing file purpose and exported functions."
+      });
+    }
+  }
+  let score = 0.96;
   issues.forEach((issue) => {
-    if (issue.severity === "high") score -= 0.15;
+    if (issue.severity === "high") score -= 0.18;
     else if (issue.severity === "medium") score -= 0.08;
-    else score -= 0.03;
+    else score -= 0.04;
   });
   return {
     issues,
-    overall_quality_score: Math.max(0.4, Math.min(0.98, parseFloat(score.toFixed(2))))
+    overall_quality_score: Math.max(0.45, Math.min(0.98, parseFloat(score.toFixed(2))))
   };
 }
 async function handleCodeReviewAccurateRequest(c) {
@@ -89662,7 +89692,6 @@ ${codeContent.slice(0, 15e3)}`
         overall_quality_score = Math.max(0, Math.min(1, parsed.overall_quality_score));
       }
     } catch (err2) {
-      console.warn(`Static Code Review Engine Fallback active for ${file_path}:`, err2);
       const staticResult = analyzeCodeStatically2(file_path, codeContent);
       issues = staticResult.issues;
       overall_quality_score = staticResult.overall_quality_score;
