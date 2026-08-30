@@ -86604,7 +86604,7 @@ async function callOpenRouter(options) {
   if (keys.length > 0) {
     const apiKey = keys[0];
     try {
-      console.log(`[AI Router] Attempting OpenRouter completion with model: ${requestedModel}`);
+      console.log(`[AI Router] Sending request to model: ${requestedModel}`);
       const bodyPayload = {
         model: requestedModel,
         messages: options.messages,
@@ -86632,24 +86632,16 @@ async function callOpenRouter(options) {
         }
       } else {
         const errText = await response.text();
-        console.warn(`[AI Router] OpenRouter returned status ${response.status}: ${errText}`);
+        console.warn(`[AI Router] OpenRouter HTTP ${response.status}: ${errText}`);
       }
     } catch (err2) {
       console.warn(`[AI Router] OpenRouter attempt failed:`, err2);
     }
   }
   try {
-    console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
-    return await callPuterAI({
-      model: options.model,
-      messages: options.messages,
-      temperature: options.temperature,
-      max_tokens: options.max_tokens,
-      response_format: options.response_format
-    });
-  } catch (puterErr) {
-    console.warn(`[AI Router] Puter AI attempt unavailable in server mode:`, puterErr);
-    throw new Error("All external AI model providers (OpenRouter / Puter AI) unavailable. Local PRISM engine active.");
+    return await callPuterAI(options);
+  } catch (err2) {
+    throw new Error("AI Provider unavailable in backend mode. PRISM Static Engine engaged.");
   }
 }
 var FAST_MODEL2, ACCURATE_MODEL2;
@@ -86657,8 +86649,8 @@ var init_openrouter_client = __esm({
   "handlers/lib/openrouter-client.ts"() {
     "use strict";
     init_puter_client();
-    FAST_MODEL2 = process.env.FAST_MODEL || FAST_MODEL;
-    ACCURATE_MODEL2 = process.env.ACCURATE_MODEL || ACCURATE_MODEL;
+    FAST_MODEL2 = process.env.FAST_MODEL || "google/gemini-2.5-flash";
+    ACCURATE_MODEL2 = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
   }
 });
 

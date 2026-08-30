@@ -1,7 +1,7 @@
-import { callPuterAI, PuterAIOptions, FAST_MODEL as PUTER_FAST, ACCURATE_MODEL as PUTER_ACCURATE } from './puter-client';
+import { callPuterAI, FAST_MODEL as PUTER_FAST, ACCURATE_MODEL as PUTER_ACCURATE } from './puter-client';
 
-export const FAST_MODEL = process.env.FAST_MODEL || PUTER_FAST;
-export const ACCURATE_MODEL = process.env.ACCURATE_MODEL || PUTER_ACCURATE;
+export const FAST_MODEL = process.env.FAST_MODEL || 'google/gemini-2.5-flash';
+export const ACCURATE_MODEL = process.env.ACCURATE_MODEL || 'meta-llama/llama-3.3-70b-instruct';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,7 +29,7 @@ export function getOpenRouterKeys(): string[] {
 
 /**
  * Primary AI Chat Router.
- * Attempts OpenRouter first if key is present; falls back to Puter AI and local engine.
+ * Performs completion via OpenRouter when API key is set; delegates to Puter AI or local engine cleanly.
  */
 export async function callOpenRouter(options: OpenRouterOptions): Promise<string> {
   const keys = getOpenRouterKeys();
@@ -38,7 +38,7 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
   if (keys.length > 0) {
     const apiKey = keys[0];
     try {
-      console.log(`[AI Router] Attempting OpenRouter completion with model: ${requestedModel}`);
+      console.log(`[AI Router] Sending request to model: ${requestedModel}`);
       const bodyPayload: Record<string, any> = {
         model: requestedModel,
         messages: options.messages,
@@ -69,25 +69,17 @@ export async function callOpenRouter(options: OpenRouterOptions): Promise<string
         }
       } else {
         const errText = await response.text();
-        console.warn(`[AI Router] OpenRouter returned status ${response.status}: ${errText}`);
+        console.warn(`[AI Router] OpenRouter HTTP ${response.status}: ${errText}`);
       }
     } catch (err) {
       console.warn(`[AI Router] OpenRouter attempt failed:`, err);
     }
   }
 
-  // Fallback to Puter AI completion engine
+  // Delegate to Puter AI (suppressing verbose trace logs for headless Node environment)
   try {
-    console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
-    return await callPuterAI({
-      model: options.model,
-      messages: options.messages,
-      temperature: options.temperature,
-      max_tokens: options.max_tokens,
-      response_format: options.response_format,
-    });
-  } catch (puterErr) {
-    console.warn(`[AI Router] Puter AI attempt unavailable in server mode:`, puterErr);
-    throw new Error('All external AI model providers (OpenRouter / Puter AI) unavailable. Local PRISM engine active.');
+    return await callPuterAI(options);
+  } catch (err) {
+    throw new Error('AI Provider unavailable in backend mode. PRISM Static Engine engaged.');
   }
 }
