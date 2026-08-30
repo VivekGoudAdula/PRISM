@@ -86472,125 +86472,107 @@ var init_extract_document = __esm({
   }
 });
 
-// handlers/lib/openrouter-client.ts
-function getOpenRouterKeys() {
-  const keys = [];
-  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
-    keys.push(process.env.OPENROUTER_API_KEY.trim());
-  }
-  for (let i = 1; i <= 10; i++) {
-    const k = process.env[`OPENROUTER_API_KEY_${i}`];
-    if (k && k.trim() && !keys.includes(k.trim())) {
-      keys.push(k.trim());
-    }
-  }
-  return keys;
-}
-async function fetchOpenRouterSingle(apiKey, model16, options, maxTokens, isFreeFallback = false) {
+// handlers/lib/puter-client.ts
+async function callPuterAI(options) {
+  const model16 = options.model || process.env.PUTER_MODEL || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+  const prompt = options.messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12e3);
+  const timeoutId = setTimeout(() => controller.abort(), 15e3);
   try {
-    const bodyPayload = {
-      model: model16,
-      messages: options.messages,
-      temperature: options.temperature ?? 0.2
-    };
-    if (maxTokens !== void 0) {
-      bodyPayload.max_tokens = maxTokens;
-    }
-    if (options.response_format && !isFreeFallback) {
-      bodyPayload.response_format = options.response_format;
-    }
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    console.log(`[PuterAI] Sending request to model: ${model16}`);
+    const response = await fetch("https://api.puter.com/v2/ai/chat", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://prism.ai",
-        "X-OpenRouter-Title": "PRISM AI Router"
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(bodyPayload),
+      body: JSON.stringify({
+        model: model16,
+        messages: options.messages,
+        prompt,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.max_tokens ?? 2500,
+        stream: false
+      }),
       signal: controller.signal
     });
     if (!response.ok) {
-      const errorText = await response.text();
-      return { status: response.status, text: errorText };
+      const errText = await response.text();
+      console.warn(`[PuterAI] HTTP ${response.status} from Puter API: ${errText}`);
+      const driverRes = await fetch("https://api.puter.com/v2/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interface: "puter-driver-openai-completion",
+          driver: "openai-completion",
+          testMode: false,
+          method: "complete",
+          args: {
+            model: model16,
+            messages: options.messages,
+            temperature: options.temperature ?? 0.2
+          }
+        })
+      });
+      if (driverRes.ok) {
+        const driverData = await driverRes.json();
+        const content2 = driverData?.message?.content || driverData?.text || driverData?.result;
+        if (content2 && typeof content2 === "string") {
+          return content2.trim();
+        }
+      }
+      throw new Error(`Puter AI returned status ${response.status}: ${errText}`);
     }
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    return { status: 200, text: "", content: content ?? void 0 };
+    let content = void 0;
+    if (typeof data === "string") {
+      content = data;
+    } else if (data.message && typeof data.message.content === "string") {
+      content = data.message.content;
+    } else if (data.choices?.[0]?.message?.content) {
+      content = data.choices[0].message.content;
+    } else if (data.text) {
+      content = data.text;
+    } else if (data.result) {
+      content = typeof data.result === "string" ? data.result : JSON.stringify(data.result);
+    }
+    if (!content || !content.trim()) {
+      throw new Error("Puter AI returned empty response content.");
+    }
+    return content.trim();
+  } catch (err2) {
+    console.error(`[PuterAI] Request failed on model ${model16}:`, err2);
+    throw err2;
   } finally {
     clearTimeout(timeoutId);
   }
 }
+var FAST_MODEL, ACCURATE_MODEL;
+var init_puter_client = __esm({
+  "handlers/lib/puter-client.ts"() {
+    "use strict";
+    FAST_MODEL = process.env.FAST_MODEL || "gpt-4o-mini";
+    ACCURATE_MODEL = process.env.ACCURATE_MODEL || "gpt-4o";
+  }
+});
+
+// handlers/lib/openrouter-client.ts
 async function callOpenRouter(options) {
-  const keys = getOpenRouterKeys();
-  if (keys.length === 0) {
-    throw new Error("No OPENROUTER_API_KEY found in environment variables.");
-  }
-  const model16 = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
-  const requestedMaxTokens = options.max_tokens ?? 2500;
-  let lastError = null;
-  let isCreditError = false;
-  for (let index = 0; index < keys.length; index++) {
-    const apiKey = keys[index];
-    try {
-      console.log(`[OpenRouter] Sending request to model: ${model16} (Key index ${index + 1}/${keys.length})`);
-      const result = await fetchOpenRouterSingle(apiKey, model16, options, requestedMaxTokens, false);
-      if (result.status === 402) {
-        console.warn(`[OpenRouter] Key index ${index + 1} HTTP 402 (Insufficient Credits): ${result.text}`);
-        isCreditError = true;
-        lastError = new Error(`OpenRouter HTTP 402: ${result.text}`);
-        break;
-      }
-      if (result.status !== 200) {
-        console.warn(`[OpenRouter] Key index ${index + 1} HTTP ${result.status}: ${result.text}`);
-        lastError = new Error(`OpenRouter HTTP ${result.status}: ${result.text}`);
-        continue;
-      }
-      if (!result.content || !result.content.trim()) {
-        console.warn(`[OpenRouter] Empty content returned from model ${model16}`);
-        lastError = new Error(`OpenRouter returned empty message content.`);
-        continue;
-      }
-      return result.content;
-    } catch (err2) {
-      console.error(`[OpenRouter] Request failed on ${model16} with key index ${index + 1}:`, err2);
-      lastError = err2 instanceof Error ? err2 : new Error(String(err2));
-    }
-  }
-  if (!model16.includes(":free")) {
-    console.warn(`[OpenRouter] Primary model ${model16} failed (Credit error: ${isCreditError}). Attempting free fallback models...`);
-    const apiKey = keys[0];
-    for (const freeModel of FREE_FALLBACK_MODELS) {
-      try {
-        console.log(`[OpenRouter] Attempting free fallback model: ${freeModel}`);
-        const freeResult = await fetchOpenRouterSingle(apiKey, freeModel, options, void 0, true);
-        if (freeResult.status === 200 && freeResult.content && freeResult.content.trim()) {
-          console.log(`[OpenRouter] Free fallback model ${freeModel} succeeded.`);
-          return freeResult.content;
-        } else {
-          console.warn(`[OpenRouter] Free fallback model ${freeModel} status ${freeResult.status}: ${freeResult.text}`);
-        }
-      } catch (freeErr) {
-        console.warn(`[OpenRouter] Free fallback model ${freeModel} failed:`, freeErr);
-      }
-    }
-  }
-  throw lastError || new Error("All OpenRouter API attempts failed.");
+  console.log(`[AI Router] Executing AI chat completion via Puter AI...`);
+  return callPuterAI({
+    model: options.model,
+    messages: options.messages,
+    temperature: options.temperature,
+    max_tokens: options.max_tokens,
+    response_format: options.response_format
+  });
 }
-var FAST_MODEL, ACCURATE_MODEL, FREE_FALLBACK_MODELS;
+var FAST_MODEL2, ACCURATE_MODEL2;
 var init_openrouter_client = __esm({
   "handlers/lib/openrouter-client.ts"() {
     "use strict";
-    FAST_MODEL = process.env.FAST_MODEL || "google/gemini-2.5-flash";
-    ACCURATE_MODEL = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
-    FREE_FALLBACK_MODELS = [
-      "google/gemma-2-9b-it:free",
-      "meta-llama/llama-3.3-70b-instruct:free",
-      "deepseek/deepseek-r1:free",
-      "qwen/qwen-2.5-72b-instruct:free"
-    ];
+    init_puter_client();
+    FAST_MODEL2 = process.env.FAST_MODEL || FAST_MODEL;
+    ACCURATE_MODEL2 = process.env.ACCURATE_MODEL || ACCURATE_MODEL;
   }
 });
 
@@ -88273,7 +88255,7 @@ async function buildSemanticMap(category, extracted_text, filename = "document")
   if (extracted_text.trim().length > 0) {
     try {
       const content = await callOpenRouter({
-        model: FAST_MODEL,
+        model: FAST_MODEL2,
         messages: [
           { role: "system", content: promptSystem },
           { role: "user", content: `Document text:
@@ -88490,7 +88472,7 @@ Return ONLY a JSON object with this exact structure:
 }`;
     try {
       const rawContent = await callOpenRouter({
-        model: FAST_MODEL,
+        model: FAST_MODEL2,
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: `Task Type: ${input.taskType || "general_query"}
@@ -88511,7 +88493,7 @@ ${currentContext}` }
         );
         if (validation.isValid) {
           currentContext = candidateText;
-          modelUsed = `${FAST_MODEL} + deterministic`;
+          modelUsed = `${FAST_MODEL2} + deterministic`;
           if (Array.isArray(parsed.removedRedundancies)) {
             removedRedundancies.push(...parsed.removedRedundancies);
           }
@@ -88649,7 +88631,7 @@ async function handleResumeScreenFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL,
+          model: FAST_MODEL2,
           messages: [
             {
               role: "system",
@@ -88876,7 +88858,7 @@ async function handleContractAnalyzeFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL,
+          model: FAST_MODEL2,
           messages: [
             {
               role: "system",
@@ -89115,7 +89097,7 @@ async function handleInvoiceExtractFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL,
+          model: FAST_MODEL2,
           messages: [
             {
               role: "system",
@@ -89352,7 +89334,7 @@ async function handleCodeReviewFastRequest(c) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: FAST_MODEL,
+        model: FAST_MODEL2,
         messages: [
           {
             role: "system",
@@ -89809,7 +89791,7 @@ async function handleClassifyTaskRequest(c) {
     let category = "unsupported";
     try {
       const openRouterContent = await callOpenRouter({
-        model: FAST_MODEL,
+        model: FAST_MODEL2,
         messages: [
           {
             role: "system",
@@ -90777,7 +90759,7 @@ INSTRUCTIONS:
 5. Keep your response concise, clear, and under 3-4 sentences.`;
   try {
     const content = await callOpenRouter({
-      model: FAST_MODEL,
+      model: FAST_MODEL2,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message }
@@ -102273,7 +102255,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
 }`;
   try {
     const rawContent = await callOpenRouter({
-      model: FAST_MODEL,
+      model: FAST_MODEL2,
       messages: [
         { role: "system", content: systemInstruction },
         { role: "user", content: `Task Request: "${promptText}"${contextStr}` }
@@ -102311,7 +102293,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
       constraints: sanitizeStringArray(parsed.constraints),
       suggestions: sanitizeStringArray(parsed.suggestions),
       improvedPrompt,
-      modelUsed: FAST_MODEL,
+      modelUsed: FAST_MODEL2,
       originalInputTokens: inputTokens
     };
   } catch (err2) {
