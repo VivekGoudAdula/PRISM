@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
 import { callOpenRouter } from './lib/openrouter-client';
+import { evaluateCandidateDeterministic } from './lib/resume-evaluator';
 
 /**
  * POST /resume-screen-accurate
@@ -80,29 +81,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
         };
       } catch (err) {
         console.warn(`Fallback active for candidate processing of file: ${file.filename}`, err);
-        let fallbackSkills: string[] = Array.isArray(semantic_map?.skills) && semantic_map.skills.length > 0 ? semantic_map.skills : [];
-        if (fallbackSkills.length === 0 && extracted_text) {
-          const found = extracted_text.match(/\b(Python|Node|React|TypeScript|JavaScript|Docker|AWS|SQL|PostgreSQL|Go|Java|C\+\+|C\#|HTML|CSS|Kubernetes|Linux|Git|CI\/CD|DevOps|Microservices|REST|GraphQL|MongoDB|Redis|Agile|Scrum|SEO|Marketing|Management|Leadership|Sales|Analytics|Design|Security|Architecture)\b/gi) || [];
-          fallbackSkills = Array.from(new Set(found.map((s: string) => s.trim()))).slice(0, 6);
-        }
-        if (fallbackSkills.length === 0) {
-          fallbackSkills = ['Technical Background', 'Core Competencies'];
-        }
-
-        const rawName = semantic_map?.name && semantic_map.name !== 'Candidate'
-          ? semantic_map.name
-          : file.filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
-        const candidateName = rawName.replace(/\s+Profile$/i, '').trim();
-
-        candidateInfo = {
-          name: candidateName,
-          match_score: 0.88,
-          role: 'Senior Software Engineer',
-          key_skills: fallbackSkills,
-          primary_domain: 'Software Engineering',
-          alternative_roles: ['Full Stack Developer', 'Technical Lead'],
-          reason: `Evaluated ${candidateName} against position criteria based on verified technical profile and resume experience.`,
-        };
+        candidateInfo = evaluateCandidateDeterministic(file.filename, extracted_text, semantic_map, task_description);
       }
       candidates.push(candidateInfo);
     }

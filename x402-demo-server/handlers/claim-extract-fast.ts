@@ -189,6 +189,7 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
     if (/^(NEWS ARTICLE|PRESS RELEASE|SYNTHETIC PRISM|TESTING PURPOSE)/i.test(s)) return true;
     if (s.includes('Synthetic PRISM Media Intelligence Test Document')) return true;
     if (s.startsWith('Testing purpose:')) return true;
+    if (/^extract\s+(claims|factual\s+claims|all\s+claims)/i.test(s)) return true; // User prompt instruction
     if (/^[A-Z\s\---–—]{5,60}$/.test(s) && !/[a-z]/.test(s)) return true; // ALL CAPS TITLE
     return false;
   };
@@ -261,7 +262,7 @@ export async function handleClaimExtractFastRequest(c: Context) {
     const { text, documentType, taskDescription, files: rawFiles } = body;
 
     const { files, taskDescription: resolvedTaskDesc } = await resolveFiles(body);
-    let inputText = text || '';
+    let fileExtractedText = '';
 
     if (files && files.length > 0) {
       for (const file of files) {
@@ -275,17 +276,26 @@ export async function handleClaimExtractFastRequest(c: Context) {
           }
         }
         if (fileText) {
-          inputText += (inputText ? '\n\n' : '') + fileText;
+          fileExtractedText += (fileExtractedText ? '\n\n' : '') + fileText;
         }
       }
     }
 
-    if (!inputText && (taskDescription || resolvedTaskDesc)) {
-      inputText = taskDescription || resolvedTaskDesc;
+    // Prefer extracted file text when files are attached; fall back to text / taskDescription
+    let inputText = fileExtractedText.trim();
+    if (!inputText) {
+      inputText = (text || taskDescription || resolvedTaskDesc || '').trim();
     }
 
-    if (!inputText || inputText.trim().length === 0) {
-      return c.json({ error: 'No text or valid document provided for claim extraction.' }, 400);
+    // Filter out user meta-instruction lines (e.g. "extract claims from this doc/pdf")
+    inputText = inputText
+      .split('\n')
+      .filter((line) => !/^(extract\s+claims|extract\s+factual\s+claims|extract\s+all\s+claims|analyze\s+this\s+doc)/i.test(line.trim()))
+      .join('\n')
+      .trim();
+
+    if (!inputText || inputText.length === 0) {
+      return c.json({ error: 'No valid document text provided for claim extraction.' }, 400);
     }
 
     const llmStart = Date.now();
