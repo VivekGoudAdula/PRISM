@@ -255,7 +255,7 @@ function localClassify(description: string): string {
     desc.includes('article claims') ||
     desc.includes('verifiable claims') ||
     desc.includes('extract all factual claims from this article') ||
-    (desc.includes('extract') && desc.includes('claim'))
+    (desc.includes('extract') && (desc.includes('claim') || desc.includes('article') || desc.includes('factual') || desc.includes('news')))
   ) {
     return 'claim_extraction';
   }
