@@ -230,6 +230,7 @@ x402Server.onAfterSettle(async (context) => {
   const paymentAmount = parseFloat((Number(rawAmount) / 1e6).toFixed(4));
 
   console.log('[x402 DIAGNOSTIC SETTLED]', {
+    network: NETWORK_CONFIG.name,
     endpointPath,
     canonicalResourceUrl,
     resourceId,
@@ -557,11 +558,27 @@ app.post('/plan-task', optionalAuth, async (c) => {
  * Helpful for debugging and integration
  */
 app.get('/info', (c) => {
+  // Sanitize payTo — show first 8 + last 4 chars only
+  const payToFull = avmAddress || '';
+  const payToShort = payToFull.length > 12
+    ? `${payToFull.slice(0, 8)}...${payToFull.slice(-4)}`
+    : payToFull;
+
+  // Mask USDC asset ID middle digits
+  const assetStr = String(NETWORK_CONFIG.usdcAssetId);
+  const assetMasked = assetStr.length > 4
+    ? `${assetStr.slice(0, 2)}${'*'.repeat(assetStr.length - 4)}${assetStr.slice(-2)}`
+    : assetStr;
+
   return c.json({
-    service: 'x402-hackathon-starter',
+    service: 'PRISM x402 Resource Server',
     version: '1.0.0',
-    network: 'Algorand TestNet',
-    receiver: avmAddress,
+    // ── Sanitized x402 Config Summary (no secrets) ──
+    x402Network: NETWORK_CONFIG.name,         // 'MAINNET' or 'TESTNET'
+    x402UsdcAsset: assetMasked,               // e.g. '31****04'
+    x402PayTo: payToShort,                    // e.g. 'FL7U7GHU...RLBE'
+    x402Facilitator: facilitatorUrl,          // public URL, safe to expose
+    // ── Endpoint info ──
     endpoints: Object.keys(paymentConfig),
     documentation: 'See README.md in project root',
   });

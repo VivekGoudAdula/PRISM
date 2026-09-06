@@ -22,6 +22,7 @@ import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
 import { Task } from '../models/Task';
 import { Payments } from '../models/Payments';
+import { NETWORK_CONFIG } from '../endpoints.config';
 import { EndpointUsage } from '../models/EndpointUsage';
 import { AuditLog } from '../models/AuditLog';
 import { User } from '../models/User';
@@ -460,6 +461,7 @@ export async function handleExecuteTaskRequest(c: Context) {
       platformFee: 0,
       totalAmount: finalTotalCost,
       blockchain: 'Algorand',
+      network: NETWORK_CONFIG.name,   // 'MAINNET' or 'TESTNET' — used by analytics to filter
       currency: 'USDC',
       status: 'completed',
       groupTransactionId: transactionIds[0] || `grouped-independent-${new mongoose.Types.ObjectId()}`,

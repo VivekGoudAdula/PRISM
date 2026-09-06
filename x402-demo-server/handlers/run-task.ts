@@ -22,6 +22,7 @@ import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Task } from '../models/Task';
 import { Payments } from '../models/Payments';
+import { NETWORK_CONFIG } from '../endpoints.config';
 import { EndpointUsage } from '../models/EndpointUsage';
 import { AuditLog } from '../models/AuditLog';
 
@@ -196,6 +197,7 @@ export async function handleRunTaskRequest(c: Context) {
       x402TransactionId: paymentSignature,
       amount: 0.75, // $0.75 USDC standard task cost charged to end user
       blockchain: 'Algorand',
+      network: NETWORK_CONFIG.name,   // 'MAINNET' or 'TESTNET' — used by analytics to filter
       currency: 'USDC',
       status: 'completed',
     });

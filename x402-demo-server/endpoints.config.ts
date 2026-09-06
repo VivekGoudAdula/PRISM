@@ -12,7 +12,12 @@
  *    document, and returns the computed totalCost.
  */
 
-import { ALGORAND_MAINNET_CAIP2, USDC_MAINNET_ASA_ID } from '@x402/avm';
+import {
+  ALGORAND_MAINNET_CAIP2,
+  ALGORAND_TESTNET_CAIP2,
+  USDC_MAINNET_ASA_ID,
+  USDC_TESTNET_ASA_ID,
+} from '@x402/avm';
 import { declareDiscoveryExtension } from '@x402-avm/extensions';
 import mongoose from 'mongoose';
 import { Task } from './models/Task';
@@ -22,15 +27,36 @@ import { ENDPOINT_BASE_PRICES, formatBasePriceString } from './pricing.config';
 export type DynamicPrice = (context: any) => Promise<string> | string;
 
 // ─── Network Mode Configuration ─────────────────────────────────────────────
+//
+// Single source of truth for x402 network, asset, and algod configuration.
+// Control via environment variable NETWORK_MODE:
+//   NETWORK_MODE=testnet  → Algorand Testnet  (USDC ASA 10458941)
+//   NETWORK_MODE=mainnet  → Algorand Mainnet  (USDC ASA 31566704)  [default]
+//
+// The payTo address is controlled separately via AVM_ADDRESS in .env.
+// The facilitator URL is controlled via FACILITATOR_URL in .env.
 
-export const NETWORK_MODE = 'mainnet';
+export const NETWORK_MODE = (process.env.NETWORK_MODE || 'mainnet').toLowerCase();
 
-export const NETWORK_CONFIG = {
-  caip2: ALGORAND_MAINNET_CAIP2,
-  usdcAssetId: Number(USDC_MAINNET_ASA_ID), // 31566704
-  name: 'MAINNET',
-  algodServer: 'https://mainnet-api.algonode.cloud',
-};
+const IS_TESTNET = NETWORK_MODE === 'testnet';
+
+/** USDC ASA IDs */
+const USDC_TESTNET_ASSET_ID = Number(USDC_TESTNET_ASA_ID); // 10458941
+const USDC_MAINNET_ASSET_ID = Number(USDC_MAINNET_ASA_ID); // 31566704
+
+export const NETWORK_CONFIG = IS_TESTNET
+  ? {
+      caip2: ALGORAND_TESTNET_CAIP2,
+      usdcAssetId: USDC_TESTNET_ASSET_ID,
+      name: 'TESTNET',
+      algodServer: 'https://testnet-api.algonode.cloud',
+    }
+  : {
+      caip2: ALGORAND_MAINNET_CAIP2,
+      usdcAssetId: USDC_MAINNET_ASSET_ID,
+      name: 'MAINNET',
+      algodServer: 'https://mainnet-api.algonode.cloud',
+    };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -41,6 +41,12 @@ export interface IPayment {
 
   currency: string;
   blockchain: string;
+  /**
+   * The Algorand network this payment was settled on.
+   * 'MAINNET' or 'TESTNET' — used by analytics to exclude Testnet volume
+   * from the Mainnet leaderboard.
+   */
+  network?: string;
   status: 'pending' | 'completed' | 'failed';
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +74,8 @@ const PaymentsSchema = new Schema<IPayment>({
 
   currency: { type: String, default: 'USDC' },
   blockchain: { type: String, default: 'Algorand' },
+  // 'MAINNET' or 'TESTNET' — set from NETWORK_CONFIG.name at payment time
+  network: { type: String, default: 'MAINNET', index: true },
   status: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
 }, {
   timestamps: true,
