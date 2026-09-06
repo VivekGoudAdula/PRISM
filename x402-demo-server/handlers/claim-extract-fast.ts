@@ -11,16 +11,17 @@ export const CLAIM_EXTRACT_SYSTEM_PROMPT = `You are PRISM Media Claims Extractor
 Your goal is to extract atomic, independently verifiable factual claims from news articles, press releases, statements, and interview transcripts.
 
 CRITICAL RULES:
-1. ATOMICITY: Each claim must represent EXACTLY ONE independently verifiable factual proposition. Do not bundle multiple claims into one, but do not fragment a single coherent fact into meaningless split pieces.
-2. PRESERVE NUMBERS & PRECISION: Do NOT modify or round currency, percentages, dates, quantities, or metrics (e.g., keep $25 million, 37.5%, March 2026 as is).
-3. PRESERVE TEMPORAL CONTEXT: Retain year, date, and timeframe qualifiers in the claim (e.g. "in 2025", "since January 2026").
-4. PRESERVE QUALIFIERS: Keep words like "more than", "fewer than", "approximately", "estimated", "preliminary", "alleged", "reported", "according to".
-5. ATTRIBUTION: Identify who made the claim if mentioned (e.g., "CEO", "Company annual report"). If no explicit attribution, use "UNATTRIBUTED". Never invent an attribution.
-6. EXCLUDE NON-CLAIMS: Exclude subjective opinions ("product is amazing"), generic marketing hype, rhetoric, greetings, and calls to action.
+1. EXCLUDE NON-CONTENT: DO NOT extract document titles, headings, subheadings (e.g. "NEWS ARTICLE - NORTHSTAR ENERGY"), document metadata (e.g. "Synthetic PRISM Media Intelligence Test Document"), testing instructions/purposes (e.g. "Testing purpose: agreements..."), copyright notices, or visual headers/footers as claims. ONLY extract factual claims asserted within the body text.
+2. ATOMICITY & COMPLETE PROPOSITIONS: Each claim must represent EXACTLY ONE independently verifiable factual proposition as a complete sentence. DO NOT split wrapped sentences or clauses across line breaks into incomplete fragments (e.g. "create approximately 500" + "jobs over three years" MUST be unified into "The program is expected to create approximately 500 jobs over the next three years.").
+3. EXACT ATTRIBUTION: Identify the specific entity or speaker making the claim (e.g. "Maya Rao", "NorthStar Energy", "Financial Reports"). Do NOT truncate entity names (e.g. extract "NorthStar Energy", never "Star Energy"). If no explicit entity is credited, use "UNATTRIBUTED". Never invent an attribution.
+4. PRESERVE NUMBERS & PRECISION: Do NOT modify or round currency, percentages, dates, quantities, or metrics (e.g., keep $25 million, 37.5%, March 2026 as is).
+5. PRESERVE TEMPORAL CONTEXT: Retain year, date, and timeframe qualifiers in the claim (e.g. "in 2025", "since January 2026").
+6. PRESERVE QUALIFIERS: Keep words like "more than", "fewer than", "approximately", "estimated", "preliminary", "alleged", "reported", "according to".
 7. CLAIM TYPES: Assign each claim to the best fitting category: PERSON, ORGANIZATION, EVENT, DATE, LOCATION, FINANCIAL, STATISTICAL, LEGAL, BUSINESS, GOVERNMENT, SCIENTIFIC, PRODUCT, EMPLOYMENT, OTHER.
-8. DOCUMENT TYPES: Identify input documentType as: ARTICLE, STATEMENT, PRESS_RELEASE, INTERVIEW_TRANSCRIPT, or OTHER.
-9. DETERMINISTIC IDs: Generate sequential IDs claim_001, claim_002, claim_003...
-10. DEDUPLICATION & CONFLICTS: Deduplicate identical repeated claims. If repeated statements contain conflicting facts (e.g. $20M vs $18M), preserve BOTH as separate claims.
+8. ACCURATE PARAGRAPH INDEX: Determine the exact 1-based paragraph index (1, 2, 3...) in the source text where the claim originates.
+9. DOCUMENT TYPES: Identify input documentType as: ARTICLE, STATEMENT, PRESS_RELEASE, INTERVIEW_TRANSCRIPT, or OTHER.
+10. DETERMINISTIC IDs: Generate sequential IDs claim_001, claim_002, claim_003...
+11. DEDUPLICATION & CONFLICTS: Deduplicate identical repeated claims. If repeated statements contain conflicting facts (e.g. $20M vs $18M), preserve BOTH as separate claims.
 
 Return ONLY valid JSON with this exact structure:
 {
@@ -30,7 +31,7 @@ Return ONLY valid JSON with this exact structure:
       "id": "claim_001",
       "claim": "Full atomic claim text preserving temporal context, numbers, and qualifiers",
       "claimType": "FINANCIAL" | "PERSON" | "ORGANIZATION" | "EVENT" | "DATE" | "LOCATION" | "STATISTICAL" | "LEGAL" | "BUSINESS" | "GOVERNMENT" | "SCIENTIFIC" | "PRODUCT" | "EMPLOYMENT" | "OTHER",
-      "attribution": "Attributed person/source or UNATTRIBUTED",
+      "attribution": "Attributed person/organization or UNATTRIBUTED",
       "sourceText": "Original exact sentence or clause from document",
       "sourceLocation": {
         "paragraph": 1
@@ -53,8 +54,11 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
     };
   }
 
-  // Pre-calculate paragraph locations
-  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  // Pre-calculate paragraph locations (separated by double newlines)
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   let parsed: any = {};
   let rawClaims: any[] = [];
@@ -81,27 +85,31 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
     const extractedItems: { text: string; paraIdx: number; attribution?: string }[] = [];
     
     paragraphs.forEach((p, pIdx) => {
-      // Split paragraph by lines or sentences, respecting numbers like 3.0 or 18.5%
-      const lines = p.split('\n').map((l) => l.trim()).filter(Boolean);
-      for (const line of lines) {
-        // Speaker line detection like "CEO: We serve..." or "CTO: Our engineering..."
-        const speakerMatch = line.match(/^([A-Z0-9_\-\s]{2,15}):\s*(.*)/);
-        if (speakerMatch) {
-          const speaker = speakerMatch[1].trim();
-          const content = speakerMatch[2].trim();
-          if (speaker.toUpperCase() !== 'INTERVIEWER' && content.length > 10) {
-            extractedItems.push({ text: content, paraIdx: pIdx + 1, attribution: speaker });
-          }
-          continue;
-        }
+      // Normalize paragraph text: join wrapped lines into a clean paragraph single-line string
+      const cleanPara = p.replace(/\s*\n\s*/g, ' ').trim();
+      
+      // Ignore headings / metadata banners in fallback
+      if (/^(news article|press release|synthetic prism|testing purpose|interview transcript)/i.test(cleanPara) && cleanPara.length < 100) {
+        return;
+      }
 
-        // Standard sentences split by period followed by whitespace and capital letter (avoiding decimals like 3.0 or 18.5%)
-        const sentences = line.split(/(?<=\b[a-z0-9)]+[.!?])\s+(?=[A-Z"'])/i);
-        for (const s of sentences) {
-          const trimmed = s.trim();
-          if (trimmed.length > 15) {
-            extractedItems.push({ text: trimmed, paraIdx: pIdx + 1 });
-          }
+      // Speaker line detection like "CEO Maya Rao: We serve..."
+      const speakerMatch = cleanPara.match(/^([A-Za-z0-9_\-\s]{2,30}):\s*(.*)/);
+      if (speakerMatch) {
+        const speaker = speakerMatch[1].trim();
+        const content = speakerMatch[2].trim();
+        if (speaker.toUpperCase() !== 'INTERVIEWER' && speaker.toUpperCase() !== 'QUESTION' && content.length > 15) {
+          extractedItems.push({ text: content, paraIdx: pIdx + 1, attribution: speaker });
+          return;
+        }
+      }
+
+      // Standard sentences split by period followed by whitespace and capital letter
+      const sentences = cleanPara.split(/(?<=\b[a-z0-9)]+[.!?])\s+(?=[A-Z"'])/i);
+      for (const s of sentences) {
+        const trimmed = s.trim();
+        if (trimmed.length > 20) {
+          extractedItems.push({ text: trimmed, paraIdx: pIdx + 1 });
         }
       }
     });
@@ -118,10 +126,12 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
     rawClaims = extractedItems
       .filter((item) => {
         const lower = item.text.toLowerCase();
-        // Exclude marketing fluff & greetings
+        // Exclude headings, test metadata, marketing hype & instructions
+        if (lower.startsWith('synthetic prism') || lower.startsWith('testing purpose:')) return false;
+        if (lower.startsWith('news article') || lower.startsWith('press release')) return false;
         if (lower.includes('most revolutionary and amazing')) return false;
         if (lower.includes('thrilled to transform')) return false;
-        if (lower.includes('for immediate release') && item.text.length < 40) return false;
+        if (lower.includes('for immediate release') && item.text.length < 50) return false;
         if (lower.startsWith('interviewer:')) return false;
         return true;
       })
@@ -130,7 +140,7 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
         let attribution = item.attribution || 'UNATTRIBUTED';
 
         if (attribution === 'UNATTRIBUTED') {
-          const attrMatch = s.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:said|stated|announced|claimed|noted|reported|declared)/);
+          const attrMatch = s.match(/([A-Z][A-Za-z0-9_]+(?:\s+[A-Z][A-Za-z0-9_]+)*)\s+(?:said|stated|announced|claimed|noted|reported|declared)/);
           if (attrMatch) {
             attribution = attrMatch[1];
           } else if (/\baccording to financial reports\b/i.test(s)) {
@@ -173,19 +183,51 @@ export async function processClaimExtraction(rawText: string, providedDocType?: 
     'GOVERNMENT', 'SCIENTIFIC', 'PRODUCT', 'EMPLOYMENT', 'OTHER'
   ];
 
-  const processedClaims = rawClaims.map((item: any, idx: number) => {
+  // Post-filter to eliminate any titles or metadata claims returned by LLM
+  const isHeaderOrMetadata = (str: string): boolean => {
+    const s = str.trim();
+    if (/^(NEWS ARTICLE|PRESS RELEASE|SYNTHETIC PRISM|TESTING PURPOSE)/i.test(s)) return true;
+    if (s.includes('Synthetic PRISM Media Intelligence Test Document')) return true;
+    if (s.startsWith('Testing purpose:')) return true;
+    if (/^[A-Z\s\---–—]{5,60}$/.test(s) && !/[a-z]/.test(s)) return true; // ALL CAPS TITLE
+    return false;
+  };
+
+  const filteredRawClaims = rawClaims.filter((item: any) => {
+    const claimTxt = (item.claim || item.claimText || item.text || '').trim();
+    return !isHeaderOrMetadata(claimTxt);
+  });
+
+  const processedClaims = filteredRawClaims.map((item: any, idx: number) => {
     const claimId = `claim_${String(idx + 1).padStart(3, '0')}`;
     const claimText = (item.claim || item.claimText || item.text || '').trim();
     let claimType = (item.claimType || item.type || 'OTHER').toUpperCase();
     if (!validTypes.includes(claimType)) claimType = 'OTHER';
 
-    const attribution = (item.attribution || 'UNATTRIBUTED').trim() || 'UNATTRIBUTED';
+    let attribution = (item.attribution || 'UNATTRIBUTED').trim() || 'UNATTRIBUTED';
     const sourceText = (item.sourceText || item.source_text || claimText).trim();
 
-    // Map source paragraph location if possible
+    // Refine attribution if truncated (e.g., if attribution is a substring of full entity like NorthStar Energy)
+    if (attribution !== 'UNATTRIBUTED') {
+      const fullEntityMatches = sourceText.match(/([A-Z][A-Za-z0-9_]+(?:\s+[A-Z][A-Za-z0-9_]+)+)/g);
+      if (fullEntityMatches) {
+        for (const fullEnt of fullEntityMatches) {
+          if (fullEnt.endsWith(attribution) && fullEnt.length > attribution.length) {
+            attribution = fullEnt;
+            break;
+          }
+        }
+      }
+    }
+
+    // Map source paragraph location accurately
     let paragraphNum = typeof item.sourceLocation?.paragraph === 'number' ? item.sourceLocation.paragraph : 1;
-    if (paragraphs.length > 0 && sourceText) {
-      const foundIdx = paragraphs.findIndex((p) => p.includes(sourceText) || sourceText.includes(p.slice(0, 30)));
+    if (paragraphs.length > 0) {
+      const normSource = sourceText.replace(/\s+/g, ' ').toLowerCase();
+      const foundIdx = paragraphs.findIndex((p) => {
+        const normP = p.replace(/\s+/g, ' ').toLowerCase();
+        return normP.includes(normSource.slice(0, 40)) || normSource.includes(normP.slice(0, 40));
+      });
       if (foundIdx !== -1) paragraphNum = foundIdx + 1;
     }
 

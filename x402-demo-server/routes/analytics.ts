@@ -386,14 +386,29 @@ adminRouter.get('/tasks', async (c) => {
  */
 adminRouter.get('/payments', async (c) => {
   try {
-    const payments = await Payments.find({
-      // Exclude testnet transactions — mainnet only
-      blockchain: { $not: /testnet/i },
-      $or: [
-        { network: { $exists: false } },
-        { network: { $not: /testnet/i } },
-      ],
-    })
+    const networkFilter = (c.req.query('network') || '').toLowerCase();
+    let query: any = {};
+    if (networkFilter === 'testnet') {
+      query = {
+        $or: [
+          { blockchain: /testnet/i },
+          { network: /testnet/i },
+        ],
+      };
+    } else if (networkFilter === 'all') {
+      query = {};
+    } else {
+      // Default: mainnet (preserved)
+      query = {
+        blockchain: { $not: /testnet/i },
+        $or: [
+          { network: { $exists: false } },
+          { network: { $not: /testnet/i } },
+        ],
+      };
+    }
+
+    const payments = await Payments.find(query)
       .populate('userId', 'fullName email')
       .sort({ createdAt: -1 })
       .limit(200);
@@ -539,15 +554,30 @@ adminRouter.get('/analytics-overtime', async (c) => {
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    // Daily payment volume + settlement count (mainnet only)
-    const paymentDocs = await Payments.find({
-      createdAt: { $gte: startDate, $lte: endDate },
-      status: 'completed',
+    const networkFilter = (c.req.query('network') || '').toLowerCase();
+    let paymentNetworkQuery: any = {
       blockchain: { $not: /testnet/i },
       $or: [
         { network: { $exists: false } },
         { network: { $not: /testnet/i } },
       ],
+    };
+    if (networkFilter === 'testnet') {
+      paymentNetworkQuery = {
+        $or: [
+          { blockchain: /testnet/i },
+          { network: /testnet/i },
+        ],
+      };
+    } else if (networkFilter === 'all') {
+      paymentNetworkQuery = {};
+    }
+
+    // Daily payment volume + settlement count
+    const paymentDocs = await Payments.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+      status: 'completed',
+      ...paymentNetworkQuery,
     }).select('amount createdAt').lean();
 
     for (const p of paymentDocs) {

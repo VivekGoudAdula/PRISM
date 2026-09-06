@@ -398,9 +398,11 @@ export async function createX402Fetch(walletSigner: any) {
   };
 
   const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet';
-  const caip2Network = isMainnet ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2;
   const algodUrl = isMainnet ? 'https://mainnet-api.algonode.cloud' : 'https://testnet-api.algonode.cloud';
-  client.register(caip2Network, new ExactAvmScheme(x402Signer, { algodUrl }));
+
+  // Register both Mainnet and Testnet CAIP2 networks to support payments across both networks seamlessly
+  client.register(ALGORAND_MAINNET_CAIP2, new ExactAvmScheme(x402Signer, { algodUrl: 'https://mainnet-api.algonode.cloud' }));
+  client.register(ALGORAND_TESTNET_CAIP2, new ExactAvmScheme(x402Signer, { algodUrl: 'https://testnet-api.algonode.cloud' }));
 
   return wrapFetchWithPayment(fetch, client);
 }

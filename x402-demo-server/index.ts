@@ -20,7 +20,7 @@ import { serve } from '@hono/node-server';
 import { paymentMiddleware } from '@x402/hono';
 import { x402ResourceServer, HTTPFacilitatorClient } from '@x402/core/server';
 import { ExactAvmScheme } from '@x402/avm/exact/server';
-import { ALGORAND_TESTNET_CAIP2 } from '@x402/avm';
+import { ALGORAND_MAINNET_CAIP2, ALGORAND_TESTNET_CAIP2 } from '@x402/avm';
 import mongoose from 'mongoose';
 
 // Import handler functions
@@ -205,9 +205,10 @@ const facilitatorClient = new HTTPFacilitatorClient({ url: facilitatorUrl });
 const x402Server = new x402ResourceServer(facilitatorClient);
 x402Server.registerExtension(bazaarResourceServerExtension as unknown as ResourceServerExtension);
 
-// Register payment scheme for configured network (TestNet / MainNet)
+// Register payment scheme for both Mainnet and TestNet networks
 const avmServerScheme = new ExactAvmScheme();
-x402Server.register(NETWORK_CONFIG.caip2, avmServerScheme);
+x402Server.register(ALGORAND_MAINNET_CAIP2, avmServerScheme);
+x402Server.register(ALGORAND_TESTNET_CAIP2, avmServerScheme);
 
 // Add x402 Debug Logging Hooks
 x402Server.onBeforeVerify(async (context) => {

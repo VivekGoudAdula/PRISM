@@ -103,18 +103,18 @@ export async function extractText(
           const { createWorker } = await import('tesseract.js');
           const worker = await createWorker('eng');
           const result = await worker.recognize(imageBuffer);
-          ocrText += result.data.text + '\n';
+          ocrText += result.data.text + '\n\n';
           await worker.terminate();
         }
 
-        return { text: ocrText.trim(), method: 'ocr' };
+        return { text: normalizePdfText(ocrText), method: 'ocr' };
       } catch (ocrErr: any) {
         console.error(`OCR fallback failed for ${filename}:`, ocrErr);
         throw new Error(`Failed to extract text from PDF via both text-layer and OCR fallback: ${ocrErr.message}`);
       }
     }
 
-    return { text, method: 'pdf-text' };
+    return { text: normalizePdfText(text), method: 'pdf-text' };
   }
 
   if (normalizedFilename.endsWith('.docx')) {
