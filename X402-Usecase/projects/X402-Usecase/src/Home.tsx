@@ -1028,10 +1028,10 @@ const Home: React.FC<HomeProps> = () => {
               <p className="lp-eyebrow">Pricing</p>
               <h2 className="lp-section-heading">Only pay when it runs</h2>
               <p className="lp-section-sub">
-                No seat licenses. No idle spend. Every dollar goes to work.
+                Transparent base pricing with PRISM Dynamic Token Optimization savings. No seat licenses. Every dollar goes to work.
               </p>
               <div className="pricing-grid">
-                {/* Subscription — foil */}
+                {/* Traditional SaaS Card */}
                 <div className="pricing-card">
                   <p className="pricing-label">Traditional SaaS</p>
                   <p className="pricing-amount">Flat fee / mo</p>
@@ -1043,16 +1043,17 @@ const Home: React.FC<HomeProps> = () => {
                   </ul>
                 </div>
 
-                {/* Pay-per-task — hero */}
+                {/* Base Pricing Overview Card */}
                 <div className="pricing-card pricing-card--highlight">
                   <div className="pricing-badge">Recommended</div>
-                  <p className="pricing-label">Prism Pay-per-task</p>
-                  <p className="pricing-amount pricing-amount--highlight">$0.15 – $0.75</p>
-                  <p className="pricing-caption">per task · billed in real time</p>
+                  <p className="pricing-label">Prism Base Pricing</p>
+                  <p className="pricing-amount pricing-amount--highlight">From $0.012 / unit</p>
+                  <p className="pricing-caption">base price · minus dynamic optimization savings</p>
                   <ul className="pricing-features">
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> No subscription needed</li>
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Pay only for what runs</li>
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> On-chain verified results</li>
+                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Resume Screen: $0.12 (Fast) / $0.30 (Accurate)</li>
+                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Contract Analysis: $0.18 (Fast) / $0.42 (Accurate)</li>
+                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Invoice Extract: $0.096 (Fast) / $0.24 (Accurate)</li>
+                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> SEO Audit: $0.12 (Fast) / $0.30 (Accurate per page)</li>
                   </ul>
                   <button
                     className="btn btn-primary w-full mt-6 rounded-xl font-bold text-sm"
@@ -1060,6 +1061,56 @@ const Home: React.FC<HomeProps> = () => {
                   >
                     Get Started Free
                   </button>
+                </div>
+              </div>
+
+              {/* Code Review Workload-Based Pricing Tier Section */}
+              <div className="mt-12 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Code Review Workload Pricing</h3>
+                    <p className="text-xs text-slate-400">Determined per file based on Lines of Code (LOC) and token workload signals.</p>
+                  </div>
+                  <span className="badge badge-primary badge-outline text-xs font-semibold px-3 py-1">Dynamic Optimization Eligible</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">TINY</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">1–50 LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.012 / file</p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SMALL</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">51–150 LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.036 / file</p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MEDIUM</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">151–400 LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.12 / file</p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LARGE</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">401–800 LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.30 / file</p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VERY LARGE</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">801–1,500 LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.60 / file</p>
+                  </div>
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">HUGE</p>
+                    <p className="text-xs font-semibold text-slate-300 mt-1">1,500+ LOC</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$1.08 / file</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
+                  <span><strong>Base Price:</strong> Initial workload tier price</span>
+                  <span><strong>Optimization Savings:</strong> Base Price × Token Savings Rate × 50%</span>
+                  <span><strong>Final Price:</strong> Base Price – Savings (min $0.01)</span>
                 </div>
               </div>
             </div>

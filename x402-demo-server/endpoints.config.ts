@@ -17,6 +17,7 @@ import { declareDiscoveryExtension } from '@x402-avm/extensions';
 import mongoose from 'mongoose';
 import { Task } from './models/Task';
 import { CANONICAL_ENDPOINTS } from './endpoints.registry';
+import { ENDPOINT_BASE_PRICES, formatBasePriceString } from './pricing.config';
 
 export type DynamicPrice = (context: any) => Promise<string> | string;
 
@@ -461,7 +462,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['resume-screen-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/resume-screen-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -474,7 +475,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['resume-screen-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/resume-screen-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -488,7 +489,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['resume-screen-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/resume-screen-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -501,7 +502,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['resume-screen-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/resume-screen-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -515,7 +516,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['contract-analyze-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.15'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/contract-analyze-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -528,7 +529,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['contract-analyze-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.15'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/contract-analyze-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -542,7 +543,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['contract-analyze-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.35'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/contract-analyze-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -555,7 +556,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['contract-analyze-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.35'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/contract-analyze-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -569,7 +570,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['invoice-extract-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.08'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/invoice-extract-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -582,7 +583,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['invoice-extract-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.08'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/invoice-extract-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -596,7 +597,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['invoice-extract-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.20'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/invoice-extract-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -609,7 +610,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['invoice-extract-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.20'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/invoice-extract-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -623,7 +624,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['code-review-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/code-review-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -636,7 +637,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['code-review-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/code-review-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -650,7 +651,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['code-review-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.20'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/code-review-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -663,7 +664,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['code-review-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.20'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/code-review-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -677,7 +678,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['seo-audit-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/seo-audit-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -690,7 +691,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['seo-audit-fast'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.10'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/seo-audit-fast'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -704,7 +705,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['seo-audit-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/seo-audit-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -717,7 +718,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['seo-audit-accurate'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/seo-audit-accurate'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -731,7 +732,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['run-task'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/run-task'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
@@ -744,7 +745,7 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       resource: CANONICAL_ENDPOINTS['run-task'].resourceUrl,
       accepts: [{
         scheme: 'exact',
-        price: createDynamicPriceResolver('$0.25'),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/run-task'])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },

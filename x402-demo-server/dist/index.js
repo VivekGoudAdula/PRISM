@@ -81251,6 +81251,42 @@ var init_endpoints_registry = __esm({
   }
 });
 
+// pricing.config.ts
+function formatBasePriceString(price) {
+  const str = price.toString();
+  return `$${str}`;
+}
+var CODE_REVIEW_WORKLOAD_TIERS, ENDPOINT_BASE_PRICES;
+var init_pricing_config = __esm({
+  "pricing.config.ts"() {
+    "use strict";
+    CODE_REVIEW_WORKLOAD_TIERS = [
+      { tier: "TINY", maxLines: 50, maxTokens: 200, basePrice: 0.012 },
+      { tier: "SMALL", maxLines: 150, maxTokens: 600, basePrice: 0.036 },
+      { tier: "MEDIUM", maxLines: 400, maxTokens: 1600, basePrice: 0.12 },
+      { tier: "LARGE", maxLines: 800, maxTokens: 3200, basePrice: 0.3 },
+      { tier: "VERY_LARGE", maxLines: 1500, maxTokens: 6e3, basePrice: 0.6 },
+      { tier: "HUGE", maxLines: Infinity, maxTokens: Infinity, basePrice: 1.08 }
+    ];
+    ENDPOINT_BASE_PRICES = {
+      "/resume-screen-fast": 0.12,
+      "/resume-screen-accurate": 0.3,
+      "/contract-analyze-fast": 0.18,
+      "/contract-analyze-accurate": 0.42,
+      "/invoice-extract-fast": 0.096,
+      "/invoice-extract-accurate": 0.24,
+      "/code-review-fast": 0.012,
+      // Baseline TINY price
+      "/code-review-accurate": 0.012,
+      // Baseline TINY price (workload dynamic)
+      "/seo-audit-fast": 0.12,
+      "/seo-audit-accurate": 0.3,
+      "/execute-task": 0.25,
+      "/run-task": 0.25
+    };
+  }
+});
+
 // endpoints.config.ts
 function createDynamicPriceResolver(fallbackPrice) {
   return async (context) => {
@@ -81600,7 +81636,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["resume-screen-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/resume-screen-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81613,7 +81649,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["resume-screen-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/resume-screen-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81626,7 +81662,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["resume-screen-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/resume-screen-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81639,7 +81675,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["resume-screen-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/resume-screen-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81652,7 +81688,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["contract-analyze-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.15"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/contract-analyze-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81665,7 +81701,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["contract-analyze-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.15"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/contract-analyze-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81678,7 +81714,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["contract-analyze-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.35"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/contract-analyze-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81691,7 +81727,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["contract-analyze-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.35"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/contract-analyze-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81704,7 +81740,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["invoice-extract-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.08"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/invoice-extract-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81717,7 +81753,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["invoice-extract-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.08"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/invoice-extract-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81730,7 +81766,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["invoice-extract-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.20"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/invoice-extract-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81743,7 +81779,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["invoice-extract-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.20"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/invoice-extract-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81756,7 +81792,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["code-review-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/code-review-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81769,7 +81805,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["code-review-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/code-review-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81782,7 +81818,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["code-review-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.20"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/code-review-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81795,7 +81831,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["code-review-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.20"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/code-review-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81808,7 +81844,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["seo-audit-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/seo-audit-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81821,7 +81857,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["seo-audit-fast"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.10"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/seo-audit-fast"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81834,7 +81870,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["seo-audit-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/seo-audit-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81847,7 +81883,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["seo-audit-accurate"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/seo-audit-accurate"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81860,7 +81896,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["run-task"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/run-task"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81873,7 +81909,7 @@ function createPaymentConfig(avmAddress2) {
       resource: CANONICAL_ENDPOINTS["run-task"].resourceUrl,
       accepts: [{
         scheme: "exact",
-        price: createDynamicPriceResolver("$0.25"),
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES["/run-task"])),
         network: NETWORK_CONFIG.caip2,
         payTo: avmAddress2,
         extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: "x402-global-challenge" }
@@ -81893,6 +81929,7 @@ var init_endpoints_config = __esm({
     import_mongoose2 = __toESM(require("mongoose"));
     init_Task();
     init_endpoints_registry();
+    init_pricing_config();
     NETWORK_CONFIG = {
       caip2: ALGORAND_MAINNET_CAIP2,
       usdcAssetId: Number(USDC_MAINNET_ASA_ID),
@@ -90235,24 +90272,24 @@ async function selectEndpointForTask(category, taskDescription = "") {
   };
   const candidatesMap = {
     seo_audit: [
-      { endpoint_path: "/seo-audit-fast", price: 0.1, confidence: 0.76, latency_ms: 850, reputation_score: getRep("/seo-audit-fast") },
-      { endpoint_path: "/seo-audit-accurate", price: 0.25, confidence: 0.94, latency_ms: 2300, reputation_score: getRep("/seo-audit-accurate") }
+      { endpoint_path: "/seo-audit-fast", price: ENDPOINT_BASE_PRICES["/seo-audit-fast"], confidence: 0.76, latency_ms: 850, reputation_score: getRep("/seo-audit-fast") },
+      { endpoint_path: "/seo-audit-accurate", price: ENDPOINT_BASE_PRICES["/seo-audit-accurate"], confidence: 0.94, latency_ms: 2300, reputation_score: getRep("/seo-audit-accurate") }
     ],
     code_review: [
-      { endpoint_path: "/code-review-fast", price: 0.12, confidence: 0.78, latency_ms: 900, reputation_score: getRep("/code-review-fast") },
-      { endpoint_path: "/code-review-accurate", price: 0.3, confidence: 0.95, latency_ms: 2500, reputation_score: getRep("/code-review-accurate") }
+      { endpoint_path: "/code-review-fast", price: ENDPOINT_BASE_PRICES["/code-review-fast"], confidence: 0.78, latency_ms: 900, reputation_score: getRep("/code-review-fast") },
+      { endpoint_path: "/code-review-accurate", price: ENDPOINT_BASE_PRICES["/code-review-accurate"], confidence: 0.95, latency_ms: 2500, reputation_score: getRep("/code-review-accurate") }
     ],
     resume_screening: [
-      { endpoint_path: "/resume-screen-fast", price: 0.1, confidence: 0.75, latency_ms: 800, reputation_score: getRep("/resume-screen-fast") },
-      { endpoint_path: "/resume-screen-accurate", price: 0.25, confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/resume-screen-accurate") }
+      { endpoint_path: "/resume-screen-fast", price: ENDPOINT_BASE_PRICES["/resume-screen-fast"], confidence: 0.75, latency_ms: 800, reputation_score: getRep("/resume-screen-fast") },
+      { endpoint_path: "/resume-screen-accurate", price: ENDPOINT_BASE_PRICES["/resume-screen-accurate"], confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/resume-screen-accurate") }
     ],
     contract_analysis: [
-      { endpoint_path: "/contract-analyze-fast", price: 0.15, confidence: 0.75, latency_ms: 800, reputation_score: getRep("/contract-analyze-fast") },
-      { endpoint_path: "/contract-analyze-accurate", price: 0.35, confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/contract-analyze-accurate") }
+      { endpoint_path: "/contract-analyze-fast", price: ENDPOINT_BASE_PRICES["/contract-analyze-fast"], confidence: 0.75, latency_ms: 800, reputation_score: getRep("/contract-analyze-fast") },
+      { endpoint_path: "/contract-analyze-accurate", price: ENDPOINT_BASE_PRICES["/contract-analyze-accurate"], confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/contract-analyze-accurate") }
     ],
     invoice_extraction: [
-      { endpoint_path: "/invoice-extract-fast", price: 0.08, confidence: 0.75, latency_ms: 800, reputation_score: getRep("/invoice-extract-fast") },
-      { endpoint_path: "/invoice-extract-accurate", price: 0.2, confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/invoice-extract-accurate") }
+      { endpoint_path: "/invoice-extract-fast", price: ENDPOINT_BASE_PRICES["/invoice-extract-fast"], confidence: 0.75, latency_ms: 800, reputation_score: getRep("/invoice-extract-fast") },
+      { endpoint_path: "/invoice-extract-accurate", price: ENDPOINT_BASE_PRICES["/invoice-extract-accurate"], confidence: 0.93, latency_ms: 2200, reputation_score: getRep("/invoice-extract-accurate") }
     ]
   };
   const candidates = candidatesMap[category];
@@ -90342,6 +90379,7 @@ async function handleSelectEndpointRequest(c) {
 var init_select_endpoint = __esm({
   "handlers/select-endpoint.ts"() {
     "use strict";
+    init_pricing_config();
   }
 });
 
@@ -92252,23 +92290,34 @@ function calculateCodeReviewBasePrice(input) {
   const tokens = typeof input.inputTokens === "number" && input.inputTokens >= 0 ? input.inputTokens : null;
   const lines = typeof input.lineCount === "number" && input.lineCount >= 0 ? input.lineCount : 0;
   const bytes = typeof input.fileSizeBytes === "number" && input.fileSizeBytes >= 0 ? input.fileSizeBytes : 0;
-  let chosenTierConfig = CODE_REVIEW_WORKLOAD_TIERS[CODE_REVIEW_WORKLOAD_TIERS.length - 1];
-  if (tokens !== null && tokens > 0) {
-    for (const config9 of CODE_REVIEW_WORKLOAD_TIERS) {
-      if (tokens <= config9.maxTokens) {
-        chosenTierConfig = config9;
+  let locTierIdx = 0;
+  if (lines > 0) {
+    for (let i = 0; i < CODE_REVIEW_WORKLOAD_TIERS.length; i++) {
+      if (lines <= CODE_REVIEW_WORKLOAD_TIERS[i].maxLines) {
+        locTierIdx = i;
         break;
       }
     }
   } else {
-    for (const config9 of CODE_REVIEW_WORKLOAD_TIERS) {
-      if (lines <= config9.maxLines) {
-        chosenTierConfig = config9;
+    locTierIdx = 0;
+  }
+  let tokenTierIdx = 0;
+  if (tokens !== null && tokens > 0) {
+    for (let i = 0; i < CODE_REVIEW_WORKLOAD_TIERS.length; i++) {
+      if (tokens <= CODE_REVIEW_WORKLOAD_TIERS[i].maxTokens) {
+        tokenTierIdx = i;
         break;
       }
     }
   }
-  const basePrice = Math.min(0.9, chosenTierConfig.basePrice);
+  let finalTierIdx = locTierIdx;
+  if (lines === 0 && tokens !== null) {
+    finalTierIdx = tokenTierIdx;
+  } else if (tokens !== null && tokens > 0) {
+    finalTierIdx = Math.max(locTierIdx, tokenTierIdx);
+  }
+  const chosenTierConfig = CODE_REVIEW_WORKLOAD_TIERS[finalTierIdx];
+  const basePrice = chosenTierConfig.basePrice;
   return {
     complexityTier: chosenTierConfig.tier,
     inputTokens: tokens !== null ? tokens : Math.round(lines * 4),
@@ -92277,18 +92326,10 @@ function calculateCodeReviewBasePrice(input) {
     basePrice
   };
 }
-var CODE_REVIEW_WORKLOAD_TIERS;
 var init_code_review_pricing = __esm({
   "handlers/lib/code-review-pricing.ts"() {
     "use strict";
-    CODE_REVIEW_WORKLOAD_TIERS = [
-      { tier: "TINY", maxTokens: 200, maxLines: 50, basePrice: 0.01 },
-      { tier: "SMALL", maxTokens: 600, maxLines: 150, basePrice: 0.03 },
-      { tier: "MEDIUM", maxTokens: 1600, maxLines: 400, basePrice: 0.1 },
-      { tier: "LARGE", maxTokens: 3200, maxLines: 800, basePrice: 0.25 },
-      { tier: "VERY_LARGE", maxTokens: 6e3, maxLines: 1500, basePrice: 0.5 },
-      { tier: "HUGE", maxTokens: Infinity, maxLines: Infinity, basePrice: 0.9 }
-    ];
+    init_pricing_config();
   }
 });
 

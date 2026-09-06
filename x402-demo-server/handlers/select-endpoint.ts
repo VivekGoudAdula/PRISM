@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { readReputation } from './lib/reputation-store';
+import { ENDPOINT_BASE_PRICES } from '../pricing.config';
 
 interface Bid {
   endpoint_path: string;
@@ -54,24 +55,24 @@ export async function selectEndpointForTask(category: string, taskDescription: s
   // Define endpoint candidates and their baseline metadata
   const candidatesMap: Record<string, Bid[]> = {
     seo_audit: [
-      { endpoint_path: '/seo-audit-fast', price: 0.10, confidence: 0.76, latency_ms: 850, reputation_score: getRep('/seo-audit-fast') },
-      { endpoint_path: '/seo-audit-accurate', price: 0.25, confidence: 0.94, latency_ms: 2300, reputation_score: getRep('/seo-audit-accurate') },
+      { endpoint_path: '/seo-audit-fast', price: ENDPOINT_BASE_PRICES['/seo-audit-fast'], confidence: 0.76, latency_ms: 850, reputation_score: getRep('/seo-audit-fast') },
+      { endpoint_path: '/seo-audit-accurate', price: ENDPOINT_BASE_PRICES['/seo-audit-accurate'], confidence: 0.94, latency_ms: 2300, reputation_score: getRep('/seo-audit-accurate') },
     ],
     code_review: [
-      { endpoint_path: '/code-review-fast', price: 0.12, confidence: 0.78, latency_ms: 900, reputation_score: getRep('/code-review-fast') },
-      { endpoint_path: '/code-review-accurate', price: 0.30, confidence: 0.95, latency_ms: 2500, reputation_score: getRep('/code-review-accurate') },
+      { endpoint_path: '/code-review-fast', price: ENDPOINT_BASE_PRICES['/code-review-fast'], confidence: 0.78, latency_ms: 900, reputation_score: getRep('/code-review-fast') },
+      { endpoint_path: '/code-review-accurate', price: ENDPOINT_BASE_PRICES['/code-review-accurate'], confidence: 0.95, latency_ms: 2500, reputation_score: getRep('/code-review-accurate') },
     ],
     resume_screening: [
-      { endpoint_path: '/resume-screen-fast', price: 0.10, confidence: 0.75, latency_ms: 800, reputation_score: getRep('/resume-screen-fast') },
-      { endpoint_path: '/resume-screen-accurate', price: 0.25, confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/resume-screen-accurate') },
+      { endpoint_path: '/resume-screen-fast', price: ENDPOINT_BASE_PRICES['/resume-screen-fast'], confidence: 0.75, latency_ms: 800, reputation_score: getRep('/resume-screen-fast') },
+      { endpoint_path: '/resume-screen-accurate', price: ENDPOINT_BASE_PRICES['/resume-screen-accurate'], confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/resume-screen-accurate') },
     ],
     contract_analysis: [
-      { endpoint_path: '/contract-analyze-fast', price: 0.15, confidence: 0.75, latency_ms: 800, reputation_score: getRep('/contract-analyze-fast') },
-      { endpoint_path: '/contract-analyze-accurate', price: 0.35, confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/contract-analyze-accurate') },
+      { endpoint_path: '/contract-analyze-fast', price: ENDPOINT_BASE_PRICES['/contract-analyze-fast'], confidence: 0.75, latency_ms: 800, reputation_score: getRep('/contract-analyze-fast') },
+      { endpoint_path: '/contract-analyze-accurate', price: ENDPOINT_BASE_PRICES['/contract-analyze-accurate'], confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/contract-analyze-accurate') },
     ],
     invoice_extraction: [
-      { endpoint_path: '/invoice-extract-fast', price: 0.08, confidence: 0.75, latency_ms: 800, reputation_score: getRep('/invoice-extract-fast') },
-      { endpoint_path: '/invoice-extract-accurate', price: 0.20, confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/invoice-extract-accurate') },
+      { endpoint_path: '/invoice-extract-fast', price: ENDPOINT_BASE_PRICES['/invoice-extract-fast'], confidence: 0.75, latency_ms: 800, reputation_score: getRep('/invoice-extract-fast') },
+      { endpoint_path: '/invoice-extract-accurate', price: ENDPOINT_BASE_PRICES['/invoice-extract-accurate'], confidence: 0.93, latency_ms: 2200, reputation_score: getRep('/invoice-extract-accurate') },
     ],
   };
 
