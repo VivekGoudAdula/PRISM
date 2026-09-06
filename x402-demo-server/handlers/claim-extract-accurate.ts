@@ -14,10 +14,10 @@ export async function handleClaimExtractAccurateRequest(c: Context) {
     const body = await c.req.json().catch(() => ({}));
     const { text, documentType, taskDescription } = body;
 
-    const { files } = await resolveFiles(body);
-    let inputText = text || taskDescription || '';
+    const { files, taskDescription: resolvedTaskDesc } = await resolveFiles(body);
+    let inputText = text || '';
 
-    if (!inputText && files && files.length > 0) {
+    if (files && files.length > 0) {
       for (const file of files) {
         let fileText = file.text || '';
         if (!fileText && file.content_base64) {
@@ -32,6 +32,10 @@ export async function handleClaimExtractAccurateRequest(c: Context) {
           inputText += (inputText ? '\n\n' : '') + fileText;
         }
       }
+    }
+
+    if (!inputText && (taskDescription || resolvedTaskDesc)) {
+      inputText = taskDescription || resolvedTaskDesc;
     }
 
     if (!inputText || inputText.trim().length === 0) {

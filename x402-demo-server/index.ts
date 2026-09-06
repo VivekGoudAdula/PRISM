@@ -25,16 +25,33 @@ import mongoose from 'mongoose';
 
 // Import handler functions
 import { handleAnalyticsRequest, handleAnalyticsReportRequest } from './handlers/analytics';
-import {
-  handleAIAnalysisRequest,
-  handleAIAnalysisBatchRequest,
-} from './handlers/ai-analysis';
-import {
-  handleCreatorContentRequest,
-  handleCreatorContentListRequest,
-  handleCreatorPublishRequest,
-  handleCreatorEarningsRequest,
-} from './handlers/creator-content';
+import { handleAIAnalysisRequest, handleAIAnalysisBatchRequest } from './handlers/ai-analysis';
+import { handleCreatorContentRequest, handleCreatorContentListRequest, handleCreatorPublishRequest, handleCreatorEarningsRequest } from './handlers/creator-content';
+import { handleResumeScreenFastRequest } from './handlers/resume-screen-fast';
+import { handleResumeScreenAccurateRequest } from './handlers/resume-screen-accurate';
+import { handleContractAnalyzeFastRequest } from './handlers/contract-analyze-fast';
+import { handleContractAnalyzeAccurateRequest } from './handlers/contract-analyze-accurate';
+import { handleInvoiceExtractFastRequest } from './handlers/invoice-extract-fast';
+import { handleInvoiceExtractAccurateRequest } from './handlers/invoice-extract-accurate';
+import { handleCodeReviewFastRequest } from './handlers/code-review-fast';
+import { handleCodeReviewAccurateRequest } from './handlers/code-review-accurate';
+import { handleSeoAuditFastRequest } from './handlers/seo-audit-fast';
+import { handleSeoAuditAccurateRequest } from './handlers/seo-audit-accurate';
+import { handleClaimExtractFastRequest } from './handlers/claim-extract-fast';
+import { handleClaimExtractAccurateRequest } from './handlers/claim-extract-accurate';
+import { handleClaimVerifyFastRequest } from './handlers/claim-verify-fast';
+import { handleClaimVerifyAccurateRequest } from './handlers/claim-verify-accurate';
+import { handleSourceCompareFastRequest } from './handlers/source-compare-fast';
+import { handleSourceCompareAccurateRequest } from './handlers/source-compare-accurate';
+import { handleNewsResearchFastRequest } from './handlers/news-research-fast';
+import { handleNewsResearchAccurateRequest } from './handlers/news-research-accurate';
+import { handleRunTaskRequest } from './handlers/run-task';
+import { handlePlanTaskRequest } from './handlers/plan-task';
+import { handleExecuteTaskRequest } from './handlers/execute-task';
+import { handleClassifyTaskRequest } from './handlers/classify-task';
+import { handleSelectEndpointRequest } from './handlers/select-endpoint';
+import { handleChatReplyRequest } from './handlers/chat-reply';
+import { handleSavingsSummaryRequest } from './handlers/savings-summary';
 
 import { bazaarResourceServerExtension } from '@x402-avm/extensions';
 import type { ResourceServerExtension } from '@x402/core/types';
@@ -317,241 +334,43 @@ app.use(paymentMiddleware(paymentConfig as any, x402Server));
  * by the x402 middleware
  */
 
-// 6 new payment-protected endpoints
-app.on(['GET', 'POST'], '/resume-screen-fast', async (c) => {
-  const { handleResumeScreenFastRequest } = await import('./handlers/resume-screen-fast');
-  return handleResumeScreenFastRequest(c);
-});
-app.on(['GET', 'POST'], '/resume-screen-accurate', async (c) => {
-  const { handleResumeScreenAccurateRequest } = await import('./handlers/resume-screen-accurate');
-  return handleResumeScreenAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/contract-analyze-fast', async (c) => {
-  const { handleContractAnalyzeFastRequest } = await import('./handlers/contract-analyze-fast');
-  return handleContractAnalyzeFastRequest(c);
-});
-app.on(['GET', 'POST'], '/contract-analyze-accurate', async (c) => {
-  const { handleContractAnalyzeAccurateRequest } = await import('./handlers/contract-analyze-accurate');
-  return handleContractAnalyzeAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/invoice-extract-fast', async (c) => {
-  const { handleInvoiceExtractFastRequest } = await import('./handlers/invoice-extract-fast');
-  return handleInvoiceExtractFastRequest(c);
-});
-app.on(['GET', 'POST'], '/invoice-extract-accurate', async (c) => {
-  const { handleInvoiceExtractAccurateRequest } = await import('./handlers/invoice-extract-accurate');
-  return handleInvoiceExtractAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/code-review-fast', async (c) => {
-  const { handleCodeReviewFastRequest } = await import('./handlers/code-review-fast');
-  return handleCodeReviewFastRequest(c);
-});
-app.on(['GET', 'POST'], '/code-review-accurate', async (c) => {
-  const { handleCodeReviewAccurateRequest } = await import('./handlers/code-review-accurate');
-  return handleCodeReviewAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/seo-audit-fast', async (c) => {
-  const { handleSeoAuditFastRequest } = await import('./handlers/seo-audit-fast');
-  return handleSeoAuditFastRequest(c);
-});
-app.on(['GET', 'POST'], '/seo-audit-accurate', async (c) => {
-  const { handleSeoAuditAccurateRequest } = await import('./handlers/seo-audit-accurate');
-  return handleSeoAuditAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-extract-fast', async (c) => {
-  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
-  return handleClaimExtractFastRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-extract-accurate', async (c) => {
-  const { handleClaimExtractAccurateRequest } = await import('./handlers/claim-extract-accurate');
-  return handleClaimExtractAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-extract', async (c) => {
-  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
-  return handleClaimExtractFastRequest(c);
-});
-app.on(['GET', 'POST'], '/api/claim-extract', async (c) => {
-  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
-  return handleClaimExtractFastRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-verify-fast', async (c) => {
-  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
-  return handleClaimVerifyFastRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-verify-accurate', async (c) => {
-  const { handleClaimVerifyAccurateRequest } = await import('./handlers/claim-verify-accurate');
-  return handleClaimVerifyAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/claim-verify', async (c) => {
-  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
-  return handleClaimVerifyFastRequest(c);
-});
-app.on(['GET', 'POST'], '/api/claim-verify', async (c) => {
-  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
-  return handleClaimVerifyFastRequest(c);
-});
-app.on(['GET', 'POST'], '/source-compare-fast', async (c) => {
-  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
-  return handleSourceCompareFastRequest(c);
-});
-app.on(['GET', 'POST'], '/source-compare-accurate', async (c) => {
-  const { handleSourceCompareAccurateRequest } = await import('./handlers/source-compare-accurate');
-  return handleSourceCompareAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/source-compare', async (c) => {
-  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
-  return handleSourceCompareFastRequest(c);
-});
-app.on(['GET', 'POST'], '/api/source-compare', async (c) => {
-  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
-  return handleSourceCompareFastRequest(c);
-});
-app.on(['GET', 'POST'], '/news-research-fast', async (c) => {
-  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
-  return handleNewsResearchFastRequest(c);
-});
-app.on(['GET', 'POST'], '/news-research-accurate', async (c) => {
-  const { handleNewsResearchAccurateRequest } = await import('./handlers/news-research-accurate');
-  return handleNewsResearchAccurateRequest(c);
-});
-app.on(['GET', 'POST'], '/news-research', async (c) => {
-  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
-  return handleNewsResearchFastRequest(c);
-});
-app.on(['GET', 'POST'], '/api/news-research', async (c) => {
-  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
-  return handleNewsResearchFastRequest(c);
-});
+// Payment-protected endpoints
+app.on(['GET', 'POST'], '/resume-screen-fast', (c) => handleResumeScreenFastRequest(c));
+app.on(['GET', 'POST'], '/resume-screen-accurate', (c) => handleResumeScreenAccurateRequest(c));
+app.on(['GET', 'POST'], '/contract-analyze-fast', (c) => handleContractAnalyzeFastRequest(c));
+app.on(['GET', 'POST'], '/contract-analyze-accurate', (c) => handleContractAnalyzeAccurateRequest(c));
+app.on(['GET', 'POST'], '/invoice-extract-fast', (c) => handleInvoiceExtractFastRequest(c));
+app.on(['GET', 'POST'], '/invoice-extract-accurate', (c) => handleInvoiceExtractAccurateRequest(c));
+app.on(['GET', 'POST'], '/code-review-fast', (c) => handleCodeReviewFastRequest(c));
+app.on(['GET', 'POST'], '/code-review-accurate', (c) => handleCodeReviewAccurateRequest(c));
+app.on(['GET', 'POST'], '/seo-audit-fast', (c) => handleSeoAuditFastRequest(c));
+app.on(['GET', 'POST'], '/seo-audit-accurate', (c) => handleSeoAuditAccurateRequest(c));
+app.on(['GET', 'POST'], '/claim-extract-fast', (c) => handleClaimExtractFastRequest(c));
+app.on(['GET', 'POST'], '/claim-extract-accurate', (c) => handleClaimExtractAccurateRequest(c));
+app.on(['GET', 'POST'], '/claim-extract', (c) => handleClaimExtractFastRequest(c));
+app.on(['GET', 'POST'], '/api/claim-extract', (c) => handleClaimExtractFastRequest(c));
+app.on(['GET', 'POST'], '/claim-verify-fast', (c) => handleClaimVerifyFastRequest(c));
+app.on(['GET', 'POST'], '/claim-verify-accurate', (c) => handleClaimVerifyAccurateRequest(c));
+app.on(['GET', 'POST'], '/claim-verify', (c) => handleClaimVerifyFastRequest(c));
+app.on(['GET', 'POST'], '/api/claim-verify', (c) => handleClaimVerifyFastRequest(c));
+app.on(['GET', 'POST'], '/source-compare-fast', (c) => handleSourceCompareFastRequest(c));
+app.on(['GET', 'POST'], '/source-compare-accurate', (c) => handleSourceCompareAccurateRequest(c));
+app.on(['GET', 'POST'], '/source-compare', (c) => handleSourceCompareFastRequest(c));
+app.on(['GET', 'POST'], '/api/source-compare', (c) => handleSourceCompareFastRequest(c));
+app.on(['GET', 'POST'], '/news-research-fast', (c) => handleNewsResearchFastRequest(c));
+app.on(['GET', 'POST'], '/news-research-accurate', (c) => handleNewsResearchAccurateRequest(c));
+app.on(['GET', 'POST'], '/news-research', (c) => handleNewsResearchFastRequest(c));
+app.on(['GET', 'POST'], '/api/news-research', (c) => handleNewsResearchFastRequest(c));
 
-app.on(['GET', 'POST'], '/run-task', requireAuth, async (c) => {
-  const { handleRunTaskRequest } = await import('./handlers/run-task');
-  return handleRunTaskRequest(c);
-});
+app.on(['GET', 'POST'], '/run-task', requireAuth, (c) => handleRunTaskRequest(c));
+app.get('/savings-summary', optionalAuth, (c) => handleSavingsSummaryRequest(c));
+app.post('/chat-reply', (c) => handleChatReplyRequest(c));
 
-app.get('/savings-summary', optionalAuth, async (c) => {
-  const { handleSavingsSummaryRequest } = await import('./handlers/savings-summary');
-  return handleSavingsSummaryRequest(c);
-});
+app.post('/execute-task', optionalAuth, (c) => handleExecuteTaskRequest(c));
 
-app.post('/chat-reply', async (c) => {
-  const { handleChatReplyRequest } = await import('./handlers/chat-reply');
-  return handleChatReplyRequest(c);
-});
-
-/**
- * POST /execute-task?planId=<id> — DYNAMIC PAYMENT PROTECTED
- *
- * Phase 2 of the new pipeline. The x402 paymentMiddleware enforces a
- * dynamic price resolved from the plan's totalCost (quantity × unitPrice
- * + platformFee). Called only after the user confirms the Execution Summary
- * and the blockchain payment is verified.
- */
-app.post('/execute-task', optionalAuth, async (c) => {
-  const { handleExecuteTaskRequest } = await import('./handlers/execute-task');
-  return handleExecuteTaskRequest(c);
-});
-
-// Example 2: Analytics - Uncomment to enable
-// app.get('/analytics', handleAnalyticsRequest);
-// app.post('/analytics/report', handleAnalyticsReportRequest);
-
-// Example 3: AI Analysis - Uncomment to enable
-// app.post('/ai-analysis', handleAIAnalysisRequest);
-// app.post('/ai-analysis/batch', handleAIAnalysisBatchRequest);
-
-// Example 4: Creator Content - Uncomment to enable
-// app.get('/exclusive-content/:id', handleCreatorContentRequest);
-// app.get('/creators/:wallet/content', handleCreatorContentListRequest);
-// app.post('/creators/publish', handleCreatorPublishRequest);
-// app.get('/creators/:wallet/earnings', handleCreatorEarningsRequest);
-
-// ════════════════════════════════════════════════════════════════════
-// PUBLIC ENDPOINTS - No payment required
-// ════════════════════════════════════════════════════════════════════
-
-/**
- * Root endpoint - Content negotiation for HTML crawlers (GoPlausible scrapers) vs API clients
- */
-app.use('/logo.png', async (c) => {
-  const { serveStatic } = await import('@hono/node-server/serve-static');
-  return serveStatic({ path: './public/logo.png' })(c, async () => {});
-});
-
-app.use('/icon.png', async (c) => {
-  const { serveStatic } = await import('@hono/node-server/serve-static');
-  return serveStatic({ path: './public/icon.png' })(c, async () => {});
-});
-
-app.get('/', (c) => {
-  const host = c.req.header('host') || 'prism-99h2.onrender.com';
-  const proto = c.req.header('x-forwarded-proto') || 'https';
-  const logoUrl = `${proto}://${host}/logo.png`;
-  const iconUrl = `${proto}://${host}/icon.png`;
-
-  // Always return HTML if crawler/browser, or if User-Agent/Accept header doesn't explicitly block it
-  const acceptHeader = c.req.header('accept') || '';
-  const userAgent = c.req.header('user-agent') || '';
-  
-  if (acceptHeader.includes('text/html') || userAgent.toLowerCase().includes('bot') || userAgent.toLowerCase().includes('crawler') || acceptHeader.includes('*/*') || !acceptHeader) {
-    return c.html(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>PRISM</title>
-  <link rel="icon" type="image/png" href="${iconUrl}">
-  <meta name="description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
-  <meta property="og:site_name" content="PRISM">
-  <meta property="og:title" content="PRISM">
-  <meta property="og:description" content="Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.">
-  <meta property="og:image" content="${logoUrl}">
-  <meta property="og:type" content="website">
-</head>
-<body>
-  <h1>PRISM</h1>
-  <p>Decentralized multi-tier AI routing & task orchestration platform powered by Algorand and x402 payment protocol.</p>
-</body>
-</html>`);
-  }
-  return c.json({
-    service: 'PRISM x402 Resource Server',
-    status: 'ok',
-    uptime: process.uptime(),
-  });
-});
-
-/**
- * Health check - Use this to verify server is running
- * No payment required
- */
-app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    service: 'x402-hackathon-starter',
-    uptime: process.uptime(),
-  });
-});
-
-app.post('/classify-task', async (c) => {
-  const { handleClassifyTaskRequest } = await import('./handlers/classify-task');
-  return handleClassifyTaskRequest(c);
-});
-
-app.post('/select-endpoint', async (c) => {
-  const { handleSelectEndpointRequest } = await import('./handlers/select-endpoint');
-  return handleSelectEndpointRequest(c);
-});
-
-/**
- * POST /plan-task — PUBLIC (no payment required)
- *
- * Phase 1 of the new pipeline. Classifies the task, discovers providers,
- * computes dynamic pricing (quantity × unitPrice + platform fee), and
- * returns a planId + full ExecutionPlan to the client.
- */
-app.post('/plan-task', optionalAuth, async (c) => {
-  const { handlePlanTaskRequest } = await import('./handlers/plan-task');
-  return handlePlanTaskRequest(c);
-});
+app.post('/classify-task', (c) => handleClassifyTaskRequest(c));
+app.post('/select-endpoint', (c) => handleSelectEndpointRequest(c));
+app.post('/plan-task', optionalAuth, (c) => handlePlanTaskRequest(c));
 
 /**
  * Info endpoint - Shows configured endpoints

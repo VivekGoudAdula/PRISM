@@ -22,16 +22,32 @@ export async function resolveFiles(body: any): Promise<{
   files: ResolvedFile[];
   taskDescription: string;
 }> {
-  const { task_description = '', files = [], file_index, plan_id } = body;
+  const { task_description = '', files = [], file_index, plan_id, all_files } = body;
 
-  // ── Reference mode: look up stored file by plan_id + file_index ─────────────
-  if (typeof file_index === 'number' && plan_id) {
+  // ── Reference mode: look up stored file(s) by plan_id ─────────────────────
+  if (plan_id) {
     const task = await Task.findById(plan_id);
     if (!task) {
       throw new Error(`Plan not found for file lookup: ${plan_id}`);
     }
 
     const storedFiles: any[] = task.plannerOutput?.files || [];
+
+    if (all_files || file_index === undefined || file_index === null || file_index < 0) {
+      return {
+        files: storedFiles.map((sf, idx) => ({
+          filename: sf.filename || sf.path || `file-${idx + 1}`,
+          content_base64: sf.content_base64 || '',
+          text: sf.extracted_text || sf.text || sf.content || '',
+          code_content: sf.content || sf.extracted_text || '',
+          file_path: sf.path || sf.filename || '',
+          raw_url: sf.raw_url || sf.download_url || sf.url || '',
+          semantic_map: sf.semantic_map,
+        })),
+        taskDescription: task_description || task.prompt,
+      };
+    }
+
     const storedFile = storedFiles.find((f: any) => f.index === file_index) || storedFiles[file_index];
     if (!storedFile) {
       throw new Error(`File index ${file_index} not found in plan ${plan_id}`);

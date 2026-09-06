@@ -466,8 +466,11 @@ export async function executeTaskWithPayment(
 
   const plannedFiles = (plan as any).files || [];
   const plannedPages = (plan as any).pages || [];
+  const isMultiSourceTask = plan.category === 'source_comparison' || plan.category === 'news_research';
   let executionCount = plan.executionQuantity > 0 ? plan.executionQuantity : 1;
-  if (plan.category === 'code_review' && plannedFiles.length > 0) {
+  if (isMultiSourceTask) {
+    executionCount = 1;
+  } else if (plan.category === 'code_review' && plannedFiles.length > 0) {
     executionCount = Math.min(plan.executionQuantity, plannedFiles.length);
   } else if (plan.category === 'seo_audit' && plannedPages.length > 0) {
     executionCount = Math.min(plan.executionQuantity, plannedPages.length);
@@ -496,7 +499,10 @@ export async function executeTaskWithPayment(
       let payload: Record<string, unknown>;
       let fileLabel: string;
 
-      if (plan.category === 'code_review' && plannedFile) {
+      if (isMultiSourceTask) {
+        payload = { plan_id: plan.planId, task_description: taskDescription, all_files: true, files };
+        fileLabel = `${uploadedFileMeta.length || files.length} sources`;
+      } else if (plan.category === 'code_review' && plannedFile) {
         payload = { file_path: plannedFile.path, raw_url: plannedFile.raw_url };
         fileLabel = plannedFile.path;
       } else if (plan.category === 'seo_audit' && plannedPage) {
