@@ -106247,14 +106247,21 @@ app.use("*", requestLogger);
 app.use("*", rateLimiter);
 var servePublicImage = (filename) => (c) => {
   try {
-    const targetPath = import_path.default.resolve(__dirname, "public", filename);
-    if (import_fs.default.existsSync(targetPath)) {
-      const imageBuffer = import_fs.default.readFileSync(targetPath);
-      return c.body(imageBuffer, 200, {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=86400, s-maxage=86400",
-        "Access-Control-Allow-Origin": "*"
-      });
+    const candidatePaths = [
+      import_path.default.resolve(process.cwd(), "public", filename),
+      import_path.default.resolve(__dirname, "public", filename),
+      import_path.default.resolve(__dirname, "..", "public", filename),
+      import_path.default.resolve(process.cwd(), filename)
+    ];
+    for (const targetPath of candidatePaths) {
+      if (import_fs.default.existsSync(targetPath)) {
+        const imageBuffer = import_fs.default.readFileSync(targetPath);
+        return c.body(imageBuffer, 200, {
+          "Content-Type": "image/png",
+          "Cache-Control": "public, max-age=86400, s-maxage=86400",
+          "Access-Control-Allow-Origin": "*"
+        });
+      }
     }
   } catch (err2) {
     console.error(`Failed to serve static image ${filename}:`, err2);
@@ -106262,11 +106269,17 @@ var servePublicImage = (filename) => (c) => {
   return c.notFound();
 };
 app.get("/icon.png", servePublicImage("icon.png"));
+app.get("/iconpng", servePublicImage("icon.png"));
+app.get("/icon", servePublicImage("icon.png"));
 app.get("/logo.png", servePublicImage("logo.png"));
+app.get("/logopng", servePublicImage("logo.png"));
+app.get("/logo", servePublicImage("logo.png"));
 app.get("/favicon.ico", servePublicImage("icon.png"));
 app.get("/apple-touch-icon.png", servePublicImage("icon.png"));
 app.get("/public/icon.png", servePublicImage("icon.png"));
+app.get("/public/iconpng", servePublicImage("icon.png"));
 app.get("/public/logo.png", servePublicImage("logo.png"));
+app.get("/public/logopng", servePublicImage("logo.png"));
 app.route("/api/auth", auth_default);
 app.route("/api/chat", chat_default);
 app.route("/api/waitlist", waitlist_default);

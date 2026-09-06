@@ -300,14 +300,21 @@ app.use('*', rateLimiter);
 // Serve public brand icons/logos for x402 Challenge Leaderboard and Bazaar discovery
 const servePublicImage = (filename: string) => (c: any) => {
   try {
-    const targetPath = path.resolve(__dirname, 'public', filename);
-    if (fs.existsSync(targetPath)) {
-      const imageBuffer = fs.readFileSync(targetPath);
-      return c.body(imageBuffer, 200, {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-        'Access-Control-Allow-Origin': '*',
-      });
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'public', filename),
+      path.resolve(__dirname, 'public', filename),
+      path.resolve(__dirname, '..', 'public', filename),
+      path.resolve(process.cwd(), filename),
+    ];
+    for (const targetPath of candidatePaths) {
+      if (fs.existsSync(targetPath)) {
+        const imageBuffer = fs.readFileSync(targetPath);
+        return c.body(imageBuffer, 200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+          'Access-Control-Allow-Origin': '*',
+        });
+      }
     }
   } catch (err) {
     console.error(`Failed to serve static image ${filename}:`, err);
@@ -316,11 +323,17 @@ const servePublicImage = (filename: string) => (c: any) => {
 };
 
 app.get('/icon.png', servePublicImage('icon.png'));
+app.get('/iconpng', servePublicImage('icon.png'));
+app.get('/icon', servePublicImage('icon.png'));
 app.get('/logo.png', servePublicImage('logo.png'));
+app.get('/logopng', servePublicImage('logo.png'));
+app.get('/logo', servePublicImage('logo.png'));
 app.get('/favicon.ico', servePublicImage('icon.png'));
 app.get('/apple-touch-icon.png', servePublicImage('icon.png'));
 app.get('/public/icon.png', servePublicImage('icon.png'));
+app.get('/public/iconpng', servePublicImage('icon.png'));
 app.get('/public/logo.png', servePublicImage('logo.png'));
+app.get('/public/logopng', servePublicImage('logo.png'));
 
 // Mount API routes
 app.route('/api/auth', authRouter);
