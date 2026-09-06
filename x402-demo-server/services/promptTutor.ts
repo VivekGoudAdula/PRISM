@@ -209,7 +209,9 @@ function generateLocalFallbackAnalysis(
     intent = 'Evidence-based factual claim verification';
   } else if (
     p.includes('claim-extract') || p.includes('extract claims') || p.includes('extract all factual claims') ||
-    p.includes('extract key factual claims') || p.includes('factual claims') || p.includes('atomic claims')
+    p.includes('extract key factual claims') || p.includes('factual claims') || p.includes('atomic claims') ||
+    p.includes('verifiable factual claims') || p.includes('verifiable claims') || p.includes('claims from this news article') ||
+    (p.includes('extract') && (p.includes('claim') || p.includes('article') || p.includes('factual') || p.includes('news')))
   ) {
     taskType = 'claim_extraction';
     intent = 'Factual claim extraction & structuring';
@@ -255,7 +257,15 @@ function generateLocalFallbackAnalysis(
   const repoOrUrlStr = urlMatches ? urlMatches.join(' ') : prompt;
 
   let improvedPrompt = prompt;
-  if (taskType === 'resume_screening') {
+  if (taskType === 'claim_extraction') {
+    improvedPrompt = `Extract all independently verifiable factual claims from the provided document (${prompt}). Preserve exact figures, dates, and attribution.`;
+  } else if (taskType === 'claim_verification') {
+    improvedPrompt = `Verify the factual claim (${prompt}) using the provided evidence documents. Identify supporting evidence, contradicting evidence, and conflicts.`;
+  } else if (taskType === 'source_comparison') {
+    improvedPrompt = `Compare the provided sources (${prompt}) to identify agreements, conflicting claims, and information gaps.`;
+  } else if (taskType === 'news_research') {
+    improvedPrompt = `Synthesize multi-source news research (${prompt}) into an executive summary, key findings, and factual verification queue.`;
+  } else if (taskType === 'resume_screening') {
     improvedPrompt = `Screen the uploaded resumes for the specified role (${prompt}). Evaluate candidates based on relevant technical skills, years of experience, programming ability, and key projects. Rank candidates and return candidate name, match score, strengths, missing skills, and recommendation.`;
   } else if (taskType === 'code_review') {
     improvedPrompt = `Perform a comprehensive code review on the repository ${repoOrUrlStr}. Evaluate code quality, detect potential bugs, check security vulnerabilities, and recommend actionable fixes with estimated line numbers.`;
