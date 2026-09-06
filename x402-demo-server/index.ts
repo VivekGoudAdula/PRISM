@@ -357,6 +357,70 @@ app.on(['GET', 'POST'], '/seo-audit-accurate', async (c) => {
   const { handleSeoAuditAccurateRequest } = await import('./handlers/seo-audit-accurate');
   return handleSeoAuditAccurateRequest(c);
 });
+app.on(['GET', 'POST'], '/claim-extract-fast', async (c) => {
+  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
+  return handleClaimExtractFastRequest(c);
+});
+app.on(['GET', 'POST'], '/claim-extract-accurate', async (c) => {
+  const { handleClaimExtractAccurateRequest } = await import('./handlers/claim-extract-accurate');
+  return handleClaimExtractAccurateRequest(c);
+});
+app.on(['GET', 'POST'], '/claim-extract', async (c) => {
+  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
+  return handleClaimExtractFastRequest(c);
+});
+app.on(['GET', 'POST'], '/api/claim-extract', async (c) => {
+  const { handleClaimExtractFastRequest } = await import('./handlers/claim-extract-fast');
+  return handleClaimExtractFastRequest(c);
+});
+app.on(['GET', 'POST'], '/claim-verify-fast', async (c) => {
+  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
+  return handleClaimVerifyFastRequest(c);
+});
+app.on(['GET', 'POST'], '/claim-verify-accurate', async (c) => {
+  const { handleClaimVerifyAccurateRequest } = await import('./handlers/claim-verify-accurate');
+  return handleClaimVerifyAccurateRequest(c);
+});
+app.on(['GET', 'POST'], '/claim-verify', async (c) => {
+  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
+  return handleClaimVerifyFastRequest(c);
+});
+app.on(['GET', 'POST'], '/api/claim-verify', async (c) => {
+  const { handleClaimVerifyFastRequest } = await import('./handlers/claim-verify-fast');
+  return handleClaimVerifyFastRequest(c);
+});
+app.on(['GET', 'POST'], '/source-compare-fast', async (c) => {
+  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
+  return handleSourceCompareFastRequest(c);
+});
+app.on(['GET', 'POST'], '/source-compare-accurate', async (c) => {
+  const { handleSourceCompareAccurateRequest } = await import('./handlers/source-compare-accurate');
+  return handleSourceCompareAccurateRequest(c);
+});
+app.on(['GET', 'POST'], '/source-compare', async (c) => {
+  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
+  return handleSourceCompareFastRequest(c);
+});
+app.on(['GET', 'POST'], '/api/source-compare', async (c) => {
+  const { handleSourceCompareFastRequest } = await import('./handlers/source-compare-fast');
+  return handleSourceCompareFastRequest(c);
+});
+app.on(['GET', 'POST'], '/news-research-fast', async (c) => {
+  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
+  return handleNewsResearchFastRequest(c);
+});
+app.on(['GET', 'POST'], '/news-research-accurate', async (c) => {
+  const { handleNewsResearchAccurateRequest } = await import('./handlers/news-research-accurate');
+  return handleNewsResearchAccurateRequest(c);
+});
+app.on(['GET', 'POST'], '/news-research', async (c) => {
+  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
+  return handleNewsResearchFastRequest(c);
+});
+app.on(['GET', 'POST'], '/api/news-research', async (c) => {
+  const { handleNewsResearchFastRequest } = await import('./handlers/news-research-fast');
+  return handleNewsResearchFastRequest(c);
+});
 
 app.on(['GET', 'POST'], '/run-task', requireAuth, async (c) => {
   const { handleRunTaskRequest } = await import('./handlers/run-task');

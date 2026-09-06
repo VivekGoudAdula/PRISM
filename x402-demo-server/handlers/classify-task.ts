@@ -66,6 +66,8 @@ export async function handleClassifyTaskRequest(c: Context) {
 
       // Known task keywords — let LLM classify even without files attached
       const hasTaskKeyword =
+        lowerDesc.includes('claim') || lowerDesc.includes('article') || lowerDesc.includes('press release') ||
+        lowerDesc.includes('transcript') || lowerDesc.includes('statement') || lowerDesc.includes('media') ||
         lowerDesc.includes('resume') || lowerDesc.includes('candidate') || lowerDesc.includes('cv') ||
         lowerDesc.includes('hiring') || lowerDesc.includes('screen') ||
         lowerDesc.includes('contract') || lowerDesc.includes('agreement') || lowerDesc.includes('nda') ||
@@ -96,9 +98,9 @@ export async function handleClassifyTaskRequest(c: Context) {
         messages: [
           {
             role: 'system',
-            content: `Classify the input into exactly one of: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
+            content: `Classify the input into exactly one of: news_research, source_comparison, claim_verification, claim_extraction, resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.
 
-Respond with ONLY the single category string: resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`,
+Respond with ONLY the single category string: news_research, source_comparison, claim_verification, claim_extraction, resume_screening, contract_analysis, invoice_extraction, code_review, seo_audit, conversational, or unsupported.`,
           },
           {
             role: 'user',
@@ -112,6 +114,14 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
       const normalized = openRouterContent.toLowerCase().trim();
       if (normalized.includes('conversational')) {
         category = 'conversational';
+      } else if (normalized.includes('news_research') || normalized.includes('news research') || normalized.includes('research brief')) {
+        category = 'news_research';
+      } else if (normalized.includes('source_comparison') || normalized.includes('source compare') || normalized.includes('compare sources')) {
+        category = 'source_comparison';
+      } else if (normalized.includes('claim_verification') || normalized.includes('claim verify') || normalized.includes('verify claim')) {
+        category = 'claim_verification';
+      } else if (normalized.includes('claim_extraction') || normalized.includes('claim extraction') || normalized.includes('claim')) {
+        category = 'claim_extraction';
       } else if (normalized.includes('resume_screening') || normalized.includes('resume screening') || normalized.includes('resume')) {
         category = 'resume_screening';
       } else if (normalized.includes('contract_analysis') || normalized.includes('contract analysis') || normalized.includes('contract')) {
@@ -133,7 +143,15 @@ Respond with ONLY the single category string: resume_screening, contract_analysi
     // Safety net: If files are attached and category is still unsupported, run file-sensitive fallback
     if (category === 'unsupported' && has_files) {
       const lower = task_description.toLowerCase();
-      if (lower.includes('contract') || lower.includes('nda') || lower.includes('agreement')) {
+      if (lower.includes('news-research') || lower.includes('news research') || lower.includes('research brief')) {
+        category = 'news_research';
+      } else if (lower.includes('compare source') || lower.includes('source-compare') || lower.includes('cross-source')) {
+        category = 'source_comparison';
+      } else if (lower.includes('verify claim') || lower.includes('claim-verify') || lower.includes('evidence')) {
+        category = 'claim_verification';
+      } else if (lower.includes('claim') || lower.includes('article') || lower.includes('press release') || lower.includes('transcript') || lower.includes('statement')) {
+        category = 'claim_extraction';
+      } else if (lower.includes('contract') || lower.includes('nda') || lower.includes('agreement')) {
         category = 'contract_analysis';
       } else if (lower.includes('invoice') || lower.includes('bill') || lower.includes('receipt')) {
         category = 'invoice_extraction';
@@ -173,6 +191,58 @@ function localClassify(description: string): string {
     desc.includes('who are you')
   ) {
     return 'conversational';
+  }
+
+  // News Research (media & journalism orchestrator)
+  if (
+    desc.includes('news-research') ||
+    desc.includes('news research') ||
+    desc.includes('research brief') ||
+    desc.includes('newsroom research') ||
+    desc.includes('media research') ||
+    desc.includes('research workspace') ||
+    desc.includes('multi-document research')
+  ) {
+    return 'news_research';
+  }
+
+  // Source comparison (media & journalism)
+  if (
+    desc.includes('source-compare') ||
+    desc.includes('compare sources') ||
+    desc.includes('source comparison') ||
+    desc.includes('cross-source') ||
+    desc.includes('cross source') ||
+    desc.includes('compare multiple sources')
+  ) {
+    return 'source_comparison';
+  }
+
+  // Claim verification (media & journalism)
+  if (
+    desc.includes('claim-verify') ||
+    desc.includes('verify claim') ||
+    desc.includes('claim verification') ||
+    desc.includes('verify this claim') ||
+    desc.includes('evidence verification') ||
+    desc.includes('verify factual claim')
+  ) {
+    return 'claim_verification';
+  }
+
+  // Claim extraction (media & journalism)
+  if (
+    desc.includes('claim') ||
+    desc.includes('claim-extract') ||
+    desc.includes('extract claims') ||
+    desc.includes('extract factual claims') ||
+    desc.includes('atomic claims') ||
+    desc.includes('press release') ||
+    desc.includes('interview transcript') ||
+    desc.includes('article claims') ||
+    desc.includes('verifiable claims')
+  ) {
+    return 'claim_extraction';
   }
 
   // SEO Audit check

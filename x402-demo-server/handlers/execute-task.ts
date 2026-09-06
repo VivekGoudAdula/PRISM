@@ -9,6 +9,14 @@ import { handleCodeReviewFastRequest } from './code-review-fast';
 import { handleCodeReviewAccurateRequest } from './code-review-accurate';
 import { handleSeoAuditFastRequest } from './seo-audit-fast';
 import { handleSeoAuditAccurateRequest } from './seo-audit-accurate';
+import { handleClaimExtractFastRequest } from './claim-extract-fast';
+import { handleClaimExtractAccurateRequest } from './claim-extract-accurate';
+import { handleClaimVerifyFastRequest } from './claim-verify-fast';
+import { handleClaimVerifyAccurateRequest } from './claim-verify-accurate';
+import { handleSourceCompareFastRequest } from './source-compare-fast';
+import { handleSourceCompareAccurateRequest } from './source-compare-accurate';
+import { handleNewsResearchFastRequest } from './news-research-fast';
+import { handleNewsResearchAccurateRequest } from './news-research-accurate';
 import { verifyOutput } from './lib/verify-output';
 import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
@@ -177,6 +185,52 @@ function aggregateResults(category: string, results: any[]): any {
     };
   }
 
+  if (category === 'source_comparison') {
+    const primary = results[0] || {};
+    return {
+      success: true,
+      sourceCount: primary.sourceCount || 2,
+      summary: primary.summary || { agreementGroups: 0, conflicts: 0, missingInformation: 0, uncorroboratedClaims: 0 },
+      claims: primary.claims || [],
+      agreements: primary.agreements || [],
+      conflicts: primary.conflicts || [],
+      missingInformation: primary.missingInformation || [],
+      uncorroboratedClaims: primary.uncorroboratedClaims || [],
+      averageConfidence: 0.90
+    };
+  }
+
+  if (category === 'claim_verification') {
+    const primary = results[0] || {};
+    return {
+      success: true,
+      claim: primary.claim || { id: 'claim_001', text: 'Verified Claim' },
+      verification: primary.verification || { status: 'REQUIRES_VERIFICATION', summary: 'Unverified', confidence: 'LOW' },
+      supportingEvidence: primary.supportingEvidence || [],
+      contradictingEvidence: primary.contradictingEvidence || [],
+      conflicts: primary.conflicts || [],
+      requiresVerification: primary.requiresVerification || [],
+      averageConfidence: primary.confidenceScore ?? 0.85
+    };
+  }
+
+  if (category === 'claim_extraction') {
+    const allClaims = results.flatMap((r) => r.claims ?? []);
+    const reindexedClaims = allClaims.map((c, i) => ({
+      ...c,
+      id: `claim_${String(i + 1).padStart(3, '0')}`,
+    }));
+    const avgConfidence = results.reduce((sum, r) => sum + (r.confidence ?? 0), 0) / (results.length || 1);
+    const docType = results.find((r) => r.documentType && r.documentType !== 'OTHER')?.documentType || results[0]?.documentType || 'OTHER';
+    return {
+      success: true,
+      documentType: docType,
+      claimCount: reindexedClaims.length,
+      claims: reindexedClaims,
+      averageConfidence: parseFloat(avgConfidence.toFixed(3)),
+    };
+  }
+
   return { results };
 }
 
@@ -200,6 +254,21 @@ async function invokeProviderHandler(endpoint: string, bodyData: Record<string, 
     case '/code-review-accurate':  return handleCodeReviewAccurateRequest(ctx);
     case '/seo-audit-fast':        return handleSeoAuditFastRequest(ctx);
     case '/seo-audit-accurate':    return handleSeoAuditAccurateRequest(ctx);
+    case '/claim-extract-fast':    return handleClaimExtractFastRequest(ctx);
+    case '/claim-extract-accurate': return handleClaimExtractAccurateRequest(ctx);
+    case '/claim-extract':         return handleClaimExtractFastRequest(ctx);
+    case '/claim-verify-fast':     return handleClaimVerifyFastRequest(ctx);
+    case '/claim-verify-accurate': return handleClaimVerifyAccurateRequest(ctx);
+    case '/claim-verify':          return handleClaimVerifyFastRequest(ctx);
+    case '/api/claim-verify':      return handleClaimVerifyFastRequest(ctx);
+    case '/source-compare-fast':   return handleSourceCompareFastRequest(ctx);
+    case '/source-compare-accurate': return handleSourceCompareAccurateRequest(ctx);
+    case '/source-compare':        return handleSourceCompareFastRequest(ctx);
+    case '/api/source-compare':    return handleSourceCompareFastRequest(ctx);
+    case '/news-research-fast':    return handleNewsResearchFastRequest(ctx);
+    case '/news-research-accurate': return handleNewsResearchAccurateRequest(ctx);
+    case '/news-research':         return handleNewsResearchFastRequest(ctx);
+    case '/api/news-research':     return handleNewsResearchFastRequest(ctx);
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }

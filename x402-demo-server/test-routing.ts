@@ -46,7 +46,7 @@ async function runTests() {
 
   // Test 4: Incompatible providers are never selected
   let incompatibleSelected = false;
-  for (const cat of ['resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review', 'seo_audit']) {
+  for (const cat of ['claim_extraction', 'resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review', 'seo_audit']) {
     const r = await selectEndpointForTask(cat, 'analyze query');
     const validEndpoints = r.eligibleProviders;
     if (!validEndpoints.includes(r.winner.endpoint_path)) {

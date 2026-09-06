@@ -48,7 +48,38 @@ export async function buildSemanticMap(
   let promptSystem = '';
   let defaultFallbackMap: Record<string, any> = {};
 
-  if (category === 'resume_screening') {
+  if (category === 'news_research') {
+    promptSystem = 'Extract structured research session summary from raw text. Return ONLY a valid JSON object matching this schema: { "research_topic": string, "source_count": number, "claims_extracted": number, "entities": { "people": string[], "organizations": string[], "dates": string[] } }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      research_topic: filename,
+      source_count: 2,
+      claims_extracted: 0,
+      entities: { people: [], organizations: [], dates: [] }
+    };
+  } else if (category === 'source_comparison') {
+    promptSystem = 'Extract structured cross-source comparison summary from raw text. Return ONLY a valid JSON object matching this schema: { "source_count": number, "story_topic": string, "claims_compared": number, "entities": { "people": string[], "organizations": string[], "dates": string[] } }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      source_count: 2,
+      story_topic: filename,
+      claims_compared: 0,
+      entities: { people: [], organizations: [], dates: [] }
+    };
+  } else if (category === 'claim_verification') {
+    promptSystem = 'Extract structured claim & evidence summary from raw text. Return ONLY a valid JSON object matching this schema: { "claim_text": string, "evidence_count": number, "entities": { "people": string[], "organizations": string[], "dates": string[] } }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      claim_text: extracted_text.slice(0, 100),
+      evidence_count: 1,
+      entities: { people: [], organizations: [], dates: [] }
+    };
+  } else if (category === 'claim_extraction') {
+    promptSystem = 'Extract structured info from the media raw text. Return ONLY a valid JSON object matching this schema: { "document_type": string, "story_topic": string, "entities": { "people": string[], "organizations": string[], "dates": string[], "locations": string[] }, "claim_count": number }. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
+    defaultFallbackMap = {
+      document_type: 'ARTICLE',
+      story_topic: filename,
+      entities: { people: [], organizations: [], dates: [], locations: [] },
+      claim_count: 0
+    };
+  } else if (category === 'resume_screening') {
     promptSystem = 'Extract structured info from the resume raw text. Return ONLY a valid JSON object matching this schema: { "name": string, "contact": string, "skills": string[], "experience": string[], "education": string[], "years_experience": number, "seniority_level": string }. Extract the candidate\'s full name for "name" (e.g. "Jane Doe") and email/phone for "contact". Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain.';
     defaultFallbackMap = {
       name: '',

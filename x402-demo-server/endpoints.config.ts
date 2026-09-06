@@ -728,6 +728,357 @@ export function createPaymentConfig(avmAddress: string): EndpointConfig {
       extensions: seoAuditAccuratePostDiscovery,
     },
 
+    'GET /claim-extract-fast': {
+      resource: CANONICAL_ENDPOINTS['claim-extract-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract-fast'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-extract-fast': {
+      resource: CANONICAL_ENDPOINTS['claim-extract-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract-fast'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /claim-extract-accurate': {
+      resource: CANONICAL_ENDPOINTS['claim-extract-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract-accurate'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-extract-accurate': {
+      resource: CANONICAL_ENDPOINTS['claim-extract-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract-accurate'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /claim-extract': {
+      resource: CANONICAL_ENDPOINTS['claim-extract'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-extract': {
+      resource: CANONICAL_ENDPOINTS['claim-extract'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-extract'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-extract'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /claim-verify-fast': {
+      resource: CANONICAL_ENDPOINTS['claim-verify-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify-fast'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-verify-fast': {
+      resource: CANONICAL_ENDPOINTS['claim-verify-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify-fast'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /claim-verify-accurate': {
+      resource: CANONICAL_ENDPOINTS['claim-verify-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify-accurate'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-verify-accurate': {
+      resource: CANONICAL_ENDPOINTS['claim-verify-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify-accurate'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /claim-verify': {
+      resource: CANONICAL_ENDPOINTS['claim-verify'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify'].description,
+      mimeType: 'application/json',
+    },
+    'POST /claim-verify': {
+      resource: CANONICAL_ENDPOINTS['claim-verify'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify'].description,
+      mimeType: 'application/json',
+    },
+
+    'POST /api/claim-verify': {
+      resource: CANONICAL_ENDPOINTS['claim-verify'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/claim-verify'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['claim-verify'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /source-compare-fast': {
+      resource: CANONICAL_ENDPOINTS['source-compare-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare-fast'].description,
+      mimeType: 'application/json',
+    },
+    'POST /source-compare-fast': {
+      resource: CANONICAL_ENDPOINTS['source-compare-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare-fast'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /source-compare-accurate': {
+      resource: CANONICAL_ENDPOINTS['source-compare-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare-accurate'].description,
+      mimeType: 'application/json',
+    },
+    'POST /source-compare-accurate': {
+      resource: CANONICAL_ENDPOINTS['source-compare-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare-accurate'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /source-compare': {
+      resource: CANONICAL_ENDPOINTS['source-compare'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare'].description,
+      mimeType: 'application/json',
+    },
+    'POST /source-compare': {
+      resource: CANONICAL_ENDPOINTS['source-compare'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare'].description,
+      mimeType: 'application/json',
+    },
+
+    'POST /api/source-compare': {
+      resource: CANONICAL_ENDPOINTS['source-compare'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/source-compare'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['source-compare'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /news-research-fast': {
+      resource: CANONICAL_ENDPOINTS['news-research-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research-fast'].description,
+      mimeType: 'application/json',
+    },
+    'POST /news-research-fast': {
+      resource: CANONICAL_ENDPOINTS['news-research-fast'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research-fast'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research-fast'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /news-research-accurate': {
+      resource: CANONICAL_ENDPOINTS['news-research-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research-accurate'].description,
+      mimeType: 'application/json',
+    },
+    'POST /news-research-accurate': {
+      resource: CANONICAL_ENDPOINTS['news-research-accurate'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research-accurate'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research-accurate'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /news-research': {
+      resource: CANONICAL_ENDPOINTS['news-research'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research'].description,
+      mimeType: 'application/json',
+    },
+    'POST /news-research': {
+      resource: CANONICAL_ENDPOINTS['news-research'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/news-research'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['news-research'].description,
+      mimeType: 'application/json',
+    },
+
+    'GET /api/news-research': {
+      resource: CANONICAL_ENDPOINTS['api/news-research'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/api/news-research'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['api/news-research'].description,
+      mimeType: 'application/json',
+    },
+    'POST /api/news-research': {
+      resource: CANONICAL_ENDPOINTS['api/news-research'].resourceUrl,
+      accepts: [{
+        scheme: 'exact',
+        price: createDynamicPriceResolver(formatBasePriceString(ENDPOINT_BASE_PRICES['/api/news-research'])),
+        network: NETWORK_CONFIG.caip2,
+        payTo: avmAddress,
+        extra: { asset: NETWORK_CONFIG.usdcAssetId, tag: 'x402-global-challenge' },
+      }],
+      description: CANONICAL_ENDPOINTS['api/news-research'].description,
+      mimeType: 'application/json',
+    },
+
     'GET /run-task': {
       resource: CANONICAL_ENDPOINTS['run-task'].resourceUrl,
       accepts: [{

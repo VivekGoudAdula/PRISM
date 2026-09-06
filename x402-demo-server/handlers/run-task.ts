@@ -7,6 +7,14 @@ import { handleContractAnalyzeFastRequest } from './contract-analyze-fast';
 import { handleContractAnalyzeAccurateRequest } from './contract-analyze-accurate';
 import { handleInvoiceExtractFastRequest } from './invoice-extract-fast';
 import { handleInvoiceExtractAccurateRequest } from './invoice-extract-accurate';
+import { handleClaimExtractFastRequest } from './claim-extract-fast';
+import { handleClaimExtractAccurateRequest } from './claim-extract-accurate';
+import { handleClaimVerifyFastRequest } from './claim-verify-fast';
+import { handleClaimVerifyAccurateRequest } from './claim-verify-accurate';
+import { handleSourceCompareFastRequest } from './source-compare-fast';
+import { handleSourceCompareAccurateRequest } from './source-compare-accurate';
+import { handleNewsResearchFastRequest } from './news-research-fast';
+import { handleNewsResearchAccurateRequest } from './news-research-accurate';
 import { verifyOutput } from './lib/verify-output';
 import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
@@ -227,6 +235,37 @@ export async function handleRunTaskRequest(c: Context) {
         break;
       case '/invoice-extract-accurate':
         handlerResult = await handleInvoiceExtractAccurateRequest(mockContextHandler);
+        break;
+      case '/claim-extract-fast':
+      case '/claim-extract':
+        handlerResult = await handleClaimExtractFastRequest(mockContextHandler);
+        break;
+      case '/claim-extract-accurate':
+        handlerResult = await handleClaimExtractAccurateRequest(mockContextHandler);
+        break;
+      case '/claim-verify-fast':
+      case '/claim-verify':
+      case '/api/claim-verify':
+        handlerResult = await handleClaimVerifyFastRequest(mockContextHandler);
+        break;
+      case '/claim-verify-accurate':
+        handlerResult = await handleClaimVerifyAccurateRequest(mockContextHandler);
+        break;
+      case '/source-compare-fast':
+      case '/source-compare':
+      case '/api/source-compare':
+        handlerResult = await handleSourceCompareFastRequest(mockContextHandler);
+        break;
+      case '/source-compare-accurate':
+        handlerResult = await handleSourceCompareAccurateRequest(mockContextHandler);
+        break;
+      case '/news-research-fast':
+      case '/news-research':
+      case '/api/news-research':
+        handlerResult = await handleNewsResearchFastRequest(mockContextHandler);
+        break;
+      case '/news-research-accurate':
+        handlerResult = await handleNewsResearchAccurateRequest(mockContextHandler);
         break;
       default:
         taskRecord.status = 'failed';

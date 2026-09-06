@@ -16,7 +16,19 @@ const DEFAULT_ENDPOINTS = [
   "/invoice-extract-fast",
   "/invoice-extract-accurate",
   "/code-review-fast",
-  "/code-review-accurate"
+  "/code-review-accurate",
+  "/claim-extract-fast",
+  "/claim-extract-accurate",
+  "/claim-verify-fast",
+  "/claim-verify-accurate",
+  "/claim-verify",
+  "/source-compare-fast",
+  "/source-compare-accurate",
+  "/source-compare",
+  "/news-research-fast",
+  "/news-research-accurate",
+  "/news-research",
+  "/api/news-research"
 ];
 
 /**

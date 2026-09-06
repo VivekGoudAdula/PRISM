@@ -841,6 +841,7 @@ adminRouter.get('/analytics/endpoints', async (c) => {
 
     // Helper category map
     const getCategoryForEndpoint = (ep: string): string => {
+      if (ep.includes('claim')) return 'Claim Extraction';
       if (ep.includes('seo')) return 'SEO Audit';
       if (ep.includes('code')) return 'Code Review';
       if (ep.includes('resume')) return 'Resume Screening';

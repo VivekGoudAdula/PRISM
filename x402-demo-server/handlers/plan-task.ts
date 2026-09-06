@@ -27,6 +27,18 @@ const PROVIDER_NAMES: Record<string, string> = {
   '/code-review-accurate': 'CodeAI Accurate',
   '/seo-audit-fast': 'SEOAudit Fast',
   '/seo-audit-accurate': 'SEOAudit Accurate',
+  '/claim-extract-fast': 'ClaimExtract Fast',
+  '/claim-extract-accurate': 'ClaimExtract Accurate',
+  '/claim-extract': 'ClaimExtract Fast',
+  '/claim-verify-fast': 'ClaimVerify Fast',
+  '/claim-verify-accurate': 'ClaimVerify Accurate',
+  '/claim-verify': 'ClaimVerify Fast',
+  '/source-compare-fast': 'SourceCompare Fast',
+  '/source-compare-accurate': 'SourceCompare Accurate',
+  '/source-compare': 'SourceCompare Fast',
+  '/news-research-fast': 'NewsResearch Fast',
+  '/news-research-accurate': 'NewsResearch Accurate',
+  '/news-research': 'NewsResearch Fast',
 };
 
 /**

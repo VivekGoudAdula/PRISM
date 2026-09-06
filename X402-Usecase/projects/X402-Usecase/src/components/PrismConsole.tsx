@@ -572,6 +572,466 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
   const renderFormattedResult = (result: any, category: string) => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
 
+    if ((category === 'claim_extraction' || category === 'claim-extract') && result) {
+      const claims = result.claims ?? result.documents?.flatMap((d: any) => d.claims ?? []) ?? [];
+      const docType = result.documentType || 'ARTICLE';
+      const claimCount = result.claimCount ?? claims.length;
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Extracted Claims</span>
+              <span className="text-xl font-black text-emerald-400">{claimCount}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Document Type</span>
+              <span className="text-sm font-bold text-indigo-300 mt-1">{docType}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Verification Status</span>
+              <span className="badge bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold px-2 py-0.5 mt-1 w-fit">
+                Requires Verification
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 w-full mt-1">
+            {claims.map((claimItem: any, index: number) => {
+              const claimId = claimItem.id || `claim_${String(index + 1).padStart(3, '0')}`;
+              const claimType = claimItem.claimType || 'OTHER';
+              const attribution = claimItem.attribution || 'UNATTRIBUTED';
+
+              return (
+                <div key={index} className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-black text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-800/40">
+                        {claimId.toUpperCase()}
+                      </span>
+                      <span className="badge bg-slate-800 border border-slate-700 text-slate-200 text-[10px] font-extrabold uppercase px-2 py-0.5">
+                        {claimType}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="text-slate-400">Attribution:</span>
+                      <span className="font-semibold text-amber-300 bg-amber-950/30 border border-amber-900/40 px-2 py-0.5 rounded">
+                        {attribution}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-white font-medium text-sm leading-relaxed pl-1">
+                    "{claimItem.claim}"
+                  </p>
+
+                  {claimItem.sourceText && (
+                    <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/60 text-xs text-slate-400 font-mono mt-1">
+                      <span className="text-slate-500 font-bold block mb-1">SOURCE TEXT (Paragraph {claimItem.sourceLocation?.paragraph || 1}):</span>
+                      <span className="text-slate-300">"{claimItem.sourceText}"</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if ((category === 'claim_verification' || category === 'claim-verify') && result) {
+      const claim = result.claim || {};
+      const verification = result.verification || {};
+      const supporting = result.supportingEvidence || [];
+      const contradicting = result.contradictingEvidence || [];
+      const conflicts = result.conflicts || [];
+      const requiresVerif = result.requiresVerification || [];
+
+      const status = verification.status || 'INSUFFICIENT_EVIDENCE';
+      const statusLabels: Record<string, { label: string; cls: string }> = {
+        SUPPORTED_BY_PROVIDED_EVIDENCE: { label: 'SUPPORTED BY PROVIDED EVIDENCE', cls: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+        CONTRADICTED_BY_PROVIDED_EVIDENCE: { label: 'CONTRADICTED BY PROVIDED EVIDENCE', cls: 'bg-rose-500/15 border-rose-500/40 text-rose-300' },
+        PARTIALLY_SUPPORTED: { label: 'PARTIALLY SUPPORTED', cls: 'bg-amber-500/15 border-amber-500/40 text-amber-300' },
+        INSUFFICIENT_EVIDENCE: { label: 'INSUFFICIENT EVIDENCE', cls: 'bg-slate-800 border-slate-700 text-slate-300' },
+        REQUIRES_VERIFICATION: { label: 'REQUIRES VERIFICATION', cls: 'bg-sky-500/15 border-sky-500/40 text-sky-300' },
+      };
+      const statusCfg = statusLabels[status] || { label: status.replace(/_/g, ' '), cls: 'bg-slate-800 border-slate-700 text-slate-300' };
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TARGET CLAIM ({claim.id || 'CLAIM_001'})</span>
+              <span className={`px-2.5 py-1 rounded-full border text-[11px] font-black uppercase tracking-wide ${statusCfg.cls}`}>
+                {statusCfg.label}
+              </span>
+            </div>
+            <p className="text-white font-semibold text-base">"{claim.text || result.claimText}"</p>
+            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 flex flex-col gap-1">
+              <span className="text-[10px] text-slate-500 font-bold uppercase">Assessment Summary (Confidence: {verification.confidence || 'HIGH'})</span>
+              <p className="text-xs text-slate-300 leading-relaxed">{verification.summary}</p>
+            </div>
+          </div>
+
+          {supporting.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Supporting Evidence ({supporting.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {supporting.map((item: any, idx: number) => (
+                  <div key={idx} className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl p-3 text-xs flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-emerald-300 font-mono text-[11px]">
+                      <span>Source ID: {item.sourceId}</span>
+                      <span className="font-bold">SUPPORTING</span>
+                    </div>
+                    <p className="text-emerald-100 font-mono bg-emerald-950/60 p-2 rounded border border-emerald-900/30">"{item.relevantExcerpt}"</p>
+                    <p className="text-slate-300">{item.explanation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {contradicting.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400"></span> Contradicting Evidence ({contradicting.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {contradicting.map((item: any, idx: number) => (
+                  <div key={idx} className="bg-rose-950/20 border border-rose-900/40 rounded-xl p-3 text-xs flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-rose-300 font-mono text-[11px]">
+                      <span>Source ID: {item.sourceId}</span>
+                      <span className="font-bold">CONTRADICTING</span>
+                    </div>
+                    <p className="text-rose-100 font-mono bg-rose-950/60 p-2 rounded border border-rose-900/30">"{item.relevantExcerpt}"</p>
+                    <p className="text-slate-300">{item.explanation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {conflicts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Surfaced Evidence Conflicts ({conflicts.length})</span>
+              {conflicts.map((c: any, idx: number) => (
+                <div key={idx} className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-3 text-xs text-amber-200">
+                  <div className="font-bold mb-1">Conflict between {c.sourceA} & {c.sourceB} ({c.claimComponent})</div>
+                  <p className="text-slate-300">{c.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {requiresVerif.length > 0 && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-1.5">
+              <span className="text-xs font-bold text-slate-400 uppercase">Requires Further Editorial Verification</span>
+              <ul className="list-disc list-inside text-xs text-slate-300 flex flex-col gap-1">
+                {requiresVerif.map((item: string, idx: number) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if ((category === 'source_comparison' || category === 'source-compare') && result) {
+      const sourceCount = result.sourceCount || 2;
+      const summary = result.summary || {};
+      const claims = result.claims || [];
+      const agreements = result.agreements || [];
+      const conflicts = result.conflicts || [];
+      const missingInfo = result.missingInformation || [];
+      const uncorroborated = result.uncorroboratedClaims || [];
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Sources Compared</span>
+              <span className="text-xl font-black text-indigo-400">{sourceCount}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Agreements</span>
+              <span className="text-xl font-black text-emerald-400">{summary.agreementGroups ?? agreements.length}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Conflicts</span>
+              <span className="text-xl font-black text-rose-400">{summary.conflicts ?? conflicts.length}</span>
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl flex flex-col gap-0.5">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Missing Gaps</span>
+              <span className="text-xl font-black text-amber-400">{summary.missingInformation ?? missingInfo.length}</span>
+            </div>
+          </div>
+
+          {agreements.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Cross-Source Agreements ({agreements.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {agreements.map((a: any, idx: number) => (
+                  <div key={idx} className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl p-3.5 text-xs flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-emerald-300 font-mono text-[11px]">
+                      <span>{a.claimId || `AGREEMENT_${idx + 1}`}</span>
+                      <span className="font-bold">Sources: {(a.sources || []).join(' · ')}</span>
+                    </div>
+                    <p className="text-emerald-100 font-semibold text-sm">"{a.normalizedClaim}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {conflicts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400"></span> Surfaced Source Conflicts ({conflicts.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {conflicts.map((c: any, idx: number) => (
+                  <div key={idx} className="bg-rose-950/20 border border-rose-900/40 rounded-xl p-3.5 text-xs flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-rose-300 font-mono text-[11px]">
+                      <span>{c.claimId || `CONFLICT_${idx + 1}`}</span>
+                      <span className="font-bold">Sources: {(c.sources || []).join(' vs ')}</span>
+                    </div>
+                    <p className="text-rose-100 font-semibold text-sm">"{c.normalizedClaim}"</p>
+                    <p className="text-slate-300">{c.description}</p>
+                    {c.differences && c.differences.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Differences:</span>
+                        {c.differences.map((diff: string, dIdx: number) => (
+                          <span key={dIdx} className="bg-rose-950/60 border border-rose-900/50 text-rose-300 font-mono text-[11px] px-2 py-0.5 rounded">
+                            {diff}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uncorroborated.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">Uncorroborated / Single-Source Claims ({uncorroborated.length})</span>
+              {uncorroborated.map((u: any, idx: number) => (
+                <div key={idx} className="bg-sky-950/20 border border-sky-900/40 rounded-xl p-3 text-xs flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-sky-300 font-mono text-[11px]">
+                    <span>Source: {u.sourceId}</span>
+                    <span className="font-bold">UNCORROBORATED IN SOURCE SET</span>
+                  </div>
+                  <p className="text-white font-medium">"{u.normalizedClaim}"</p>
+                  <p className="text-slate-400 text-[11px]">{u.note}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {missingInfo.length > 0 && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Supplied Source Information Gaps ({missingInfo.length})</span>
+              <ul className="flex flex-col gap-1 text-xs text-slate-300">
+                {missingInfo.map((m: any, idx: number) => (
+                  <li key={idx} className="bg-slate-950/50 p-2 rounded border border-slate-800 flex flex-col gap-0.5">
+                    <span className="font-bold text-amber-300 text-[11px] uppercase">{m.topic || 'Missing Topic'}</span>
+                    <span className="text-slate-300">{m.description}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if ((category === 'news_research' || category === 'news-research' || category === 'api/news-research') && result) {
+      const sources = result.sources || [];
+      const metrics = result.metrics || {};
+      const keyFindings = result.keyFindings || [];
+      const conflicts = result.conflicts || [];
+      const uncorroborated = result.uncorroboratedClaims || [];
+      const missingInfo = result.missingInformation || [];
+      const verifQueue = result.verificationQueue || [];
+      const sourceCoverage = result.sourceCoverage || {};
+
+      return (
+        <div className="flex flex-col gap-4 w-full text-slate-300">
+          {/* Header Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Sources</span>
+              <span className="text-lg font-black text-white">{metrics.sourceCount || sources.length}</span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Claims</span>
+              <span className="text-lg font-black text-indigo-400">{metrics.claimCount || 0}</span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Verified</span>
+              <span className="text-lg font-black text-emerald-400">{metrics.verifiedClaimCount || 0}</span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Conflicts</span>
+              <span className="text-lg font-black text-rose-400">{metrics.conflictCount || conflicts.length}</span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Uncorroborated</span>
+              <span className="text-lg font-black text-sky-400">{metrics.uncorroboratedClaimCount || uncorroborated.length}</span>
+            </div>
+            <div className="bg-slate-900/70 border border-slate-800 p-2.5 rounded-xl flex flex-col gap-0.5">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Gaps</span>
+              <span className="text-lg font-black text-amber-400">{metrics.missingInformationCount || missingInfo.length}</span>
+            </div>
+          </div>
+
+          {/* Executive Summary Card */}
+          {result.executiveSummary && (
+            <div className="bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 border border-indigo-500/30 p-4 rounded-2xl flex flex-col gap-2 shadow-lg">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                <span className="text-xs font-black text-indigo-300 uppercase tracking-wider">EXECUTIVE RESEARCH SUMMARY</span>
+              </div>
+              <p className="text-slate-100 text-sm leading-relaxed">{result.executiveSummary}</p>
+            </div>
+          )}
+
+          {/* Key Findings Card */}
+          {keyFindings.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Synthesized Key Findings ({keyFindings.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {keyFindings.map((kf: any, idx: number) => (
+                  <div key={idx} className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-xs flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+                      <span className="font-bold text-white text-sm">Finding #{idx + 1}</span>
+                      <span className="badge bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-bold text-[10px]">
+                        {kf.status || 'SUPPORTED_BY_PROVIDED_EVIDENCE'}
+                      </span>
+                    </div>
+                    <p className="text-slate-200 leading-relaxed font-medium">{kf.finding}</p>
+                    {kf.supportingSources && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                        <span>Traceable Sources:</span>
+                        {kf.supportingSources.map((srcId: string, sIdx: number) => (
+                          <span key={sIdx} className="bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/40">
+                            {srcId}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Surfaced Conflicts Alert Card */}
+          {conflicts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span> Surfaced Discrepancies & Conflicts ({conflicts.length})
+              </span>
+              <div className="flex flex-col gap-2">
+                {conflicts.map((c: any, idx: number) => (
+                  <div key={idx} className="bg-rose-950/20 border border-rose-900/40 rounded-xl p-3.5 text-xs flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-rose-300 font-mono text-[11px]">
+                      <span>{c.claimId || `CONFLICT_${idx + 1}`}</span>
+                      <span className="font-bold">Sources: {(c.sources || []).join(' vs ')}</span>
+                    </div>
+                    <p className="text-rose-100 font-semibold text-sm">"{c.normalizedClaim}"</p>
+                    <p className="text-slate-300">{c.description}</p>
+                    {c.differences && c.differences.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">Reported Differences:</span>
+                        {c.differences.map((diff: string, dIdx: number) => (
+                          <span key={dIdx} className="bg-rose-950/60 border border-rose-900/50 text-rose-300 font-mono text-[11px] px-2 py-0.5 rounded">
+                            {diff}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Uncorroborated & Gaps Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Uncorroborated Single Source Claims */}
+            {uncorroborated.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-sky-400 uppercase tracking-wider">Uncorroborated Claims ({uncorroborated.length})</span>
+                <div className="flex flex-col gap-2">
+                  {uncorroborated.map((u: any, idx: number) => (
+                    <div key={idx} className="bg-sky-950/20 border border-sky-900/40 rounded-xl p-3 text-xs flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-sky-300 font-mono text-[11px]">
+                        <span>Source: {u.sourceId}</span>
+                        <span className="font-bold">UNCORROBORATED_IN_SOURCE_SET</span>
+                      </div>
+                      <p className="text-white font-medium">"{u.normalizedClaim}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Research Gaps */}
+            {missingInfo.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Research Gaps ({missingInfo.length})</span>
+                <div className="flex flex-col gap-2">
+                  {missingInfo.map((m: any, idx: number) => (
+                    <div key={idx} className="bg-amber-950/20 border border-amber-900/40 rounded-xl p-3 text-xs flex flex-col gap-0.5">
+                      <span className="font-bold text-amber-300 text-[11px] uppercase">{m.topic || 'Missing Topic'}</span>
+                      <span className="text-slate-300">{m.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Source Coverage Table */}
+          {Object.keys(sourceCoverage).length > 0 && (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 text-xs">
+              <span className="font-bold text-slate-400 uppercase tracking-wider text-[11px]">Dynamic Source Coverage Matrix</span>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(sourceCoverage).map(([srcId, count], idx) => (
+                  <div key={idx} className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px] flex items-center gap-2">
+                    <span className="text-indigo-400 font-bold">{srcId}:</span>
+                    <span className="text-white font-black">{count as number} claim(s)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Full Narrative Research Brief */}
+          {result.researchBrief && (
+            <div className="collapse collapse-arrow bg-slate-900/60 border border-slate-800 rounded-2xl mt-1">
+              <input type="checkbox" defaultChecked={true} />
+              <div className="collapse-title text-sm font-extrabold text-indigo-300 flex items-center gap-2">
+                <span>📰 FULL NEWSROOM NARRATIVE BRIEF</span>
+              </div>
+              <div className="collapse-content text-slate-200 text-xs font-mono leading-relaxed bg-slate-950/80 p-4 rounded-b-2xl border-t border-slate-800 whitespace-pre-wrap">
+                {result.researchBrief}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (category === 'resume_screening' && result.candidates) {
       return (
         <div className="overflow-x-auto w-full">

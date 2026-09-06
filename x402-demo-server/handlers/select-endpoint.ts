@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { readReputation } from './lib/reputation-store';
+import { readReputation, readReputationAsync } from './lib/reputation-store';
 import { ENDPOINT_BASE_PRICES } from '../pricing.config';
 
 interface Bid {
@@ -34,7 +34,6 @@ interface RoutingResult {
  * Helper to select endpoint based on category, prompt description, reputation, and exploration logic.
  */
 export async function selectEndpointForTask(category: string, taskDescription: string = ''): Promise<RoutingResult> {
-  const { readReputationAsync } = await import('./lib/reputation-store');
   const repStore = await readReputationAsync();
   const getRep = (path: string) => repStore[path]?.score ?? 0.5;
   const getRuns = (path: string) => repStore[path]?.total_runs ?? 0;
@@ -50,10 +49,38 @@ export async function selectEndpointForTask(category: string, taskDescription: s
     '/contract-analyze-accurate': 'ContractAnalyze Accurate',
     '/invoice-extract-fast': 'InvoiceExtract Fast',
     '/invoice-extract-accurate': 'InvoiceExtract Accurate',
+    '/claim-extract-fast': 'ClaimExtract Fast',
+    '/claim-extract-accurate': 'ClaimExtract Accurate',
+    '/claim-extract': 'ClaimExtract Fast',
+    '/claim-verify-fast': 'ClaimVerify Fast',
+    '/claim-verify-accurate': 'ClaimVerify Accurate',
+    '/claim-verify': 'ClaimVerify Fast',
+    '/source-compare-fast': 'SourceCompare Fast',
+    '/source-compare-accurate': 'SourceCompare Accurate',
+    '/source-compare': 'SourceCompare Fast',
+    '/news-research-fast': 'NewsResearch Fast',
+    '/news-research-accurate': 'NewsResearch Accurate',
+    '/news-research': 'NewsResearch Fast',
   };
 
   // Define endpoint candidates and their baseline metadata
   const candidatesMap: Record<string, Bid[]> = {
+    news_research: [
+      { endpoint_path: '/news-research-fast', price: ENDPOINT_BASE_PRICES['/news-research-fast'], confidence: 0.77, latency_ms: 1200, reputation_score: getRep('/news-research-fast') },
+      { endpoint_path: '/news-research-accurate', price: ENDPOINT_BASE_PRICES['/news-research-accurate'], confidence: 0.95, latency_ms: 2800, reputation_score: getRep('/news-research-accurate') },
+    ],
+    source_comparison: [
+      { endpoint_path: '/source-compare-fast', price: ENDPOINT_BASE_PRICES['/source-compare-fast'], confidence: 0.77, latency_ms: 950, reputation_score: getRep('/source-compare-fast') },
+      { endpoint_path: '/source-compare-accurate', price: ENDPOINT_BASE_PRICES['/source-compare-accurate'], confidence: 0.94, latency_ms: 2500, reputation_score: getRep('/source-compare-accurate') },
+    ],
+    claim_verification: [
+      { endpoint_path: '/claim-verify-fast', price: ENDPOINT_BASE_PRICES['/claim-verify-fast'], confidence: 0.77, latency_ms: 850, reputation_score: getRep('/claim-verify-fast') },
+      { endpoint_path: '/claim-verify-accurate', price: ENDPOINT_BASE_PRICES['/claim-verify-accurate'], confidence: 0.94, latency_ms: 2300, reputation_score: getRep('/claim-verify-accurate') },
+    ],
+    claim_extraction: [
+      { endpoint_path: '/claim-extract-fast', price: ENDPOINT_BASE_PRICES['/claim-extract-fast'], confidence: 0.77, latency_ms: 850, reputation_score: getRep('/claim-extract-fast') },
+      { endpoint_path: '/claim-extract-accurate', price: ENDPOINT_BASE_PRICES['/claim-extract-accurate'], confidence: 0.94, latency_ms: 2300, reputation_score: getRep('/claim-extract-accurate') },
+    ],
     seo_audit: [
       { endpoint_path: '/seo-audit-fast', price: ENDPOINT_BASE_PRICES['/seo-audit-fast'], confidence: 0.76, latency_ms: 850, reputation_score: getRep('/seo-audit-fast') },
       { endpoint_path: '/seo-audit-accurate', price: ENDPOINT_BASE_PRICES['/seo-audit-accurate'], confidence: 0.94, latency_ms: 2300, reputation_score: getRep('/seo-audit-accurate') },
@@ -173,7 +200,7 @@ export async function handleSelectEndpointRequest(c: Context) {
     const body = await c.req.json().catch(() => ({}));
     const { category, task_description = '' } = body;
 
-    const validCategories = ['resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review', 'seo_audit'];
+    const validCategories = ['news_research', 'source_comparison', 'claim_verification', 'claim_extraction', 'resume_screening', 'contract_analysis', 'invoice_extraction', 'code_review', 'seo_audit'];
     if (!category || !validCategories.includes(category)) {
       return c.json({ error: `Valid category is required: ${validCategories.join(', ')}` }, 400);
     }

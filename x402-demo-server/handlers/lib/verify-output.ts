@@ -169,6 +169,61 @@ export function verifyOutput(category: string, result: any): { passed: boolean; 
       return { passed: true, reason: 'Valid SEO audit report generated with verified page issues and scores' };
     }
 
+    case 'claim_extraction': {
+      const claims = result.claims ?? result.documents?.flatMap((d: any) => d.claims ?? []) ?? [];
+      if (!Array.isArray(claims)) {
+        return { passed: false, reason: 'Claims field is missing or not an array' };
+      }
+      if (claims.length === 0 && !result.success) {
+        return { passed: false, reason: 'Claim extraction failed to return result claims' };
+      }
+      return { passed: true, reason: 'Valid atomic claim extraction output verified' };
+    }
+
+    case 'claim_verification': {
+      const verification = result.verification || result;
+      const status = verification?.status || result?.status;
+      const validStatuses = [
+        'SUPPORTED_BY_PROVIDED_EVIDENCE',
+        'CONTRADICTED_BY_PROVIDED_EVIDENCE',
+        'PARTIALLY_SUPPORTED',
+        'INSUFFICIENT_EVIDENCE',
+        'REQUIRES_VERIFICATION'
+      ];
+      if (!status || !validStatuses.includes(status)) {
+        return { passed: false, reason: `Invalid or missing claim verification status: ${status}` };
+      }
+      if (typeof result.success === 'boolean' && !result.success) {
+        return { passed: false, reason: 'Claim verification reported success = false' };
+      }
+      return { passed: true, reason: 'Valid claim verification output verified' };
+    }
+
+    case 'news_research': {
+      if (typeof result.success === 'boolean' && !result.success) {
+        return { passed: false, reason: 'News research orchestrator reported failure' };
+      }
+      if (!result.researchBrief && !result.executiveSummary) {
+        return { passed: false, reason: 'Missing researchBrief or executiveSummary in news_research output' };
+      }
+      if (!Array.isArray(result.claims) || !Array.isArray(result.agreements) || !Array.isArray(result.conflicts)) {
+        return { passed: false, reason: 'Malformed claims, agreements, or conflicts arrays in news_research output' };
+      }
+      return { passed: true, reason: 'Valid news research workspace & brief output verified' };
+    }
+
+    case 'source_comparison': {
+      if (typeof result.success === 'boolean' && !result.success) {
+        return { passed: false, reason: 'Source comparison failed to return valid output' };
+      }
+      const claims = result.claims || [];
+      const summary = result.summary || {};
+      if (!Array.isArray(claims)) {
+        return { passed: false, reason: 'Source comparison claims is not an array' };
+      }
+      return { passed: true, reason: 'Valid source comparison output verified' };
+    }
+
     default:
       return { passed: false, reason: `Unknown task category: ${category}` };
   }
