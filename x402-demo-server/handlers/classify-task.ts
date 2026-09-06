@@ -140,28 +140,29 @@ Respond with ONLY the single category string: news_research, source_comparison, 
       console.warn('[classify-task] OpenRouter classification failed, using local safety fallbacks:', err);
     }
 
-    // Safety net: If files are attached and category is still unsupported, run file-sensitive fallback
+    // Safety net: If files are attached and category is still unsupported, run intent-driven local fallback
     if (category === 'unsupported' && has_files) {
-      const lower = task_description.toLowerCase();
-      if (lower.includes('news-research') || lower.includes('news research') || lower.includes('research brief')) {
-        category = 'news_research';
-      } else if (lower.includes('compare source') || lower.includes('source-compare') || lower.includes('cross-source')) {
-        category = 'source_comparison';
-      } else if (lower.includes('verify claim') || lower.includes('claim-verify') || lower.includes('evidence')) {
-        category = 'claim_verification';
-      } else if (lower.includes('claim') || lower.includes('article') || lower.includes('press release') || lower.includes('transcript') || lower.includes('statement')) {
-        category = 'claim_extraction';
-      } else if (lower.includes('contract') || lower.includes('nda') || lower.includes('agreement')) {
-        category = 'contract_analysis';
-      } else if (lower.includes('invoice') || lower.includes('bill') || lower.includes('receipt')) {
-        category = 'invoice_extraction';
-      } else if (lower.includes('code') || lower.includes('repo') || lower.includes('review')) {
-        category = 'code_review';
-      } else if (lower.includes('seo') || lower.includes('audit') || lower.includes('website') || lower.includes('site')) {
-        category = 'seo_audit';
+      const localMatched = localClassify(task_description);
+      if (localMatched !== 'unsupported') {
+        category = localMatched;
       } else {
-        // Default document screening task when files are present
-        category = 'resume_screening';
+        const lower = task_description.toLowerCase();
+        if (lower.includes('research') || lower.includes('article') || lower.includes('news') || lower.includes('journalism')) {
+          category = 'news_research';
+        } else if (lower.includes('contract') || lower.includes('nda') || lower.includes('agreement')) {
+          category = 'contract_analysis';
+        } else if (lower.includes('invoice') || lower.includes('bill') || lower.includes('receipt')) {
+          category = 'invoice_extraction';
+        } else if (lower.includes('code') || lower.includes('repo') || lower.includes('review')) {
+          category = 'code_review';
+        } else if (lower.includes('seo') || lower.includes('audit') || lower.includes('website') || lower.includes('site')) {
+          category = 'seo_audit';
+        } else if (lower.includes('resume') || lower.includes('cv') || lower.includes('candidate') || lower.includes('applicant') || lower.includes('hiring') || lower.includes('engineer') || lower.includes('developer')) {
+          category = 'resume_screening';
+        } else {
+          // General document task fallback
+          category = 'news_research';
+        }
       }
       console.log(`[classify-task] File-attached safety fallback applied: category = '${category}'`);
     }
@@ -201,7 +202,13 @@ function localClassify(description: string): string {
     desc.includes('newsroom research') ||
     desc.includes('media research') ||
     desc.includes('research workspace') ||
-    desc.includes('multi-document research')
+    desc.includes('multi-document research') ||
+    desc.includes('research this article') ||
+    desc.includes('research these sources') ||
+    desc.includes('research this story') ||
+    desc.includes('analyze these news sources') ||
+    desc.includes('journalist research') ||
+    (desc.includes('research') && (desc.includes('article') || desc.includes('source') || desc.includes('story') || desc.includes('claims') || desc.includes('entities') || desc.includes('verification')))
   ) {
     return 'news_research';
   }
@@ -213,7 +220,11 @@ function localClassify(description: string): string {
     desc.includes('source comparison') ||
     desc.includes('cross-source') ||
     desc.includes('cross source') ||
-    desc.includes('compare multiple sources')
+    desc.includes('compare multiple sources') ||
+    desc.includes('compare these articles') ||
+    desc.includes('compare these sources') ||
+    desc.includes('find conflicting claims') ||
+    desc.includes('find agreements and conflicts')
   ) {
     return 'source_comparison';
   }
@@ -225,22 +236,26 @@ function localClassify(description: string): string {
     desc.includes('claim verification') ||
     desc.includes('verify this claim') ||
     desc.includes('evidence verification') ||
-    desc.includes('verify factual claim')
+    desc.includes('verify factual claim') ||
+    desc.includes('verify this claim using the supplied evidence') ||
+    desc.includes('fact-check the provided sources')
   ) {
     return 'claim_verification';
   }
 
   // Claim extraction (media & journalism)
   if (
-    desc.includes('claim') ||
     desc.includes('claim-extract') ||
     desc.includes('extract claims') ||
+    desc.includes('extract all factual claims') ||
     desc.includes('extract factual claims') ||
     desc.includes('atomic claims') ||
     desc.includes('press release') ||
     desc.includes('interview transcript') ||
     desc.includes('article claims') ||
-    desc.includes('verifiable claims')
+    desc.includes('verifiable claims') ||
+    desc.includes('extract all factual claims from this article') ||
+    (desc.includes('extract') && desc.includes('claim'))
   ) {
     return 'claim_extraction';
   }

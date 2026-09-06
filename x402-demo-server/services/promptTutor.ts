@@ -105,7 +105,7 @@ Return ONLY a valid, single JSON object with this exact structure and NO Markdow
 {
   "score": number,
   "intent": "short 2-4 word intent summary",
-  "taskType": "resume_screening | contract_analysis | invoice_extraction | code_review | general_query",
+  "taskType": "news_research | source_comparison | claim_verification | claim_extraction | resume_screening | contract_analysis | invoice_extraction | code_review | general_query",
   "issues": ["list of detected issues"],
   "requiredInformation": ["list of missing required context/details"],
   "irrelevantInformation": ["list of redundant/irrelevant parts, or empty"],
@@ -188,7 +188,32 @@ function generateLocalFallbackAnalysis(
   let taskType = hintCategory || 'general_query';
   let intent = 'General query processing';
 
-  if (p.includes('resume') || p.includes('candidate') || p.includes('hiring') || p.includes('cv')) {
+  if (
+    p.includes('news-research') || p.includes('news research') || p.includes('research this article') ||
+    p.includes('research brief') || p.includes('research these sources') || p.includes('research article') ||
+    p.includes('journalist research') || p.includes('media research')
+  ) {
+    taskType = 'news_research';
+    intent = 'Multi-source news & journalism research synthesis';
+  } else if (
+    p.includes('source-compare') || p.includes('compare sources') || p.includes('compare these articles') ||
+    p.includes('source comparison') || p.includes('cross-source')
+  ) {
+    taskType = 'source_comparison';
+    intent = 'Cross-source comparison and conflict identification';
+  } else if (
+    p.includes('claim-verify') || p.includes('verify claim') || p.includes('verify this claim') ||
+    p.includes('evidence verification') || p.includes('verify claim using supplied evidence')
+  ) {
+    taskType = 'claim_verification';
+    intent = 'Evidence-based factual claim verification';
+  } else if (
+    p.includes('claim-extract') || p.includes('extract claims') || p.includes('extract all factual claims') ||
+    p.includes('extract key factual claims') || p.includes('factual claims') || p.includes('atomic claims')
+  ) {
+    taskType = 'claim_extraction';
+    intent = 'Factual claim extraction & structuring';
+  } else if (p.includes('resume') || p.includes('candidate') || p.includes('hiring') || p.includes('cv') || p.includes('screen candidate')) {
     taskType = 'resume_screening';
     intent = 'Resume screening & candidate evaluation';
   } else if (p.includes('contract') || p.includes('nda') || p.includes('clause') || p.includes('legal')) {
