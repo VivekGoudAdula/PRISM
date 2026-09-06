@@ -1,4 +1,5 @@
 import { selectEndpointForTask } from './handlers/select-endpoint';
+import mongoose from 'mongoose';
 
 async function runTests() {
   console.log('====================================================');
