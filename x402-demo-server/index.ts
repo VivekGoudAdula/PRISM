@@ -14,6 +14,8 @@
 import dns from 'node:dns';
 dns.setDefaultResultOrder('ipv4first');
 
+import fs from 'fs';
+import path from 'path';
 import { config } from 'dotenv';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
@@ -295,7 +297,30 @@ app.use('*', async (c, next) => {
 // Load standard middlewares
 app.use('*', requestLogger);
 app.use('*', rateLimiter);
-app.onError(errorMiddleware);
+// Serve public brand icons/logos for x402 Challenge Leaderboard and Bazaar discovery
+const servePublicImage = (filename: string) => (c: any) => {
+  try {
+    const targetPath = path.resolve(__dirname, 'public', filename);
+    if (fs.existsSync(targetPath)) {
+      const imageBuffer = fs.readFileSync(targetPath);
+      return c.body(imageBuffer, 200, {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+        'Access-Control-Allow-Origin': '*',
+      });
+    }
+  } catch (err) {
+    console.error(`Failed to serve static image ${filename}:`, err);
+  }
+  return c.notFound();
+};
+
+app.get('/icon.png', servePublicImage('icon.png'));
+app.get('/logo.png', servePublicImage('logo.png'));
+app.get('/favicon.ico', servePublicImage('icon.png'));
+app.get('/apple-touch-icon.png', servePublicImage('icon.png'));
+app.get('/public/icon.png', servePublicImage('icon.png'));
+app.get('/public/logo.png', servePublicImage('logo.png'));
 
 // Mount API routes
 app.route('/api/auth', authRouter);

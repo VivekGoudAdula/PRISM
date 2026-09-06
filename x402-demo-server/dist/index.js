@@ -36,8 +36,8 @@ var __toCommonJS = (mod2) => __copyProps(__defProp({}, "__esModule", { value: tr
 // node_modules/dotenv/lib/main.js
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
-    var fs = require("fs");
-    var path = require("path");
+    var fs2 = require("fs");
+    var path2 = require("path");
     var os = require("os");
     var crypto3 = require("crypto");
     var TIPS = [
@@ -168,7 +168,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs.existsSync(filepath)) {
+            if (fs2.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -176,15 +176,15 @@ var require_main = __commonJS({
           possibleVaultPath = options.path.endsWith(".vault") ? options.path : `${options.path}.vault`;
         }
       } else {
-        possibleVaultPath = path.resolve(process.cwd(), ".env.vault");
+        possibleVaultPath = path2.resolve(process.cwd(), ".env.vault");
       }
-      if (fs.existsSync(possibleVaultPath)) {
+      if (fs2.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
     }
     function _resolveHome(envPath) {
-      return envPath[0] === "~" ? path.join(os.homedir(), envPath.slice(1)) : envPath;
+      return envPath[0] === "~" ? path2.join(os.homedir(), envPath.slice(1)) : envPath;
     }
     function _configVault(options) {
       const debug = parseBoolean(process.env.DOTENV_CONFIG_DEBUG || options && options.debug);
@@ -201,7 +201,7 @@ var require_main = __commonJS({
       return { parsed };
     }
     function configDotenv(options) {
-      const dotenvPath = path.resolve(process.cwd(), ".env");
+      const dotenvPath = path2.resolve(process.cwd(), ".env");
       let encoding = "utf8";
       let processEnv = process.env;
       if (options && options.processEnv != null) {
@@ -229,13 +229,13 @@ var require_main = __commonJS({
       }
       let lastError;
       const parsedAll = {};
-      for (const path2 of optionPaths) {
+      for (const path3 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs.readFileSync(path2, { encoding }));
+          const parsed = DotenvModule.parse(fs2.readFileSync(path3, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e) {
           if (debug) {
-            _debug(`failed to load ${path2} ${e.message}`);
+            _debug(`failed to load ${path3} ${e.message}`);
           }
           lastError = e;
         }
@@ -248,7 +248,7 @@ var require_main = __commonJS({
         const shortPaths = [];
         for (const filePath of optionPaths) {
           try {
-            const relative = path.relative(process.cwd(), filePath);
+            const relative = path2.relative(process.cwd(), filePath);
             shortPaths.push(relative);
           } catch (e) {
             if (debug) {
@@ -764,8 +764,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path, errorMaps, issueData } = params;
-      const fullPath = [...path, ...issueData.path || []];
+      const { data, path: path2, errorMaps, issueData } = params;
+      const fullPath = [...path2, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -1073,11 +1073,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value, path, key) {
+      constructor(parent, value, path2, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path;
+        this._path = path2;
         this._key = key;
       }
       get path() {
@@ -7775,8 +7775,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path2) {
+      let input = path2;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -8028,8 +8028,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path2, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path2 && path2 !== "/" ? path2 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -12194,8 +12194,8 @@ function validateDiscoveryExtension(extension) {
       return { valid: true };
     }
     const errors = validate.errors?.map((err2) => {
-      const path = err2.instancePath || "(root)";
-      return `${path}: ${err2.message}`;
+      const path2 = err2.instancePath || "(root)";
+      return `${path2}: ${err2.message}`;
     }) || ["Unknown validation error"];
     return { valid: false, errors };
   } catch (error) {
@@ -40054,8 +40054,8 @@ __export(select_endpoint_exports, {
 });
 async function selectEndpointForTask(category, taskDescription = "") {
   const repStore = await readReputationAsync();
-  const getRep = (path) => repStore[path]?.score ?? 0.5;
-  const getRuns = (path) => repStore[path]?.total_runs ?? 0;
+  const getRep = (path2) => repStore[path2]?.score ?? 0.5;
+  const getRuns = (path2) => repStore[path2]?.total_runs ?? 0;
   const PROVIDER_NAMES2 = {
     "/seo-audit-fast": "SEOAudit Fast",
     "/seo-audit-accurate": "SEOAudit Accurate",
@@ -50635,28 +50635,28 @@ var require_valid_url = __commonJS({
         var splitted = [];
         var scheme = "";
         var authority = "";
-        var path = "";
+        var path2 = "";
         var query = "";
         var fragment = "";
         var out = "";
         splitted = splitUri(value);
         scheme = splitted[1];
         authority = splitted[2];
-        path = splitted[3];
+        path2 = splitted[3];
         query = splitted[4];
         fragment = splitted[5];
-        if (!(scheme && scheme.length && path.length >= 0)) return;
+        if (!(scheme && scheme.length && path2.length >= 0)) return;
         if (authority && authority.length) {
-          if (!(path.length === 0 || /^\//.test(path))) return;
+          if (!(path2.length === 0 || /^\//.test(path2))) return;
         } else {
-          if (/^\/\//.test(path)) return;
+          if (/^\/\//.test(path2)) return;
         }
         if (!/^[a-z][a-z0-9\+\-\.]*$/.test(scheme.toLowerCase())) return;
         out += scheme + ":";
         if (authority && authority.length) {
           out += "//" + authority;
         }
-        out += path;
+        out += path2;
         if (query && query.length) {
           out += "?" + query;
         }
@@ -50672,7 +50672,7 @@ var require_valid_url = __commonJS({
         var splitted = [];
         var scheme = "";
         var authority = "";
-        var path = "";
+        var path2 = "";
         var port2 = "";
         var query = "";
         var fragment = "";
@@ -50680,7 +50680,7 @@ var require_valid_url = __commonJS({
         splitted = splitUri(value);
         scheme = splitted[1];
         authority = splitted[2];
-        path = splitted[3];
+        path2 = splitted[3];
         query = splitted[4];
         fragment = splitted[5];
         if (!scheme) return;
@@ -50701,7 +50701,7 @@ var require_valid_url = __commonJS({
         if (port2) {
           out += port2;
         }
-        out += path;
+        out += path2;
         if (query && query.length) {
           out += "?" + query;
         }
@@ -54114,12 +54114,12 @@ var require_abstract_coder = __commonJS({
     exports2.Result = Result;
     function checkResultErrors(result) {
       const errors = [];
-      const checkErrors = function(path, object) {
+      const checkErrors = function(path2, object) {
         if (!Array.isArray(object)) {
           return;
         }
         for (let key in object) {
-          const childPath = path.slice();
+          const childPath = path2.slice();
           childPath.push(key);
           try {
             checkErrors(childPath, object[key]);
@@ -78807,9 +78807,9 @@ var require_provider_ipcsocket = __commonJS({
       get socket() {
         return this.#socket;
       }
-      constructor(path, network, options) {
+      constructor(path2, network, options) {
         super(network, options);
-        this.#socket = (0, net_1.connect)(path);
+        this.#socket = (0, net_1.connect)(path2);
         this.socket.on("ready", async () => {
           try {
             await this._start();
@@ -80149,11 +80149,11 @@ var require_utils7 = __commonJS({
     function spelunk(object, _path) {
       const match2 = _path.match(/^([a-z0-9$_.-]*)(:([a-z]+))?(!)?$/i);
       (0, index_js_1.assertArgument)(match2 != null, "invalid path", "path", _path);
-      const path = match2[1];
+      const path2 = match2[1];
       const type = match2[3];
       const reqd = match2[4] === "!";
       let cur = object;
-      for (const comp of path.toLowerCase().split(".")) {
+      for (const comp of path2.toLowerCase().split(".")) {
         if (Array.isArray(cur)) {
           if (!comp.match(/^[0-9]+$/)) {
             break;
@@ -80175,7 +80175,7 @@ var require_utils7 = __commonJS({
           break;
         }
       }
-      (0, index_js_1.assertArgument)(!reqd || cur != null, "missing required value", "path", path);
+      (0, index_js_1.assertArgument)(!reqd || cur != null, "missing required value", "path", path2);
       if (type && cur != null) {
         if (type === "int") {
           if (typeof cur === "string" && cur.match(/^-?[0-9]+$/)) {
@@ -80200,7 +80200,7 @@ var require_utils7 = __commonJS({
         if (type === typeof cur) {
           return cur;
         }
-        (0, index_js_1.assertArgument)(false, `wrong type found for ${type} `, "path", path);
+        (0, index_js_1.assertArgument)(false, `wrong type found for ${type} `, "path", path2);
       }
       return cur;
     }
@@ -80398,7 +80398,7 @@ var require_json_keystore = __commonJS({
       };
       if (account.mnemonic) {
         const client = options.client != null ? options.client : `ethers/${_version_js_1.version}`;
-        const path = account.mnemonic.path || defaultPath;
+        const path2 = account.mnemonic.path || defaultPath;
         const locale = account.mnemonic.locale || "en";
         const mnemonicKey = key.slice(32, 64);
         const entropy = (0, index_js_4.getBytes)(account.mnemonic.entropy, "account.mnemonic.entropy");
@@ -80411,7 +80411,7 @@ var require_json_keystore = __commonJS({
         data["x-ethers"] = {
           client,
           gethFilename,
-          path,
+          path: path2,
           locale,
           mnemonicCounter: (0, index_js_4.hexlify)(mnemonicIv).substring(2),
           mnemonicCiphertext: (0, index_js_4.hexlify)(mnemonicCiphertext).substring(2),
@@ -80496,11 +80496,11 @@ var require_hdwallet = __commonJS({
       const I2 = (0, index_js_4.getBytes)((0, index_js_1.computeHmac)("sha512", chainCode, data));
       return { IL: I2.slice(0, 32), IR: I2.slice(32) };
     }
-    function derivePath(node, path) {
-      const components = path.split("/");
-      (0, index_js_4.assertArgument)(components.length > 0, "invalid path", "path", path);
+    function derivePath(node, path2) {
+      const components = path2.split("/");
+      (0, index_js_4.assertArgument)(components.length > 0, "invalid path", "path", path2);
       if (components[0] === "m") {
-        (0, index_js_4.assertArgument)(node.depth === 0, `cannot derive root path (i.e. path starting with "m/") for a node at non-zero depth ${node.depth}`, "path", path);
+        (0, index_js_4.assertArgument)(node.depth === 0, `cannot derive root path (i.e. path starting with "m/") for a node at non-zero depth ${node.depth}`, "path", path2);
         components.shift();
       }
       let result = node;
@@ -80570,7 +80570,7 @@ var require_hdwallet = __commonJS({
       /**
        *  @private
        */
-      constructor(guard, signingKey, parentFingerprint, chainCode, path, index, depth, mnemonic, provider) {
+      constructor(guard, signingKey, parentFingerprint, chainCode, path2, index, depth, mnemonic, provider) {
         super(signingKey, provider);
         (0, index_js_4.assertPrivate)(guard, _guard, "HDNodeWallet");
         (0, index_js_4.defineProperties)(this, { publicKey: signingKey.compressedPublicKey });
@@ -80579,7 +80579,7 @@ var require_hdwallet = __commonJS({
           parentFingerprint,
           fingerprint,
           chainCode,
-          path,
+          path: path2,
           index,
           depth
         });
@@ -80663,22 +80663,22 @@ var require_hdwallet = __commonJS({
       deriveChild(_index) {
         const index = (0, index_js_4.getNumber)(_index, "index");
         (0, index_js_4.assertArgument)(index <= 4294967295, "invalid index", "index", index);
-        let path = this.path;
-        if (path) {
-          path += "/" + (index & ~HardenedBit);
+        let path2 = this.path;
+        if (path2) {
+          path2 += "/" + (index & ~HardenedBit);
           if (index & HardenedBit) {
-            path += "'";
+            path2 += "'";
           }
         }
         const { IR, IL } = ser_I(index, this.chainCode, this.publicKey, this.privateKey);
         const ki = new index_js_1.SigningKey((0, index_js_4.toBeHex)(((0, index_js_4.toBigInt)(IL) + BigInt(this.privateKey)) % N2, 32));
-        return new _HDNodeWallet(_guard, ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.mnemonic, this.provider);
+        return new _HDNodeWallet(_guard, ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path2, index, this.depth + 1, this.mnemonic, this.provider);
       }
       /**
        *  Return the HDNode for %%path%% from this node.
        */
-      derivePath(path) {
-        return derivePath(this, path);
+      derivePath(path2) {
+        return derivePath(this, path2);
       }
       static #fromSeed(_seed, mnemonic) {
         (0, index_js_4.assertArgument)((0, index_js_4.isBytesLike)(_seed), "invalid seed", "seed", "[REDACTED]");
@@ -80723,43 +80723,43 @@ var require_hdwallet = __commonJS({
       /**
        *  Creates a new random HDNode.
        */
-      static createRandom(password, path, wordlist) {
+      static createRandom(password, path2, wordlist) {
         if (password == null) {
           password = "";
         }
-        if (path == null) {
-          path = exports2.defaultPath;
+        if (path2 == null) {
+          path2 = exports2.defaultPath;
         }
         if (wordlist == null) {
           wordlist = lang_en_js_1.LangEn.wordlist();
         }
         const mnemonic = mnemonic_js_1.Mnemonic.fromEntropy((0, index_js_1.randomBytes)(16), password, wordlist);
-        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path);
+        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path2);
       }
       /**
        *  Create an HD Node from %%mnemonic%%.
        */
-      static fromMnemonic(mnemonic, path) {
-        if (!path) {
-          path = exports2.defaultPath;
+      static fromMnemonic(mnemonic, path2) {
+        if (!path2) {
+          path2 = exports2.defaultPath;
         }
-        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path);
+        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path2);
       }
       /**
        *  Creates an HD Node from a mnemonic %%phrase%%.
        */
-      static fromPhrase(phrase, password, path, wordlist) {
+      static fromPhrase(phrase, password, path2, wordlist) {
         if (password == null) {
           password = "";
         }
-        if (path == null) {
-          path = exports2.defaultPath;
+        if (path2 == null) {
+          path2 = exports2.defaultPath;
         }
         if (wordlist == null) {
           wordlist = lang_en_js_1.LangEn.wordlist();
         }
         const mnemonic = mnemonic_js_1.Mnemonic.fromPhrase(phrase, password, wordlist);
-        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path);
+        return _HDNodeWallet.#fromSeed(mnemonic.computeSeed(), mnemonic).derivePath(path2);
       }
       /**
        *  Creates an HD Node from a %%seed%%.
@@ -80812,7 +80812,7 @@ var require_hdwallet = __commonJS({
       /**
        *  @private
        */
-      constructor(guard, address, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
+      constructor(guard, address, publicKey, parentFingerprint, chainCode, path2, index, depth, provider) {
         super(address, provider);
         (0, index_js_4.assertPrivate)(guard, _guard, "HDNodeVoidWallet");
         (0, index_js_4.defineProperties)(this, { publicKey });
@@ -80822,7 +80822,7 @@ var require_hdwallet = __commonJS({
           fingerprint,
           parentFingerprint,
           chainCode,
-          path,
+          path: path2,
           index,
           depth
         });
@@ -80860,23 +80860,23 @@ var require_hdwallet = __commonJS({
       deriveChild(_index) {
         const index = (0, index_js_4.getNumber)(_index, "index");
         (0, index_js_4.assertArgument)(index <= 4294967295, "invalid index", "index", index);
-        let path = this.path;
-        if (path) {
-          path += "/" + (index & ~HardenedBit);
+        let path2 = this.path;
+        if (path2) {
+          path2 += "/" + (index & ~HardenedBit);
           if (index & HardenedBit) {
-            path += "'";
+            path2 += "'";
           }
         }
         const { IR, IL } = ser_I(index, this.chainCode, this.publicKey, null);
         const Ki = index_js_1.SigningKey.addPoints(IL, this.publicKey, true);
         const address = (0, index_js_3.computeAddress)(Ki);
-        return new _HDNodeVoidWallet(_guard, address, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.provider);
+        return new _HDNodeVoidWallet(_guard, address, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path2, index, this.depth + 1, this.provider);
       }
       /**
        *  Return the signer for %%path%% from this node.
        */
-      derivePath(path) {
-        return derivePath(this, path);
+      derivePath(path2) {
+        return derivePath(this, path2);
       }
     };
     exports2.HDNodeVoidWallet = HDNodeVoidWallet;
@@ -89471,6 +89471,8 @@ var require_jsonwebtoken = __commonJS({
 
 // index.ts
 var import_node_dns = __toESM(require("node:dns"));
+var import_fs = __toESM(require("fs"));
+var import_path = __toESM(require("path"));
 var import_dotenv8 = __toESM(require_main());
 
 // node_modules/hono/dist/compose.js
@@ -89593,26 +89595,26 @@ var handleParsingNestedValues = (form, key, value) => {
 };
 
 // node_modules/hono/dist/utils/url.js
-var splitPath = (path) => {
-  const paths = path.split("/");
+var splitPath = (path2) => {
+  const paths = path2.split("/");
   if (paths[0] === "") {
     paths.shift();
   }
   return paths;
 };
 var splitRoutingPath = (routePath) => {
-  const { groups, path } = extractGroupsFromPath(routePath);
-  const paths = splitPath(path);
+  const { groups, path: path2 } = extractGroupsFromPath(routePath);
+  const paths = splitPath(path2);
   return replaceGroupMarks(paths, groups);
 };
-var extractGroupsFromPath = (path) => {
+var extractGroupsFromPath = (path2) => {
   const groups = [];
-  path = path.replace(/\{[^}]+\}/g, (match2, index) => {
+  path2 = path2.replace(/\{[^}]+\}/g, (match2, index) => {
     const mark = `@${index}`;
     groups.push([mark, match2]);
     return mark;
   });
-  return { groups, path };
+  return { groups, path: path2 };
 };
 var replaceGroupMarks = (paths, groups) => {
   for (let i = groups.length - 1; i >= 0; i--) {
@@ -89669,8 +89671,8 @@ var getPath = (request4) => {
       const queryIndex = url.indexOf("?", i);
       const hashIndex = url.indexOf("#", i);
       const end = queryIndex === -1 ? hashIndex === -1 ? void 0 : hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
-      const path = url.slice(start, end);
-      return tryDecodeURI(path.includes("%25") ? path.replace(/%25/g, "%2525") : path);
+      const path2 = url.slice(start, end);
+      return tryDecodeURI(path2.includes("%25") ? path2.replace(/%25/g, "%2525") : path2);
     } else if (charCode === 63 || charCode === 35) {
       break;
     }
@@ -89687,11 +89689,11 @@ var mergePath = (base, sub, ...rest) => {
   }
   return `${base?.[0] === "/" ? "" : "/"}${base}${sub === "/" ? "" : `${base?.at(-1) === "/" ? "" : "/"}${sub?.[0] === "/" ? sub.slice(1) : sub}`}`;
 };
-var checkOptionalParameter = (path) => {
-  if (path.charCodeAt(path.length - 1) !== 63 || !path.includes(":")) {
+var checkOptionalParameter = (path2) => {
+  if (path2.charCodeAt(path2.length - 1) !== 63 || !path2.includes(":")) {
     return null;
   }
-  const segments = path.split("/");
+  const segments = path2.split("/");
   const results = [];
   let basePath = "";
   segments.forEach((segment) => {
@@ -89832,9 +89834,9 @@ var HonoRequest = class {
    */
   path;
   bodyCache = {};
-  constructor(request4, path = "/", matchResult = [[]]) {
+  constructor(request4, path2 = "/", matchResult = [[]]) {
     this.raw = request4;
-    this.path = path;
+    this.path = path2;
     this.#matchResult = matchResult;
     this.#validatedData = {};
   }
@@ -90586,8 +90588,8 @@ var Hono = class _Hono {
         return this;
       };
     });
-    this.on = (method, path, ...handlers) => {
-      for (const p of [path].flat()) {
+    this.on = (method, path2, ...handlers) => {
+      for (const p of [path2].flat()) {
         this.#path = p;
         for (const m of [method].flat()) {
           handlers.map((handler) => {
@@ -90644,8 +90646,8 @@ var Hono = class _Hono {
    * app.route("/api", app2) // GET /api/user
    * ```
    */
-  route(path, app2) {
-    const subApp = this.basePath(path);
+  route(path2, app2) {
+    const subApp = this.basePath(path2);
     app2.routes.map((r) => {
       let handler;
       if (app2.errorHandler === errorHandler) {
@@ -90671,9 +90673,9 @@ var Hono = class _Hono {
    * const api = new Hono().basePath('/api')
    * ```
    */
-  basePath(path) {
+  basePath(path2) {
     const subApp = this.#clone();
-    subApp._basePath = mergePath(this._basePath, path);
+    subApp._basePath = mergePath(this._basePath, path2);
     return subApp;
   }
   /**
@@ -90747,7 +90749,7 @@ var Hono = class _Hono {
    * })
    * ```
    */
-  mount(path, applicationHandler, options) {
+  mount(path2, applicationHandler, options) {
     let replaceRequest;
     let optionHandler;
     if (options) {
@@ -90774,7 +90776,7 @@ var Hono = class _Hono {
       return [c.env, executionContext];
     };
     replaceRequest ||= (() => {
-      const mergedPath = mergePath(this._basePath, path);
+      const mergedPath = mergePath(this._basePath, path2);
       const pathPrefixLength = mergedPath === "/" ? 0 : mergedPath.length;
       return (request4) => {
         const url = new URL(request4.url);
@@ -90789,14 +90791,14 @@ var Hono = class _Hono {
       }
       await next();
     };
-    this.#addRoute(METHOD_NAME_ALL, mergePath(path, "*"), handler);
+    this.#addRoute(METHOD_NAME_ALL, mergePath(path2, "*"), handler);
     return this;
   }
-  #addRoute(method, path, handler) {
+  #addRoute(method, path2, handler) {
     method = method.toUpperCase();
-    path = mergePath(this._basePath, path);
-    const r = { basePath: this._basePath, path, method, handler };
-    this.router.add(method, path, [handler, r]);
+    path2 = mergePath(this._basePath, path2);
+    const r = { basePath: this._basePath, path: path2, method, handler };
+    this.router.add(method, path2, [handler, r]);
     this.routes.push(r);
   }
   #handleError(err2, c) {
@@ -90809,10 +90811,10 @@ var Hono = class _Hono {
     if (method === "HEAD") {
       return (async () => new Response(null, await this.#dispatch(request4, executionCtx, env, "GET")))();
     }
-    const path = this.getPath(request4, { env });
-    const matchResult = this.router.match(method, path);
+    const path2 = this.getPath(request4, { env });
+    const matchResult = this.router.match(method, path2);
     const c = new Context(request4, {
-      path,
+      path: path2,
       matchResult,
       env,
       executionCtx,
@@ -90912,15 +90914,15 @@ var Hono = class _Hono {
 
 // node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
-function match(method, path) {
+function match(method, path2) {
   const matchers = this.buildAllMatchers();
-  const match2 = ((method2, path2) => {
+  const match2 = ((method2, path22) => {
     const matcher = matchers[method2] || matchers[METHOD_NAME_ALL];
-    const staticMatch = matcher[2][path2];
+    const staticMatch = matcher[2][path22];
     if (staticMatch) {
       return staticMatch;
     }
-    const match3 = path2.match(matcher[0]);
+    const match3 = path22.match(matcher[0]);
     if (!match3) {
       return [[], emptyParam];
     }
@@ -90928,7 +90930,7 @@ function match(method, path) {
     return [matcher[1][index], match3];
   });
   this.match = match2;
-  return match2(method, path);
+  return match2(method, path2);
 }
 
 // node_modules/hono/dist/router/reg-exp-router/node.js
@@ -91043,12 +91045,12 @@ var Node = class _Node {
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node();
-  insert(path, index, pathErrorCheckOnly) {
+  insert(path2, index, pathErrorCheckOnly) {
     const paramAssoc = [];
     const groups = [];
     for (let i = 0; ; ) {
       let replaced = false;
-      path = path.replace(/\{[^}]+\}/g, (m) => {
+      path2 = path2.replace(/\{[^}]+\}/g, (m) => {
         const mark = `@\\${i}`;
         groups[i] = [mark, m];
         i++;
@@ -91059,7 +91061,7 @@ var Trie = class {
         break;
       }
     }
-    const tokens = path.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
+    const tokens = path2.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
     for (let i = groups.length - 1; i >= 0; i--) {
       const [mark] = groups[i];
       for (let j = tokens.length - 1; j >= 0; j--) {
@@ -91098,9 +91100,9 @@ var Trie = class {
 // node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
-function buildWildcardRegExp(path) {
-  return wildcardRegExpCache[path] ??= new RegExp(
-    path === "*" ? "" : `^${path.replace(
+function buildWildcardRegExp(path2) {
+  return wildcardRegExpCache[path2] ??= new RegExp(
+    path2 === "*" ? "" : `^${path2.replace(
       /\/\*$|([.\\+*[^\]$()])/g,
       (_, metaChar) => metaChar ? `\\${metaChar}` : "(?:|/.*)"
     )}$`
@@ -91122,17 +91124,17 @@ function buildMatcherFromPreprocessedRoutes(routes) {
   );
   const staticMap = /* @__PURE__ */ Object.create(null);
   for (let i = 0, j = -1, len = routesWithStaticPathFlag.length; i < len; i++) {
-    const [pathErrorCheckOnly, path, handlers] = routesWithStaticPathFlag[i];
+    const [pathErrorCheckOnly, path2, handlers] = routesWithStaticPathFlag[i];
     if (pathErrorCheckOnly) {
-      staticMap[path] = [handlers.map(([h2]) => [h2, /* @__PURE__ */ Object.create(null)]), emptyParam];
+      staticMap[path2] = [handlers.map(([h2]) => [h2, /* @__PURE__ */ Object.create(null)]), emptyParam];
     } else {
       j++;
     }
     let paramAssoc;
     try {
-      paramAssoc = trie.insert(path, j, pathErrorCheckOnly);
+      paramAssoc = trie.insert(path2, j, pathErrorCheckOnly);
     } catch (e) {
-      throw e === PATH_ERROR ? new UnsupportedPathError(path) : e;
+      throw e === PATH_ERROR ? new UnsupportedPathError(path2) : e;
     }
     if (pathErrorCheckOnly) {
       continue;
@@ -91166,12 +91168,12 @@ function buildMatcherFromPreprocessedRoutes(routes) {
   }
   return [regexp, handlerMap, staticMap];
 }
-function findMiddleware(middleware, path) {
+function findMiddleware(middleware, path2) {
   if (!middleware) {
     return void 0;
   }
   for (const k of Object.keys(middleware).sort((a, b) => b.length - a.length)) {
-    if (buildWildcardRegExp(k).test(path)) {
+    if (buildWildcardRegExp(k).test(path2)) {
       return [...middleware[k]];
     }
   }
@@ -91185,7 +91187,7 @@ var RegExpRouter = class {
     this.#middleware = { [METHOD_NAME_ALL]: /* @__PURE__ */ Object.create(null) };
     this.#routes = { [METHOD_NAME_ALL]: /* @__PURE__ */ Object.create(null) };
   }
-  add(method, path, handler) {
+  add(method, path2, handler) {
     const middleware = this.#middleware;
     const routes = this.#routes;
     if (!middleware || !routes) {
@@ -91200,18 +91202,18 @@ var RegExpRouter = class {
         });
       });
     }
-    if (path === "/*") {
-      path = "*";
+    if (path2 === "/*") {
+      path2 = "*";
     }
-    const paramCount = (path.match(/\/:/g) || []).length;
-    if (/\*$/.test(path)) {
-      const re = buildWildcardRegExp(path);
+    const paramCount = (path2.match(/\/:/g) || []).length;
+    if (/\*$/.test(path2)) {
+      const re = buildWildcardRegExp(path2);
       if (method === METHOD_NAME_ALL) {
         Object.keys(middleware).forEach((m) => {
-          middleware[m][path] ||= findMiddleware(middleware[m], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
+          middleware[m][path2] ||= findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || [];
         });
       } else {
-        middleware[method][path] ||= findMiddleware(middleware[method], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
+        middleware[method][path2] ||= findMiddleware(middleware[method], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || [];
       }
       Object.keys(middleware).forEach((m) => {
         if (method === METHOD_NAME_ALL || method === m) {
@@ -91229,15 +91231,15 @@ var RegExpRouter = class {
       });
       return;
     }
-    const paths = checkOptionalParameter(path) || [path];
+    const paths = checkOptionalParameter(path2) || [path2];
     for (let i = 0, len = paths.length; i < len; i++) {
-      const path2 = paths[i];
+      const path22 = paths[i];
       Object.keys(routes).forEach((m) => {
         if (method === METHOD_NAME_ALL || method === m) {
-          routes[m][path2] ||= [
-            ...findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || []
+          routes[m][path22] ||= [
+            ...findMiddleware(middleware[m], path22) || findMiddleware(middleware[METHOD_NAME_ALL], path22) || []
           ];
-          routes[m][path2].push([handler, paramCount - len + i + 1]);
+          routes[m][path22].push([handler, paramCount - len + i + 1]);
         }
       });
     }
@@ -91256,13 +91258,13 @@ var RegExpRouter = class {
     const routes = [];
     let hasOwnRoute = method === METHOD_NAME_ALL;
     [this.#middleware, this.#routes].forEach((r) => {
-      const ownRoute = r[method] ? Object.keys(r[method]).map((path) => [path, r[method][path]]) : [];
+      const ownRoute = r[method] ? Object.keys(r[method]).map((path2) => [path2, r[method][path2]]) : [];
       if (ownRoute.length !== 0) {
         hasOwnRoute ||= true;
         routes.push(...ownRoute);
       } else if (method !== METHOD_NAME_ALL) {
         routes.push(
-          ...Object.keys(r[METHOD_NAME_ALL]).map((path) => [path, r[METHOD_NAME_ALL][path]])
+          ...Object.keys(r[METHOD_NAME_ALL]).map((path2) => [path2, r[METHOD_NAME_ALL][path2]])
         );
       }
     });
@@ -91282,13 +91284,13 @@ var SmartRouter = class {
   constructor(init) {
     this.#routers = init.routers;
   }
-  add(method, path, handler) {
+  add(method, path2, handler) {
     if (!this.#routes) {
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
     }
-    this.#routes.push([method, path, handler]);
+    this.#routes.push([method, path2, handler]);
   }
-  match(method, path) {
+  match(method, path2) {
     if (!this.#routes) {
       throw new Error("Fatal error");
     }
@@ -91303,7 +91305,7 @@ var SmartRouter = class {
         for (let i2 = 0, len2 = routes.length; i2 < len2; i2++) {
           router.add(...routes[i2]);
         }
-        res = router.match(method, path);
+        res = router.match(method, path2);
       } catch (e) {
         if (e instanceof UnsupportedPathError) {
           continue;
@@ -91353,10 +91355,10 @@ var Node2 = class _Node2 {
     }
     this.#patterns = [];
   }
-  insert(method, path, handler) {
+  insert(method, path2, handler) {
     this.#order = ++this.#order;
     let curNode = this;
-    const parts = splitRoutingPath(path);
+    const parts = splitRoutingPath(path2);
     const possibleKeys = [];
     for (let i = 0, len = parts.length; i < len; i++) {
       const p = parts[i];
@@ -91405,12 +91407,12 @@ var Node2 = class _Node2 {
       }
     }
   }
-  search(method, path) {
+  search(method, path2) {
     const handlerSets = [];
     this.#params = emptyParams;
     const curNode = this;
     let curNodes = [curNode];
-    const parts = splitPath(path);
+    const parts = splitPath(path2);
     const curNodesQueue = [];
     const len = parts.length;
     let partOffsets = null;
@@ -91452,13 +91454,13 @@ var Node2 = class _Node2 {
           if (matcher instanceof RegExp) {
             if (partOffsets === null) {
               partOffsets = new Array(len);
-              let offset = path[0] === "/" ? 1 : 0;
+              let offset = path2[0] === "/" ? 1 : 0;
               for (let p = 0; p < len; p++) {
                 partOffsets[p] = offset;
                 offset += parts[p].length + 1;
               }
             }
-            const restPathString = path.substring(partOffsets[i]);
+            const restPathString = path2.substring(partOffsets[i]);
             const m = matcher.exec(restPathString);
             if (m) {
               params[name] = m[0];
@@ -91511,18 +91513,18 @@ var TrieRouter = class {
   constructor() {
     this.#node = new Node2();
   }
-  add(method, path, handler) {
-    const results = checkOptionalParameter(path);
+  add(method, path2, handler) {
+    const results = checkOptionalParameter(path2);
     if (results) {
       for (let i = 0, len = results.length; i < len; i++) {
         this.#node.insert(method, results[i], handler);
       }
       return;
     }
-    this.#node.insert(method, path, handler);
+    this.#node.insert(method, path2, handler);
   }
-  match(method, path) {
-    return this.#node.search(method, path);
+  match(method, path2) {
+    return this.#node.search(method, path2);
   }
 };
 
@@ -92850,8 +92852,8 @@ var x402HTTPResourceServer = class {
   async processHTTPRequest(context, paywallConfig) {
     const method = context.method || context.adapter.getMethod();
     context = { ...context, method };
-    const { adapter, path } = context;
-    const routeMatch = this.getRouteConfig(path, method);
+    const { adapter, path: path2 } = context;
+    const routeMatch = this.getRouteConfig(path2, method);
     if (!routeMatch) {
       return { type: "no-payment-required" };
     }
@@ -93222,8 +93224,8 @@ var x402HTTPResourceServer = class {
    * @param method - HTTP method
    * @returns Route configuration and pattern, or undefined if no match
    */
-  getRouteConfig(path, method) {
-    const normalizedPath = this.normalizePath(path);
+  getRouteConfig(path2, method) {
+    const normalizedPath = this.normalizePath(path2);
     const upperMethod = method.toUpperCase();
     const matchingRoute = this.compiledRoutes.find(
       (route) => route.regex.test(normalizedPath) && (route.verb === "*" || route.verb === upperMethod)
@@ -93322,12 +93324,12 @@ var x402HTTPResourceServer = class {
    * @returns Parsed pattern with verb and regex
    */
   parseRoutePattern(pattern) {
-    const [verb, path] = pattern.includes(" ") ? pattern.split(/\s+/) : ["*", pattern];
+    const [verb, path2] = pattern.includes(" ") ? pattern.split(/\s+/) : ["*", pattern];
     const regex = new RegExp(
-      `^${path.replace(/\\/g, "\\\\").replace(/[$()+.?^{|}]/g, "\\$&").replace(/\*/g, ".*?").replace(/\[([^\]]+)\]/g, "[^/]+").replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, "[^/]+").replace(/\//g, "\\/")}$`,
+      `^${path2.replace(/\\/g, "\\\\").replace(/[$()+.?^{|}]/g, "\\$&").replace(/\*/g, ".*?").replace(/\[([^\]]+)\]/g, "[^/]+").replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, "[^/]+").replace(/\//g, "\\/")}$`,
       "i"
     );
-    return { verb: verb.toUpperCase(), regex, path };
+    return { verb: verb.toUpperCase(), regex, path: path2 };
   }
   /**
    * Normalize path for matching
@@ -93335,8 +93337,8 @@ var x402HTTPResourceServer = class {
    * @param path - Raw path from request
    * @returns Normalized path
    */
-  normalizePath(path) {
-    const pathWithoutQuery = path.split(/[?#]/)[0];
+  normalizePath(path2) {
+    const pathWithoutQuery = path2.split(/[?#]/)[0];
     let decodedOrRawPath;
     try {
       decodedOrRawPath = decodeURIComponent(pathWithoutQuery);
@@ -93655,11 +93657,11 @@ var HTTPFacilitatorClient = class {
    * @param path - The path to create authentication headers for (e.g., "verify", "settle", "supported")
    * @returns An object containing the authentication headers for the specified path
    */
-  async createAuthHeaders(path) {
+  async createAuthHeaders(path2) {
     if (this._createAuthHeaders) {
       const authHeaders = await this._createAuthHeaders();
       return {
-        headers: authHeaders[path] ?? {}
+        headers: authHeaders[path2] ?? {}
       };
     }
     return {
@@ -93831,9 +93833,9 @@ function assertAdditiveSettlementExtra(extra, enrichment, callerLabel) {
 function mergeAdditiveSettlementExtra(extra, enrichment) {
   return mergeAdditiveRecord(extra, enrichment);
 }
-function assertAdditiveRecord(target, enrichment, callerLabel, path) {
+function assertAdditiveRecord(target, enrichment, callerLabel, path2) {
   for (const [key, enrichmentValue] of Object.entries(enrichment)) {
-    const nextPath = `${path}["${key}"]`;
+    const nextPath = `${path2}["${key}"]`;
     if (!Object.prototype.hasOwnProperty.call(target, key)) continue;
     const targetValue = target[key];
     if (isPlainRecord(targetValue) && isPlainRecord(enrichmentValue)) {
@@ -101529,20 +101531,13 @@ async function rateLimiter(c, next) {
   }
   await next();
 }
-async function errorMiddleware(err2, c) {
-  console.error("Unhandled Server Error:", err2);
-  return c.json({
-    error: "Internal server error",
-    message: err2.message || "An unexpected error occurred"
-  }, 500);
-}
 async function requestLogger(c, next) {
   const start = Date.now();
-  const { method, path } = c.req;
-  console.log(`[REQUEST] ${method.toUpperCase()} ${path} - Initiated`);
+  const { method, path: path2 } = c.req;
+  console.log(`[REQUEST] ${method.toUpperCase()} ${path2} - Initiated`);
   await next();
   const duration = Date.now() - start;
-  console.log(`[RESPONSE] ${method.toUpperCase()} ${path} - Status ${c.res.status} (${duration}ms)`);
+  console.log(`[RESPONSE] ${method.toUpperCase()} ${path2} - Status ${c.res.status} (${duration}ms)`);
 }
 function validateAuthBody(type) {
   return async (c, next) => {
@@ -106250,7 +106245,28 @@ app.use("*", async (c, next) => {
 });
 app.use("*", requestLogger);
 app.use("*", rateLimiter);
-app.onError(errorMiddleware);
+var servePublicImage = (filename) => (c) => {
+  try {
+    const targetPath = import_path.default.resolve(__dirname, "public", filename);
+    if (import_fs.default.existsSync(targetPath)) {
+      const imageBuffer = import_fs.default.readFileSync(targetPath);
+      return c.body(imageBuffer, 200, {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=86400, s-maxage=86400",
+        "Access-Control-Allow-Origin": "*"
+      });
+    }
+  } catch (err2) {
+    console.error(`Failed to serve static image ${filename}:`, err2);
+  }
+  return c.notFound();
+};
+app.get("/icon.png", servePublicImage("icon.png"));
+app.get("/logo.png", servePublicImage("logo.png"));
+app.get("/favicon.ico", servePublicImage("icon.png"));
+app.get("/apple-touch-icon.png", servePublicImage("icon.png"));
+app.get("/public/icon.png", servePublicImage("icon.png"));
+app.get("/public/logo.png", servePublicImage("logo.png"));
 app.route("/api/auth", auth_default);
 app.route("/api/chat", chat_default);
 app.route("/api/waitlist", waitlist_default);

@@ -21,7 +21,7 @@ import {
 import { declareDiscoveryExtension } from '@x402-avm/extensions';
 import mongoose from 'mongoose';
 import { Task } from './models/Task';
-import { CANONICAL_ENDPOINTS } from './endpoints.registry';
+import { CANONICAL_ENDPOINTS, CANONICAL_BASE_URL } from './endpoints.registry';
 import { ENDPOINT_BASE_PRICES, formatBasePriceString } from './pricing.config';
 
 export type DynamicPrice = (context: any) => Promise<string> | string;
