@@ -341,8 +341,8 @@ export async function handlePlanTaskRequest(c: Context) {
       if (category === 'code_review') {
         name = item.path || `file-${idx + 1}`;
         textContent = item.content || '';
-        lineCount = textContent ? textContent.split('\n').length : 0;
-        fileSizeBytes = textContent ? Buffer.byteLength(textContent, 'utf8') : 0;
+        fileSizeBytes = textContent ? Buffer.byteLength(textContent, 'utf8') : (typeof item.size === 'number' ? item.size : 0);
+        lineCount = textContent ? textContent.split('\n').length : (fileSizeBytes > 0 ? Math.max(1, Math.round(fileSizeBytes / 35)) : 0);
       } else if (category === 'seo_audit') {
         name = item.url || `page-${idx + 1}`;
         textContent = item.title || '';
@@ -353,7 +353,9 @@ export async function handlePlanTaskRequest(c: Context) {
         fileSizeBytes = textContent ? Buffer.byteLength(textContent, 'utf8') : 0;
       }
 
-      const itemInputTokens = estimateTokens(name) + estimateTokens(textContent) + 250;
+      const itemInputTokens = textContent
+        ? estimateTokens(name) + estimateTokens(textContent) + 250
+        : (fileSizeBytes > 0 ? Math.round(fileSizeBytes / 4) + 250 : estimateTokens(name) + 250);
       let itemBasePrice = winner.price;
       let complexityTier: string | undefined = undefined;
 

@@ -92287,9 +92287,15 @@ __export(code_review_pricing_exports, {
   calculateCodeReviewBasePrice: () => calculateCodeReviewBasePrice
 });
 function calculateCodeReviewBasePrice(input) {
-  const tokens = typeof input.inputTokens === "number" && input.inputTokens >= 0 ? input.inputTokens : null;
-  const lines = typeof input.lineCount === "number" && input.lineCount >= 0 ? input.lineCount : 0;
   const bytes = typeof input.fileSizeBytes === "number" && input.fileSizeBytes >= 0 ? input.fileSizeBytes : 0;
+  let lines = typeof input.lineCount === "number" && input.lineCount >= 0 ? input.lineCount : 0;
+  if (lines === 0 && bytes > 0) {
+    lines = Math.max(1, Math.round(bytes / 35));
+  }
+  let tokens = typeof input.inputTokens === "number" && input.inputTokens >= 0 ? input.inputTokens : null;
+  if (tokens === null && bytes > 0) {
+    tokens = Math.max(1, Math.round(bytes / 4));
+  }
   let locTierIdx = 0;
   if (lines > 0) {
     for (let i = 0; i < CODE_REVIEW_WORKLOAD_TIERS.length; i++) {
@@ -92610,8 +92616,8 @@ async function handlePlanTaskRequest(c) {
       if (category === "code_review") {
         name = item.path || `file-${idx + 1}`;
         textContent = item.content || "";
-        lineCount = textContent ? textContent.split("\n").length : 0;
-        fileSizeBytes = textContent ? Buffer.byteLength(textContent, "utf8") : 0;
+        fileSizeBytes = textContent ? Buffer.byteLength(textContent, "utf8") : typeof item.size === "number" ? item.size : 0;
+        lineCount = textContent ? textContent.split("\n").length : fileSizeBytes > 0 ? Math.max(1, Math.round(fileSizeBytes / 35)) : 0;
       } else if (category === "seo_audit") {
         name = item.url || `page-${idx + 1}`;
         textContent = item.title || "";
@@ -92621,7 +92627,7 @@ async function handlePlanTaskRequest(c) {
         lineCount = textContent ? textContent.split("\n").length : 1;
         fileSizeBytes = textContent ? Buffer.byteLength(textContent, "utf8") : 0;
       }
-      const itemInputTokens = estimateTokens(name) + estimateTokens(textContent) + 250;
+      const itemInputTokens = textContent ? estimateTokens(name) + estimateTokens(textContent) + 250 : fileSizeBytes > 0 ? Math.round(fileSizeBytes / 4) + 250 : estimateTokens(name) + 250;
       let itemBasePrice = winner.price;
       let complexityTier = void 0;
       if (category === "code_review") {

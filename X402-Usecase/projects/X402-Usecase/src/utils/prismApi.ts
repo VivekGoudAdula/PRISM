@@ -287,7 +287,7 @@ export function buildPaymentPreview(
 
   const repoFiles = (plan as any).files;
   const sitePages = (plan as any).pages;
-  const itemPrices = (plan as any).itemPrices || [];
+  const itemPrices = (plan as any).itemPrices || (plan as any).plannerOutput?.itemPrices || [];
 
   if (plan.category === 'code_review' && Array.isArray(repoFiles) && repoFiles.length > 0) {
     repoFiles.forEach((f: any, i: number) => {

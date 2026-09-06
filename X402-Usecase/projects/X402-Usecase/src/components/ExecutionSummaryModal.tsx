@@ -161,7 +161,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                 <span className="font-extrabold text-[11px] text-white">GitHub Repository Review Plan</span>
                 <p>
                   This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for{' '}
-                  <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)}{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
+                  <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> (workload-based pricing per file{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
                 </p>
                 {!plan.capped && (plan.skipped || 0) > 0 && (
                   <span className="text-[9px] text-indigo-300/80 font-medium">
@@ -193,7 +193,7 @@ export const ExecutionSummaryModal: React.FC<ExecutionSummaryModalProps> = ({
                 <FiDollarSign className="text-emerald-400 text-[10px]" />
                 Unit Price
               </div>
-              <span className="font-semibold text-slate-200">${plan.unitPrice.toFixed(2)} / file</span>
+              <span className="font-semibold text-slate-200">{plan.category === 'code_review' ? `Workload-based ($${plan.unitPrice.toFixed(3)} avg)` : `$${plan.unitPrice.toFixed(2)} / file`}</span>
             </div>
             <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-900/40 border border-slate-800/40">
               <div className="flex items-center gap-1 text-slate-400 font-medium">

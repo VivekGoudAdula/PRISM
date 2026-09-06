@@ -24,9 +24,16 @@ export interface CodeReviewWorkloadResult {
  * Secondary factor: Token count / file size validation (prevents token-heavy files from falling into cheap tiers).
  */
 export function calculateCodeReviewBasePrice(input: CodeReviewWorkloadInput): CodeReviewWorkloadResult {
-  const tokens = typeof input.inputTokens === 'number' && input.inputTokens >= 0 ? input.inputTokens : null;
-  const lines = typeof input.lineCount === 'number' && input.lineCount >= 0 ? input.lineCount : 0;
   const bytes = typeof input.fileSizeBytes === 'number' && input.fileSizeBytes >= 0 ? input.fileSizeBytes : 0;
+  let lines = typeof input.lineCount === 'number' && input.lineCount >= 0 ? input.lineCount : 0;
+  if (lines === 0 && bytes > 0) {
+    lines = Math.max(1, Math.round(bytes / 35));
+  }
+
+  let tokens = typeof input.inputTokens === 'number' && input.inputTokens >= 0 ? input.inputTokens : null;
+  if (tokens === null && bytes > 0) {
+    tokens = Math.max(1, Math.round(bytes / 4));
+  }
 
   let locTierIdx = 0;
   if (lines > 0) {
