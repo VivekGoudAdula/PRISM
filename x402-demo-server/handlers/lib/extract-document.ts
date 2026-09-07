@@ -41,6 +41,19 @@ async function extractImagesFromPdf(buffer: Buffer): Promise<string[]> {
 }
 
 /**
+ * Normalizes text extracted from a PDF by cleaning whitespace and line breaks.
+ */
+function normalizePdfText(rawText: string): string {
+  if (!rawText) return '';
+  return rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n\n')
+    .trim();
+}
+
+/**
  * Centrally extracts text from base64 file content based on type (txt, pdf, scanned pdf OCR fallback).
  */
 export async function extractText(

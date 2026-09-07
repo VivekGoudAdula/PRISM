@@ -245,73 +245,6 @@ const Home: React.FC<HomeProps> = () => {
       );
     }
 
-    if ((category === 'claim_extraction' || category === 'claim-extract') && result) {
-      const claims = result.claims ?? result.documents?.flatMap((d: any) => d.claims ?? []) ?? [];
-      const docType = result.documentType || 'ARTICLE';
-      const claimCount = result.claimCount ?? claims.length;
-
-      return (
-        <div className="flex flex-col gap-4 w-full text-slate-300">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Extracted Claims</span>
-              <span className="text-xl font-black text-emerald-400">{claimCount}</span>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Document Type</span>
-              <span className="text-sm font-bold text-indigo-300 mt-1">{docType}</span>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-2xl flex flex-col gap-0.5">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Verification Status</span>
-              <span className="badge bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold px-2 py-0.5 mt-1 w-fit">
-                Requires Verification
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 w-full mt-1">
-            {claims.map((claimItem: any, index: number) => {
-              const claimId = claimItem.id || `claim_${String(index + 1).padStart(3, '0')}`;
-              const claimType = claimItem.claimType || 'OTHER';
-              const attribution = claimItem.attribution || 'UNATTRIBUTED';
-
-              return (
-                <div key={index} className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-800/40">
-                        {claimId.toUpperCase()}
-                      </span>
-                      <span className="badge bg-slate-800 border border-slate-700 text-slate-200 text-[10px] font-extrabold uppercase px-2 py-0.5">
-                        {claimType}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <span className="text-slate-400">Attribution:</span>
-                      <span className="font-semibold text-amber-300 bg-amber-950/30 border border-amber-900/40 px-2 py-0.5 rounded">
-                        {attribution}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-white font-medium text-sm leading-relaxed pl-1">
-                    "{claimItem.claim}"
-                  </p>
-
-                  {claimItem.sourceText && (
-                    <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/60 text-xs text-slate-400 font-mono mt-1">
-                      <span className="text-slate-500 font-bold block mb-1">SOURCE TEXT (Paragraph {claimItem.sourceLocation?.paragraph || 1}):</span>
-                      <span className="text-slate-300">"{claimItem.sourceText}"</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
     if (category === 'resume_screening' && result.candidates) {
       return (
         <div className="overflow-x-auto w-full">
@@ -835,11 +768,10 @@ const Home: React.FC<HomeProps> = () => {
             {viewState === 'app' && (
               <div className="relative">
                 <button
-                  className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-bold flex items-center gap-1.5 border transition-all hover:scale-105 ${
-                    activeAddress
+                  className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-bold flex items-center gap-1.5 border transition-all hover:scale-105 ${activeAddress
                       ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 font-mono'
                       : 'bg-rose-500/10 border-rose-500/40 text-rose-300 hover:bg-rose-500/20'
-                  }`}
+                    }`}
                   onClick={() => setShowWalletDropdown((p: boolean) => !p)}
                   data-test-id="connect-wallet"
                 >
@@ -1170,7 +1102,7 @@ const Home: React.FC<HomeProps> = () => {
                   <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">HUGE</p>
                     <p className="text-xs font-semibold text-slate-300 mt-1">1,500+ LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$1.08 / file</p>
+                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.90 / file</p>
                   </div>
                 </div>
 

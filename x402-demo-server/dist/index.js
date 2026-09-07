@@ -37737,6 +37737,10 @@ async function extractImagesFromPdf(buffer) {
     });
   });
 }
+function normalizePdfText(rawText) {
+  if (!rawText) return "";
+  return rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n\n").trim();
+}
 async function extractText(filename, content_base64) {
   const normalizedFilename = filename.toLowerCase();
   if (normalizedFilename.endsWith(".txt")) {

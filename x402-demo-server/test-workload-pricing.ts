@@ -197,12 +197,12 @@ async function runWorkloadTests() {
     );
   }
 
-  // Test 6: Huge file (1500+ lines) -> $1.08
+  // Test 6: Huge file (1500+ lines) -> $0.90
   {
     const res = calculateCodeReviewBasePrice({ lineCount: 2000, inputTokens: 8000 });
     assert(
-      res.complexityTier === 'HUGE' && res.basePrice === 1.08,
-      'Code Review Test 6: Huge file (2000 lines) -> HUGE ($1.08)',
+      res.complexityTier === 'HUGE' && res.basePrice === 0.90,
+      'Code Review Test 6: Huge file (2000 lines) -> HUGE ($0.90)',
       JSON.stringify(res)
     );
   }
@@ -255,10 +255,10 @@ async function runWorkloadTests() {
     const res = calculateCodeReviewBasePrice({ lineCount: 1500 });
     assert(res.complexityTier === 'VERY_LARGE' && res.basePrice === 0.60, 'Boundary 1500 LOC -> VERY_LARGE ($0.60)');
   }
-  // Boundary 1501 -> HUGE ($1.08)
+  // Boundary 1501 -> HUGE ($0.90)
   {
     const res = calculateCodeReviewBasePrice({ lineCount: 1501 });
-    assert(res.complexityTier === 'HUGE' && res.basePrice === 1.08, 'Boundary 1501 LOC -> HUGE ($1.08)');
+    assert(res.complexityTier === 'HUGE' && res.basePrice === 0.90, 'Boundary 1501 LOC -> HUGE ($0.90)');
   }
 
   // Multi-file Code Review sum test
@@ -394,7 +394,7 @@ async function runWorkloadTests() {
       { path: 'medium-server.ts',   lines: 300,  tokens: 1200 }, // MEDIUM ($0.12)
       { path: 'large-service.ts',   lines: 700,  tokens: 2800 }, // LARGE ($0.30)
       { path: 'very-large-db.ts',   lines: 1200, tokens: 5000 }, // VERY_LARGE ($0.60)
-      { path: 'huge-monolith.ts',   lines: 2500, tokens: 9000 }, // HUGE ($1.08)
+      { path: 'huge-monolith.ts',   lines: 2500, tokens: 9000 }, // HUGE ($0.90)
     ];
 
     const overallOptimizationRatio = 0.50; // 50% context reduction across repo
@@ -472,7 +472,7 @@ async function runWorkloadTests() {
     assert(repoItemPrices[2].complexityTier === 'MEDIUM' && repoItemPrices[2].basePrice === 0.12, 'Integration 2: file 3 assigned MEDIUM tier ($0.12)');
     assert(repoItemPrices[3].complexityTier === 'LARGE' && repoItemPrices[3].basePrice === 0.30, 'Integration 2: file 4 assigned LARGE tier ($0.30)');
     assert(repoItemPrices[4].complexityTier === 'VERY_LARGE' && repoItemPrices[4].basePrice === 0.60, 'Integration 2: file 5 assigned VERY_LARGE tier ($0.60)');
-    assert(repoItemPrices[5].complexityTier === 'HUGE' && repoItemPrices[5].basePrice === 1.08, 'Integration 2: file 6 assigned HUGE tier ($1.08)');
+    assert(repoItemPrices[5].complexityTier === 'HUGE' && repoItemPrices[5].basePrice === 0.90, 'Integration 2: file 6 assigned HUGE tier ($0.90)');
 
     assert(allRepoRequirementsMatched, 'Integration 2: Each file creates 1 x402 payment matching its workload-based dynamic final price');
     assert(
