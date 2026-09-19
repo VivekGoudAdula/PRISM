@@ -39,6 +39,7 @@
     "@algorandfoundation/algokit-utils": "^9.0.0",
     "@blockshake/defly-connect": "^1.2.1",
     "@dagrejs/dagre": "^3.1.0",
+    "@emailjs/browser": "^4.4.1",
     "@perawallet/connect": "^1.4.1",
     "@txnlab/use-wallet": "^4.0.0",
     "@txnlab/use-wallet-react": "^4.0.0",

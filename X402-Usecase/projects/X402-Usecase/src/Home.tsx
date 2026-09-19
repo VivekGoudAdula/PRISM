@@ -2,7 +2,8 @@
 import { useWallet } from '@txnlab/use-wallet-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign, FiMap, FiPlus } from 'react-icons/fi'
+import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign, FiMap, FiPlus, FiCode, FiUserCheck, FiGlobe, FiTv, FiCpu, FiLayers, FiZap, FiArrowRight, FiMail, FiTwitter, FiInstagram, FiLinkedin, FiGithub, FiMessageSquare, FiSend } from 'react-icons/fi'
+import emailjs from '@emailjs/browser'
 import ConnectWallet from './components/ConnectWallet'
 import PrismConsole from './components/PrismConsole'
 import Prism from './components/Prism'
@@ -68,6 +69,78 @@ const Home: React.FC<HomeProps> = () => {
   const [stats, setStats] = useState<any>(null)
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [historyTab, setHistoryTab] = useState<'conversations' | 'tasks'>('conversations')
+  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' })
+  const [formErrors, setFormErrors] = useState<{ name?: string; email?: string; message?: string }>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [contactStatus, setContactStatus] = useState<'idle' | 'success' | 'error'>('idle')
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  const validateForm = () => {
+    const errors: { name?: string; email?: string; message?: string } = {}
+    if (!contactForm.name.trim()) {
+      errors.name = 'Name is required'
+    }
+    if (!contactForm.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!validateEmail(contactForm.email.trim())) {
+      errors.email = 'Please enter a valid email address'
+    }
+    if (!contactForm.message.trim()) {
+      errors.message = 'Message is required'
+    }
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isSubmitting) return
+
+    if (!validateForm()) return
+
+    setIsSubmitting(true)
+    setContactStatus('idle')
+
+    const serviceId = (import.meta.env.VITE_EMAILJS_SERVICE_ID || '').trim()
+    const templateId = (import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '').trim()
+    const publicKey = (import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '').trim()
+
+    const templateParams = {
+      from_name: contactForm.name.trim(),
+      from_email: contactForm.email.trim(),
+      message: contactForm.message.trim(),
+    }
+
+    try {
+      if (serviceId && templateId && publicKey) {
+        emailjs.init(publicKey)
+        await emailjs.send(serviceId, templateId, templateParams)
+      } else {
+        console.warn('EmailJS variables missing in import.meta.env:', { serviceId, templateId, publicKey })
+        throw new Error('EmailJS config missing')
+      }
+      setContactStatus('success')
+    } catch (err: any) {
+      console.error('EmailJS error details:', {
+        status: err?.status,
+        text: err?.text,
+        error: err,
+        sentConfig: { serviceId, templateId, publicKeyLength: publicKey.length }
+      })
+      setContactStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResetContactForm = () => {
+    setContactForm({ name: '', email: '', message: '' })
+    setFormErrors({})
+    setContactStatus('idle')
+  }
 
   const renderFormattedResult = (result: any, category: string) => {
     if (!result) return <p className="text-slate-400 text-xs">No data returned.</p>;
@@ -769,8 +842,8 @@ const Home: React.FC<HomeProps> = () => {
               <div className="relative">
                 <button
                   className={`btn h-10 min-h-[40px] rounded-full px-4 text-xs font-bold flex items-center gap-1.5 border transition-all hover:scale-105 ${activeAddress
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 font-mono'
-                      : 'bg-rose-500/10 border-rose-500/40 text-rose-300 hover:bg-rose-500/20'
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 font-mono'
+                    : 'bg-rose-500/10 border-rose-500/40 text-rose-300 hover:bg-rose-500/20'
                     }`}
                   onClick={() => setShowWalletDropdown((p: boolean) => !p)}
                   data-test-id="connect-wallet"
@@ -896,263 +969,709 @@ const Home: React.FC<HomeProps> = () => {
         {viewState === 'landing' && (
           <div className="lp-hero-wrap w-full animate-fade-in relative">
 
-            {/* Floating Top-Left Logo */}
-            <div
-              className="absolute top-10 left-6 md:left-8 cursor-pointer z-50 transition-transform hover:scale-105"
-              onClick={() => navigate('/')}
-            >
-              <img src="/logo.png" alt="Prism Logo" className="h-14 w-auto object-contain" />
-            </div>
-
-            {/* Floating Top-Right Sign In */}
-            <div className="absolute top-10 right-6 md:right-8 z-50">
-              <button
-                className="btn btn-outline btn-sm rounded-full px-6 text-xs font-semibold hover:bg-white/10 hover:scale-105 transition-all"
-                onClick={() => navigate('/login')}
+            {/* Top Navbar Header */}
+            <header className="absolute top-6 left-0 right-0 z-50 w-full px-6 md:px-12 flex items-center justify-between">
+              {/* Top-Left Logo */}
+              <div
+                className="cursor-pointer transition-transform hover:scale-105 flex items-center shrink-0"
+                onClick={() => navigate('/')}
               >
-                Sign In
-              </button>
-            </div>
+                <img src="/logo.png" alt="Prism Logo" className="h-10 md:h-12 w-auto object-contain" />
+              </div>
 
-            {/* ── Hero ── */}
-            <div className="lp-hero-content pt-10 md:pt-14">
+              {/* Center Nav Links - Dedicated Glassmorphic Rectangle / Pill */}
+              <div className="hidden md:flex items-center gap-1 lg:gap-2 px-5 py-2 rounded-full bg-slate-900/60 backdrop-blur-xl border border-white/10 border-t-white/20 shadow-xl shadow-indigo-950/30 absolute left-1/2 -translate-x-1/2">
+                <button className="landing-nav-link whitespace-nowrap px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs lg:text-sm" onClick={() => document.getElementById('what-prism-does')?.scrollIntoView({ behavior: 'smooth' })}>Overview</button>
+                <button className="landing-nav-link whitespace-nowrap px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs lg:text-sm" onClick={() => document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' })}>Capabilities</button>
+                <button className="landing-nav-link whitespace-nowrap px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs lg:text-sm" onClick={() => document.getElementById('prism-difference')?.scrollIntoView({ behavior: 'smooth' })}>Intelligence</button>
+                <button className="landing-nav-link whitespace-nowrap px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs lg:text-sm" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pay-Per-Use</button>
+                <button className="landing-nav-link whitespace-nowrap px-3 py-1.5 rounded-full hover:bg-white/10 transition-all text-xs lg:text-sm" onClick={() => document.getElementById('traction')?.scrollIntoView({ behavior: 'smooth' })}>Traction</button>
+              </div>
+
+              {/* Top-Right Sign In */}
+              <div className="flex items-center shrink-0">
+                <button
+                  className="btn btn-outline btn-sm rounded-full px-6 text-xs font-semibold hover:bg-white/10 hover:scale-105 transition-all"
+                  onClick={() => navigate('/login')}
+                >
+                  Sign In
+                </button>
+              </div>
+            </header>
+
+            {/* ── SECTION 01: HERO ── */}
+            <div className="lp-hero-content relative z-10 pt-10 md:pt-14">
+
+              <span className="lp-hero-eyebrow">
+                AI ORCHESTRATION · PAY PER USE
+              </span>
 
               <h1 className="lp-hero-heading mb-6">
-                Stop paying for AI tools<br />
-                <span className="lp-hero-gradient">you barely use.</span>
+                One Platform.<br />
+                <span className="lp-hero-gradient">Every AI Task.</span>
               </h1>
 
               <p className="lp-hero-sub mb-6">
-                Ask for what you need: screening, contracts, invoices.
+                Send the work. PRISM understands, routes, and executes it with specialized AI capabilities.
               </p>
+
+              <div className="lp-hero-actions mt-4 mb-8">
+                <button
+                  className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform flex items-center gap-2"
+                  onClick={() => { navigate('/signup') }}
+                >
+                  <span>Get Started Free</span>
+                  <FiArrowRight />
+                </button>
+                <button
+                  className="btn btn-outline btn-lg rounded-full px-10 font-bold hover:scale-105 transition-transform"
+                  onClick={() => { document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }) }}
+                >
+                  Explore Capabilities
+                </button>
+              </div>
 
               {/* ── Trust Strip ── */}
               <div className="trust-strip my-6">
                 <span className="trust-badge">
+                  <span className="trust-icon"><FiCpu /></span>
+                  Specialized AI
+                </span>
+
+                <span className="trust-divider" />
+                <span className="trust-badge">
                   <span className="trust-icon"><FiCheckCircle /></span>
-                  No subscriptions — pay only when you use it
+                  Pay per use
+                </span>
+
+                <span className="trust-divider" />
+                <span className="trust-badge">
+                  <span className="trust-icon"><FiShield /></span>
+                  x402 payments
                 </span>
 
                 <span className="trust-divider" />
                 <span className="trust-badge">
                   <span className="trust-icon"><FiLink /></span>
-                  Secured on Algorand
+                  Algorand settlement
                 </span>
-              </div>
-
-              <div className="lp-hero-actions mt-4 mb-8">
-                <button
-                  className="btn btn-primary btn-lg rounded-full px-10 font-bold shadow-xl shadow-indigo-500/25 hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/signup') }}
-                >
-                  Get Started Free
-                </button>
-                <button
-                  className="btn btn-outline btn-lg rounded-full px-10 font-bold hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/login') }}
-                >
-                  Sign In
-                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Capability Cards — full-width section ── */}
+        {/* ── SECTION 02: WHAT PRISM DOES (REFINED PLATFORM OVERVIEW) ── */}
         {viewState === 'landing' && (
-          <section className="lp-section w-full">
-            <div className="lp-section-inner">
+          <section id="what-prism-does" className="lp-section w-full py-20 md:py-28 relative overflow-hidden bg-transparent">
+
+            {/* PRISM Iridescent Crystal (Smaller & pushed further right) */}
+            <div className="absolute top-1/2 -translate-y-1/2 -right-28 sm:-right-36 md:-right-48 lg:-right-56 pointer-events-none select-none z-0">
+              <div className="absolute inset-0 bg-indigo-600/15 blur-3xl rounded-full scale-110 pointer-events-none" />
+              <img
+                src="/prism.png"
+                alt="PRISM Iridescent Crystal"
+                className="w-[320px] sm:w-[420px] md:w-[500px] lg:w-[580px] xl:w-[640px] h-auto object-contain opacity-50 transition-transform duration-700 hover:scale-105"
+              />
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+
+                {/* LEFT: Text Description */}
+                <div className="lg:col-span-5 text-left flex flex-col gap-6 justify-center">
+                  <div>
+                    <p className="lp-eyebrow text-left mb-3">PLATFORM OVERVIEW</p>
+                    <h2 className="lp-section-heading text-left uppercase leading-tight">
+                      ONE PLATFORM.<br />
+                      <span className="lp-hero-gradient">AI FOR THE WORK YOU ACTUALLY DO.</span>
+                    </h2>
+                  </div>
+
+                  <p className="text-base sm:text-lg text-slate-300 font-medium leading-relaxed border-l-2 border-indigo-500/40 pl-4 py-1 max-w-md">
+                    Send the work to PRISM.<br />
+                    It understands, optimizes, routes, and executes.
+                  </p>
+                </div>
+
+                {/* MIDDLE: Vertical Flowchart Stack */}
+                <div className="lg:col-span-4 flex justify-center items-center z-10 py-4 lg:py-0">
+                  <div className="flex flex-col items-center text-center gap-2 w-full max-w-[290px]">
+
+                    {/* Node 01: YOUR TASK */}
+                    <div className="w-full bg-slate-900/75 backdrop-blur-xl border border-blue-500/30 border-t-blue-400/40 p-4 rounded-2xl shadow-xl hover:border-blue-400/60 transition-all duration-300 text-center flex flex-col items-center">
+                      <span className="text-[10px] font-mono font-extrabold text-blue-400 uppercase tracking-widest block text-center">01</span>
+                      <h3 className="cap-title text-sm sm:text-base font-extrabold text-slate-100 uppercase mt-1 mb-0.5 text-center">YOUR TASK</h3>
+                      <p className="cap-body text-xs sm:text-sm text-slate-200 leading-relaxed mt-0.5 text-center mb-0">Send your request or business document to PRISM.</p>
+                    </div>
+
+                    {/* Connecting Line 1 */}
+                    <div className="w-0.5 h-6 bg-gradient-to-b from-blue-500/60 to-indigo-500/60 shadow-[0_0_8px_rgba(99,102,241,0.5)] my-0.5 relative flex items-center justify-center">
+                      <span className="text-[10px] text-indigo-400 -translate-y-0.5 select-none">↓</span>
+                    </div>
+
+                    {/* Node 02: PRISM */}
+                    <div className="w-full bg-slate-900/75 backdrop-blur-xl border border-indigo-500/35 border-t-indigo-400/45 p-4 rounded-2xl shadow-xl hover:border-indigo-400/60 transition-all duration-300 text-center flex flex-col items-center">
+                      <span className="text-[10px] font-mono font-extrabold text-indigo-300 uppercase tracking-widest block text-center">02</span>
+                      <h3 className="cap-title text-sm sm:text-base font-extrabold text-slate-100 uppercase mt-1 mb-0.5 text-center">PRISM</h3>
+                      <p className="cap-body text-xs sm:text-sm text-slate-200 leading-relaxed mt-0.5 text-center mb-0">Understands intent, structures context, and optimizes tokens.</p>
+                    </div>
+
+                    {/* Connecting Line 2 */}
+                    <div className="w-0.5 h-6 bg-gradient-to-b from-indigo-500/60 to-purple-500/60 shadow-[0_0_8px_rgba(168,85,247,0.5)] my-0.5 relative flex items-center justify-center">
+                      <span className="text-[10px] text-purple-400 -translate-y-0.5 select-none">↓</span>
+                    </div>
+
+                    {/* Node 03: RIGHT AI CAPABILITY */}
+                    <div className="w-full bg-slate-900/75 backdrop-blur-xl border border-purple-500/35 border-t-purple-400/45 p-4 rounded-2xl shadow-xl hover:border-purple-400/60 transition-all duration-300 text-center flex flex-col items-center">
+                      <span className="text-[10px] font-mono font-extrabold text-purple-400 uppercase tracking-widest block text-center">03</span>
+                      <h3 className="cap-title text-sm sm:text-base font-extrabold text-slate-100 uppercase mt-1 mb-0.5 text-center">RIGHT AI CAPABILITY</h3>
+                      <p className="cap-body text-xs sm:text-sm text-slate-200 leading-relaxed mt-0.5 text-center mb-0">Routes execution to the optimal specialized AI tier.</p>
+                    </div>
+
+                    {/* Connecting Line 3 */}
+                    <div className="w-0.5 h-6 bg-gradient-to-b from-purple-500/60 to-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.5)] my-0.5 relative flex items-center justify-center">
+                      <span className="text-[10px] text-emerald-400 -translate-y-0.5 select-none">↓</span>
+                    </div>
+
+                    {/* Node 04: RESULT */}
+                    <div className="w-full bg-slate-900/75 backdrop-blur-xl border border-emerald-500/35 border-t-emerald-400/45 p-4 rounded-2xl shadow-xl hover:border-emerald-400/60 transition-all duration-300 text-center flex flex-col items-center">
+                      <span className="text-[10px] font-mono font-extrabold text-emerald-400 uppercase tracking-widest block text-center">04</span>
+                      <h3 className="cap-title text-sm sm:text-base font-extrabold text-slate-100 uppercase mt-1 mb-0.5 text-center">RESULT</h3>
+                      <p className="cap-body text-xs sm:text-sm text-slate-200 leading-relaxed mt-0.5 text-center mb-0">Structured, actionable output returned instantly.</p>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* RIGHT SPACER FOR PRISM CRYSTAL VISUAL */}
+                <div className="hidden lg:block lg:col-span-3 pointer-events-none" />
+
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── SECTION 03: CAPABILITIES ── */}
+        {viewState === 'landing' && (
+          <section id="capabilities" className="lp-section w-full relative overflow-hidden bg-transparent">
+            {/* Top-Left Image Graphic (shifted even further top and left) */}
+            <div className="absolute -top-16 -left-16 sm:-top-24 sm:-left-24 pointer-events-none select-none z-0">
+              <img
+                src="/capabilitiestop.png"
+                alt="Capabilities Top Graphic"
+                className="w-auto h-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg object-contain opacity-50 -translate-x-8 -translate-y-8"
+              />
+            </div>
+
+            <div className="lp-section-inner relative z-10">
               <p className="lp-eyebrow">Capabilities</p>
-              <h2 className="lp-section-heading">Built for real AI workloads</h2>
-              <p className="lp-section-sub">
-                Three production-ready task types — routed, priced, and verified on every run.
+              <h2 className="lp-section-heading uppercase">AI FOR THE WORK THAT MATTERS.</h2>
+              <p className="lp-section-sub mb-10 md:mb-14">
+                Specialized capabilities for real business workflows.
               </p>
-              <div className="capability-grid">
-                {/* Card 1 */}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left mt-10 md:mt-14 mb-8">
+                {/* Card 1: Code Review */}
                 <div className="cap-card cap-card--indigo">
-                  <div className="cap-icon-wrap cap-icon-wrap--indigo">
-                    <FiFileText />
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--indigo mb-0">
+                      <FiCode />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full">Engineering</span>
                   </div>
-                  <h3 className="cap-title">Resume Screening</h3>
+                  <h3 className="cap-title">CODE REVIEW</h3>
                   <p className="cap-body">
-                    Evaluate candidates against target job descriptions using optimized LLM models with verified, auditable output.
+                    Analyze code, identify issues, and provide actionable feedback.
                   </p>
-                  <ul className="cap-features">
-                    <li><FiCheckCircle className="cap-feat-icon" /> JD matching score</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> On-chain verification</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> Pay per result</li>
-                  </ul>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Scope:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> Static &amp; dynamic code analysis</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Vulnerability &amp; bug detection</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Actionable refactoring guidance</li>
+                    </ul>
+                  </div>
                 </div>
 
-                {/* Card 2 */}
+                {/* Card 2: Resume Screening */}
                 <div className="cap-card cap-card--blue">
-                  <div className="cap-icon-wrap cap-icon-wrap--blue">
-                    <FiBarChart2 />
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--blue mb-0">
+                      <FiUserCheck />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">HR</span>
                   </div>
-                  <h3 className="cap-title">Invoice Extraction</h3>
+                  <h3 className="cap-title">RESUME SCREENING</h3>
                   <p className="cap-body">
-                    Extract line items, quantities, and values from documents instantly with perfect, structured JSON output.
+                    Evaluate candidates against job requirements and surface relevant hiring insights.
                   </p>
-                  <ul className="cap-features">
-                    <li><FiCheckCircle className="cap-feat-icon" /> Structured JSON output</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> Multi-format support</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> Sub-second routing</li>
-                  </ul>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Scope:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> Job description alignment</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Candidate skill extraction</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Objective match scoring</li>
+                    </ul>
+                  </div>
                 </div>
 
-                {/* Card 3 */}
+                {/* Card 3: SEO Audit */}
                 <div className="cap-card cap-card--purple">
-                  <div className="cap-icon-wrap cap-icon-wrap--purple">
-                    <FiLock />
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--purple mb-0">
+                      <FiGlobe />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-purple-400 uppercase bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-full">Marketing</span>
                   </div>
-                  <h3 className="cap-title">Contract Analysis</h3>
+                  <h3 className="cap-title">SEO AUDIT</h3>
                   <p className="cap-body">
-                    Analyze legal documents to detect risk clauses and receive professional mitigation suggestions instantly.
+                    Evaluate websites and identify actionable opportunities to improve search performance.
                   </p>
-                  <ul className="cap-features">
-                    <li><FiCheckCircle className="cap-feat-icon" /> Risk clause detection</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> Mitigation advice</li>
-                    <li><FiCheckCircle className="cap-feat-icon" /> Verified result hash</li>
-                  </ul>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Scope:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> On-page structure &amp; meta audit</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Issue severity breakdown</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Actionable search optimization</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Card 4: Invoice Extraction */}
+                <div className="cap-card cap-card--blue">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--blue mb-0">
+                      <FiBarChart2 />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-blue-400 uppercase bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">Finance</span>
+                  </div>
+                  <h3 className="cap-title">INVOICE EXTRACTION</h3>
+                  <p className="cap-body">
+                    Turn invoices and documents into structured, usable data.
+                  </p>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Scope:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> Line-item &amp; metadata parsing</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Structured JSON conversion</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Automated ledger readiness</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Card 5: Contract Analysis */}
+                <div className="cap-card cap-card--purple">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--purple mb-0">
+                      <FiLock />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-purple-400 uppercase bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-full">Legal</span>
+                  </div>
+                  <h3 className="cap-title">CONTRACT ANALYSIS</h3>
+                  <p className="cap-body">
+                    Surface important clauses, risks, and mitigation insights from contracts.
+                  </p>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Scope:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> Critical clause detection</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Risk severity classification</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Mitigation recommendations</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Card 6: Media Intelligence */}
+                <div className="cap-card cap-card--indigo">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="cap-icon-wrap cap-icon-wrap--indigo mb-0">
+                      <FiTv />
+                    </div>
+                    <span className="text-[10px] font-extrabold font-mono text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-full">Media / News</span>
+                  </div>
+                  <h3 className="cap-title">MEDIA INTELLIGENCE</h3>
+                  <p className="cap-body">
+                    Turn information from articles and sources into structured, verifiable intelligence.
+                  </p>
+                  <div className="mt-auto border-t border-slate-800/60 pt-4">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Includes:</p>
+                    <ul className="cap-features">
+                      <li><FiCheckCircle className="cap-feat-icon" /> Claim Extract</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Claim Verify</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> Source Compare</li>
+                      <li><FiCheckCircle className="cap-feat-icon" /> News Research</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* ── Pricing — full-width section ── */}
+        {/* ── SECTION 04: THE PRISM DIFFERENCE ── */}
         {viewState === 'landing' && (
-          <section id="pricing" className="lp-section lp-section--alt w-full">
-            <div className="lp-section-inner">
-              <p className="lp-eyebrow">Pricing</p>
-              <h2 className="lp-section-heading">Only pay when it runs</h2>
-              <p className="lp-section-sub">
-                Transparent base pricing with PRISM Dynamic Token Optimization savings. No seat licenses. Every dollar goes to work.
+          <section id="prism-difference" className="lp-section w-full relative overflow-hidden bg-transparent">
+            {/* Background Graphic on Right Side (shifted down and left) */}
+            <div className="absolute top-[52%] -translate-y-1/3 -right-4 sm:-right-8 md:-right-12 lg:-right-16 pointer-events-none select-none z-0">
+              <img
+                src="/intelligencelayer.png"
+                alt="Intelligence Layer Visual"
+                className="w-[320px] sm:w-[420px] md:w-[520px] lg:w-[600px] h-auto object-contain opacity-50 translate-y-6"
+              />
+            </div>
+
+            <div className="lp-section-inner relative z-10">
+              <p className="lp-eyebrow">Intelligence Layer</p>
+              <h2 className="lp-section-heading uppercase">PRISM THINKS BEFORE IT RUNS.</h2>
+              <p className="lp-section-sub mb-10 md:mb-14">
+                Every request passes through an intelligence layer that helps understand the task, optimize context, and select the appropriate capability before execution.
               </p>
-              <div className="pricing-grid">
-                {/* Traditional SaaS Card */}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-left mt-10 md:mt-14 mb-8">
+                <div className="cap-card !p-4 sm:!p-5 gap-1.5 h-auto">
+                  <h3 className="cap-title text-sm font-extrabold text-indigo-400 mb-1">PROMPT TUTOR</h3>
+                  <p className="cap-body !flex-none text-xs text-slate-200 leading-relaxed !mb-0">Understand the task and intent.</p>
+                </div>
+                <div className="cap-card !p-4 sm:!p-5 gap-1.5 h-auto">
+                  <h3 className="cap-title text-sm font-extrabold text-blue-400 mb-1">DATA MAP</h3>
+                  <p className="cap-body !flex-none text-xs text-slate-200 leading-relaxed !mb-0">Structure the relevant context.</p>
+                </div>
+                <div className="cap-card !p-4 sm:!p-5 gap-1.5 h-auto">
+                  <h3 className="cap-title text-sm font-extrabold text-purple-400 mb-1">SEMANTIC CACHE</h3>
+                  <p className="cap-body !flex-none text-xs text-slate-200 leading-relaxed !mb-0">Reuse relevant context when applicable.</p>
+                </div>
+                <div className="cap-card !p-4 sm:!p-5 gap-1.5 h-auto">
+                  <h3 className="cap-title text-sm font-extrabold text-emerald-400 mb-1">PROMPT OPTIMIZER</h3>
+                  <p className="cap-body !flex-none text-xs text-slate-200 leading-relaxed !mb-0">Reduce unnecessary processing and measure token savings.</p>
+                </div>
+                <div className="cap-card !p-4 sm:!p-5 gap-1.5 h-auto">
+                  <h3 className="cap-title text-sm font-extrabold text-amber-400 mb-1">AI ROUTER</h3>
+                  <p className="cap-body !flex-none text-xs text-slate-200 leading-relaxed !mb-0">Select the appropriate capability and execution tier.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 !py-2.5 !px-6 cap-card flex flex-col items-center justify-center gap-1 max-w-xl mx-auto text-center">
+                <p className="cap-title text-xs sm:text-sm font-extrabold text-indigo-300 tracking-wider uppercase mb-0">
+                  UNDERSTAND &nbsp;→&nbsp; OPTIMIZE &nbsp;→&nbsp; ROUTE &nbsp;→&nbsp; EXECUTE
+                </p>
+                <span className="cap-body !flex-none text-xs sm:text-sm text-slate-200 font-semibold !mb-0">Specialized AI, intelligently orchestrated.</span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── SECTION 05: PAY-PER-USE ── */}
+        {viewState === 'landing' && (
+          <section id="pricing" className="lp-section lp-section--alt w-full py-12 md:py-16 overflow-hidden relative">
+            <div className="lp-section-inner max-w-7xl mx-auto px-6 md:px-12 relative z-10">
+              <div className="text-center">
+                <p className="lp-eyebrow">Pay-Per-Use Access</p>
+                <h2 className="lp-section-heading uppercase">AI WITHOUT THE SUBSCRIPTION OVERHEAD.</h2>
+                <p className="lp-section-sub mb-12 md:mb-16 max-w-2xl mx-auto">
+                  No seats. No unused bundles. Pay when the capability runs.
+                </p>
+              </div>
+
+              {/* 2 PRICING CARDS CENTERED */}
+              <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 text-left mt-6">
+                {/* Traditional AI Tools Card */}
                 <div className="pricing-card">
-                  <p className="pricing-label">Traditional SaaS</p>
-                  <p className="pricing-amount">Flat fee / mo</p>
-                  <p className="pricing-caption">Pay whether you use it or not.</p>
+                  <h3 className="cap-title text-base font-extrabold text-slate-100 uppercase mb-2">TRADITIONAL AI TOOLS</h3>
+                  <div className="my-4 py-4 border-y border-slate-800/80 flex flex-col items-center gap-2">
+                    <span className="cap-body text-sm font-bold text-slate-200 mb-0">Subscription</span>
+                    <span className="text-slate-500 text-xs">↓</span>
+                    <span className="cap-body text-sm font-bold text-slate-200 mb-0">Fixed access</span>
+                    <span className="text-slate-500 text-xs">↓</span>
+                    <span className="cap-body text-sm font-bold text-rose-400 mb-0">Pay even when unused</span>
+                  </div>
                   <ul className="pricing-features">
-                    <li className="pricing-feat pricing-feat--no"><span>✕</span> Monthly subscription</li>
-                    <li className="pricing-feat pricing-feat--no"><span>✕</span> Pay for idle capacity</li>
-                    <li className="pricing-feat pricing-feat--no"><span>✕</span> Black-box results</li>
+                    <li className="pricing-feat pricing-feat--no text-sm font-semibold"><span>✕</span> Mandatory per-seat subscriptions</li>
+                    <li className="pricing-feat pricing-feat--no text-sm font-semibold"><span>✕</span> Unused bundle waste</li>
+                    <li className="pricing-feat pricing-feat--no text-sm font-semibold"><span>✕</span> Fixed monthly commitments</li>
                   </ul>
                 </div>
 
-                {/* Base Pricing Overview Card */}
+                {/* PRISM Card */}
                 <div className="pricing-card pricing-card--highlight">
-                  <div className="pricing-badge">Recommended</div>
-                  <p className="pricing-label">Prism Base Pricing</p>
-                  <p className="pricing-amount pricing-amount--highlight">From $0.012 / unit</p>
-                  <p className="pricing-caption">base price · minus dynamic optimization savings</p>
+                  <div className="pricing-badge">PRISM</div>
+                  <h3 className="cap-title text-base font-extrabold text-slate-100 uppercase mb-2">PAY-PER-USE AI</h3>
+                  <div className="my-4 py-4 border-y border-slate-800/80 flex flex-col items-center gap-2">
+                    <span className="cap-body text-sm font-bold text-indigo-300 mb-0">Choose a task</span>
+                    <span className="text-indigo-400 text-xs">↓</span>
+                    <span className="cap-body text-sm font-bold text-indigo-300 mb-0">Run a capability</span>
+                    <span className="text-indigo-400 text-xs">↓</span>
+                    <span className="cap-body text-sm font-bold text-emerald-400 mb-0">Pay per use</span>
+                  </div>
                   <ul className="pricing-features">
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Resume Screen: $0.12 (Fast) / $0.30 (Accurate)</li>
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Contract Analysis: $0.18 (Fast) / $0.42 (Accurate)</li>
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> Invoice Extract: $0.096 (Fast) / $0.24 (Accurate)</li>
-                    <li className="pricing-feat pricing-feat--yes"><FiCheckCircle /> SEO Audit: $0.12 (Fast) / $0.30 (Accurate per page)</li>
+                    <li className="pricing-feat pricing-feat--yes text-sm font-semibold"><FiCheckCircle /> Fast &amp; Accurate execution tiers where available</li>
+                    <li className="pricing-feat pricing-feat--yes text-sm font-semibold"><FiCheckCircle /> Optimization savings may apply when eligible</li>
+                    <li className="pricing-feat pricing-feat--yes text-sm font-semibold"><FiCheckCircle /> x402 instant settlement on Algorand</li>
                   </ul>
                   <button
                     className="btn btn-primary w-full mt-6 rounded-xl font-bold text-sm"
                     onClick={() => { navigate('/signup') }}
                   >
-                    Get Started Free
+                    View Pricing &amp; Get Started →
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+        )}
 
-              {/* Code Review Workload-Based Pricing Tier Section */}
-              <div className="mt-12 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Code Review Workload Pricing</h3>
-                    <p className="text-xs text-slate-400">Determined per file based on Lines of Code (LOC) and token workload signals.</p>
+        {/* ── SECTION 08: TRACTION / METRICS ── */}
+        {viewState === 'landing' && (
+          <section id="traction" className="lp-section w-full py-10 md:py-14 overflow-hidden relative">
+            {/* ABSOLUTE BACKGROUND 3D PRISM VISUAL (LOWERED SLIGHTLY) */}
+            <div className="absolute -left-12 sm:-left-24 md:-left-32 lg:-left-40 top-1/2 -translate-y-1/3 mt-2 md:mt-4 z-0 pointer-events-none select-none">
+              <img
+                src="/metrics.png"
+                alt="PRISM Metrics Background Visual"
+                className="w-[440px] sm:w-[560px] md:w-[680px] lg:w-[760px] max-w-none h-auto object-contain mix-blend-multiply opacity-50 transition-transform duration-700 hover:scale-105"
+              />
+            </div>
+
+            <div className="lp-section-inner max-w-7xl mx-auto px-6 md:px-12 relative z-10">
+
+              {/* SECTION HEADER */}
+              <div className="text-center mb-10 md:mb-14 max-w-3xl lg:ml-auto lg:translate-x-36 xl:translate-x-48">
+                <p className="lp-eyebrow text-center">Verified Metrics</p>
+                <h2 className="lp-section-heading text-center uppercase">ALREADY RUNNING IN THE REAL WORLD.</h2>
+                <p className="lp-section-sub text-center max-w-2xl mx-auto mb-10 md:mb-14">
+                  PRISM is already being used, paid for, and settled on-chain.
+                </p>
+              </div>
+
+              {/* CONTENT CONTAINER WITH CARDS ANCHORED TO THE RIGHT */}
+              <div className="flex flex-col lg:flex-row items-center justify-end gap-8 relative">
+
+                {/* UNIFORM APPLE GLASS UI METRIC GRID (COMPACT & RIGHT-ALIGNED) */}
+                <div className="w-full lg:w-[80%] xl:w-[82%] lg:ml-auto lg:translate-x-40 xl:translate-x-56 grid grid-cols-2 sm:grid-cols-3 gap-5 md:gap-6 lg:gap-7 z-20">
+
+                  {/* Card 1 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      $950+
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Settled Volume
+                    </span>
                   </div>
-                  <span className="badge badge-primary badge-outline text-xs font-semibold px-3 py-1">Dynamic Optimization Eligible</span>
+
+                  {/* Card 2 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      11.9K
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Settlements
+                    </span>
+                  </div>
+
+                  {/* Card 3 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      99.9%
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Success Rate
+                    </span>
+                  </div>
+
+                  {/* Card 4 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      0.2 sec
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Avg. Settlement
+                    </span>
+                  </div>
+
+                  {/* Card 5 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      16
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Organizations
+                    </span>
+                  </div>
+
+                  {/* Card 6 */}
+                  <div className="cap-card !py-5 !px-6 md:!py-6 md:!px-8 min-h-[120px] md:min-h-[140px] h-full flex flex-col items-center justify-center text-center group relative overflow-hidden">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white group-hover:scale-105 transition-transform">
+                      35
+                    </span>
+                    <span className="cap-body !flex-none text-[11px] sm:text-xs md:text-sm font-semibold uppercase tracking-wider text-slate-200 mt-2 whitespace-nowrap !mb-0">
+                      Active Users
+                    </span>
+                  </div>
+
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">TINY</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">1–50 LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.012 / file</p>
-                  </div>
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SMALL</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">51–150 LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.036 / file</p>
-                  </div>
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MEDIUM</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">151–400 LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.12 / file</p>
-                  </div>
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LARGE</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">401–800 LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.30 / file</p>
-                  </div>
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VERY LARGE</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">801–1,500 LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.60 / file</p>
-                  </div>
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">HUGE</p>
-                    <p className="text-xs font-semibold text-slate-300 mt-1">1,500+ LOC</p>
-                    <p className="text-sm font-extrabold text-emerald-400 mt-1">$0.90 / file</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
-                  <span><strong>Base Price:</strong> Initial workload tier price</span>
-                  <span><strong>Optimization Savings:</strong> Base Price × Token Savings Rate × 50%</span>
-                  <span><strong>Final Price:</strong> Base Price – Savings (min $0.01)</span>
-                </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* ── Final CTA — full-width section ── */}
+        {/* ── SECTION 09: GET IN TOUCH ── */}
         {viewState === 'landing' && (
-          <section className="lp-cta-section w-full">
-            <div className="lp-cta-inner">
-              <p className="lp-eyebrow lp-eyebrow--light">Get started today</p>
-              <h2 className="lp-cta-heading">Ready to route your first task?</h2>
-              <p className="lp-cta-sub">
-                Sign up in seconds. No credit card required. Your first result is on us.
-              </p>
-              <div className="flex gap-4 flex-wrap justify-center mt-8">
-                <button
-                  className="btn btn-primary btn-lg rounded-full px-10 text-sm font-bold shadow-2xl shadow-indigo-500/30 hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/signup') }}
-                >
-                  Get Started — It's Free
-                </button>
-                <button
-                  className="btn btn-outline btn-lg rounded-full px-10 text-sm font-bold hover:scale-105 transition-transform"
-                  onClick={() => { navigate('/login') }}
-                >
-                  Sign In
-                </button>
+          <section id="get-in-touch" className="lp-section relative w-full min-h-screen py-16 md:py-24 overflow-hidden flex flex-col justify-center items-center bg-slate-950/40 backdrop-blur-xs border-t border-white/10">
+            {/* Background Glow effects */}
+            <div className="absolute inset-0 pointer-events-none select-none z-0">
+              <div className="absolute left-1/4 top-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-gradient-to-r from-blue-600/15 via-indigo-600/20 to-purple-600/15 blur-[140px]" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[130px]" />
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10 w-full flex flex-col items-center">
+              
+              {/* CENTERED SECTION TITLE & SUBTITLE */}
+              <div className="text-center max-w-2xl mx-auto mb-10 md:mb-12">
+                <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-3 text-center">
+                  Get in <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Touch</span>
+                </h2>
+                <p className="text-sm md:text-base text-slate-300 font-medium text-center">
+                  Have a collaboration opportunity, or question? Send us a message and we'll get right back to you.
+                </p>
               </div>
-              <p className="lp-cta-footnote">Powered by Algorand · x402 payments · GoPlausible verification</p>
+
+              {/* SIDE-BY-SIDE: BOX ON LEFT, IMAGE ON RIGHT TOUCHING SCREEN RIGHT EDGE */}
+              <div className="w-full flex flex-col lg:flex-row items-center justify-between gap-4 lg:gap-0">
+                
+                {/* LEFT: FORM BOX */}
+                <div className="w-full lg:w-1/2 max-w-xl shrink-0 text-left py-2 z-20">
+                  <form
+                    onSubmit={handleContactSubmit}
+                    noValidate
+                    className="bg-slate-900/15 backdrop-blur-2xl border border-white/10 border-t-white/20 p-6 md:p-8 rounded-3xl shadow-2xl shadow-black/80 flex flex-col gap-4 relative text-left items-start"
+                  >
+                    {contactStatus === 'success' ? (
+                      <div className="py-8 flex flex-col items-center text-center gap-3 animate-fade-in w-full" role="status">
+                        <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-2xl shadow-lg shadow-emerald-500/10">
+                          <FiCheckCircle />
+                        </div>
+                        <h4 className="text-xl font-bold text-white">Message sent successfully! ✓</h4>
+                        <p className="text-xs md:text-sm text-slate-300 max-w-xs leading-relaxed">
+                          Thanks for reaching out. We’ll get back to you soon.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleResetContactForm}
+                          className="btn btn-outline btn-sm rounded-full px-6 text-xs font-semibold mt-3 hover:bg-white/10 transition-all text-white"
+                        >
+                          Send another message
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {contactStatus === 'error' && (
+                          <div role="alert" className="p-3 bg-rose-500/15 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-semibold flex items-center gap-2 animate-fade-in w-full text-left">
+                            <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                            <span>Something went wrong. Please try again.</span>
+                          </div>
+                        )}
+
+                        {/* Name Field */}
+                        <div className="flex flex-col gap-1.5 text-left items-start w-full">
+                          <label htmlFor="from_name" className="text-sm md:text-base font-extrabold text-slate-100 text-left">Name</label>
+                          <input
+                            id="from_name"
+                            name="from_name"
+                            type="text"
+                            placeholder="Your Name"
+                            value={contactForm.name}
+                            disabled={isSubmitting}
+                            aria-invalid={!!formErrors.name}
+                            aria-describedby={formErrors.name ? "name-error" : undefined}
+                            onChange={(e) => {
+                              setContactForm({ ...contactForm, name: e.target.value })
+                              if (formErrors.name) setFormErrors({ ...formErrors, name: undefined })
+                            }}
+                            className={`w-full bg-slate-950/70 border ${formErrors.name ? 'border-rose-500/80 focus:border-rose-500' : 'border-slate-800 focus:border-indigo-500/80'} focus:ring-2 focus:ring-indigo-500/30 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-400 outline-none transition-all disabled:opacity-60 text-left placeholder:text-left`}
+                          />
+                          {formErrors.name && (
+                            <span id="name-error" className="text-xs sm:text-sm text-rose-400 font-medium text-left">{formErrors.name}</span>
+                          )}
+                        </div>
+
+                        {/* Email Field */}
+                        <div className="flex flex-col gap-1.5 text-left items-start w-full">
+                          <label htmlFor="from_email" className="text-sm md:text-base font-extrabold text-slate-100 text-left">Email</label>
+                          <input
+                            id="from_email"
+                            name="from_email"
+                            type="email"
+                            placeholder="your.email@company.com"
+                            value={contactForm.email}
+                            disabled={isSubmitting}
+                            aria-invalid={!!formErrors.email}
+                            aria-describedby={formErrors.email ? "email-error" : undefined}
+                            onChange={(e) => {
+                              setContactForm({ ...contactForm, email: e.target.value })
+                              if (formErrors.email) setFormErrors({ ...formErrors, email: undefined })
+                            }}
+                            className={`w-full bg-slate-950/70 border ${formErrors.email ? 'border-rose-500/80 focus:border-rose-500' : 'border-slate-800 focus:border-indigo-500/80'} focus:ring-2 focus:ring-indigo-500/30 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-400 outline-none transition-all disabled:opacity-60 text-left placeholder:text-left`}
+                          />
+                          {formErrors.email && (
+                            <span id="email-error" className="text-xs sm:text-sm text-rose-400 font-medium text-left">{formErrors.email}</span>
+                          )}
+                        </div>
+
+                        {/* Message Field */}
+                        <div className="flex flex-col gap-1.5 text-left items-start w-full">
+                          <label htmlFor="message" className="text-sm md:text-base font-extrabold text-slate-100 text-left">Message</label>
+                          <textarea
+                            id="message"
+                            name="message"
+                            rows={4}
+                            placeholder="Tell us how we can help..."
+                            value={contactForm.message}
+                            disabled={isSubmitting}
+                            aria-invalid={!!formErrors.message}
+                            aria-describedby={formErrors.message ? "message-error" : undefined}
+                            onChange={(e) => {
+                              setContactForm({ ...contactForm, message: e.target.value })
+                              if (formErrors.message) setFormErrors({ ...formErrors, message: undefined })
+                            }}
+                            className={`w-full bg-slate-950/70 border ${formErrors.message ? 'border-rose-500/80 focus:border-rose-500' : 'border-slate-800 focus:border-indigo-500/80'} focus:ring-2 focus:ring-indigo-500/30 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-400 outline-none transition-all resize-none disabled:opacity-60 text-left placeholder:text-left`}
+                          />
+                          {formErrors.message && (
+                            <span id="message-error" className="text-xs sm:text-sm text-rose-400 font-medium text-left">{formErrors.message}</span>
+                          )}
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="btn btn-primary w-full rounded-xl py-4 mt-2 font-extrabold text-base shadow-xl shadow-indigo-500/25 border border-indigo-400/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none text-center"
+                        >
+                          <span>{isSubmitting ? 'Sending...' : 'Send Message →'}</span>
+                        </button>
+                      </>
+                    )}
+                  </form>
+                </div>
+
+                {/* RIGHT: ARTWORK IMAGE (MOVED RIGHT) */}
+                <div className="w-full lg:w-[45%] xl:w-[48%] 2xl:w-[50%] h-[280px] md:h-[350px] lg:h-[400px] 2xl:h-[450px] relative flex items-center justify-center lg:justify-end z-10 pointer-events-none select-none scale-90 sm:scale-95 lg:scale-105 xl:scale-115 2xl:scale-125 origin-right translate-x-2 lg:translate-x-10 xl:translate-x-16">
+                  <img
+                    src="/get-in-touch.png"
+                    alt="Get in Touch PRISM Visual"
+                    className="w-full h-full object-contain lg:object-right opacity-50"
+                  />
+                </div>
+
+              </div>
+
             </div>
           </section>
         )}
-
-        {/* ── Waitlist section (disabled locally — live on deployed branch) ──
-        {viewState === 'landing' && (
-          <section id="waitlist" className="lp-section w-full">...</section>
-        )}
-        ── end waitlist section ── */}
 
         {/* AUTH VIEW (LOGIN / SIGNUP) */}
         {viewState === 'auth' && (
-          <div className="auth-screen">
+          <div className="auth-screen relative overflow-hidden">
 
             {/* Top-left logo — click to return to landing */}
             <div
@@ -1166,8 +1685,17 @@ const Home: React.FC<HomeProps> = () => {
               <img src="/logo.png" alt="Prism" className="h-14 w-auto object-contain" />
             </div>
 
+            {/* Bottom Graphic Visual */}
+            <div className="absolute -bottom-12 -right-12 sm:-bottom-20 sm:-right-20 pointer-events-none select-none z-0">
+              <img
+                src="/metrics.png"
+                alt="PRISM Metrics Visual"
+                className="w-auto h-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg object-contain opacity-40 translate-x-6 translate-y-6"
+              />
+            </div>
+
             {/* Centered card */}
-            <div className="w-full max-w-md liquid-glass p-8 animate-scale-up">
+            <div className="w-full max-w-md liquid-glass p-8 animate-scale-up relative z-10">
 
               {/* Form Toggle Tabs */}
               <div className="flex border-b border-slate-800 mb-6">
@@ -1295,55 +1823,47 @@ const Home: React.FC<HomeProps> = () => {
 
       </main>
 
-      {/* ── Site Footer (landing only) ── */}
+      {/* ── MINIMAL TRANSPARENT FOOTER WITH OVERSIZED WORDMARK (landing only) ── */}
       {viewState === 'landing' && (
-        <footer className="lp-footer">
-          <div className="lp-footer-inner">
-
-            {/* Brand column */}
-            <div className="lp-footer-brand">
-              <img src="/logo.png" alt="Prism" className="lp-footer-logo" />
-              <p className="lp-footer-tagline">
-                AI task routing — verified on-chain,<br />paid per result.
-              </p>
-            </div>
-
-            {/* Product links */}
-            <div className="lp-footer-col">
-              <p className="lp-footer-col-title">Product</p>
-              <ul className="lp-footer-links">
-                <li><a href="#pricing" className="lp-footer-link">Pricing</a></li>
-                <li><button className="lp-footer-link" onClick={() => { navigate('/signup') }}>Get Started</button></li>
-                <li><button className="lp-footer-link" onClick={() => { navigate('/login') }}>Sign In</button></li>
-              </ul>
-            </div>
-
-            {/* Capabilities */}
-            <div className="lp-footer-col">
-              <p className="lp-footer-col-title">Capabilities</p>
-              <ul className="lp-footer-links">
-                <li><span className="lp-footer-link">Resume Screening</span></li>
-                <li><span className="lp-footer-link">Invoice Extraction</span></li>
-                <li><span className="lp-footer-link">Contract Analysis</span></li>
-              </ul>
-            </div>
-
-            {/* Built with */}
-            <div className="lp-footer-col">
-              <p className="lp-footer-col-title">Built With</p>
-              <div className="lp-footer-tech">
-                <span className="lp-tech-badge"><FiLink className="inline mr-1" />Algorand</span>
-                <span className="lp-tech-badge"><FiShield className="inline mr-1" />x402</span>
-                <span className="lp-tech-badge"><FiCheckCircle className="inline mr-1" />GoPlausible</span>
-              </div>
-            </div>
-
+        <footer className="w-full bg-transparent text-white pt-6 md:pt-10 pb-6 relative z-20 overflow-hidden select-none border-t border-white/10">
+          {/* OVERSIZED PRISM WORDMARK (TOUCHES THE BOTTOM GLASS BAR) */}
+          <div className="w-full px-4 text-center mt-2 md:mt-4 -mb-3 sm:-mb-5 md:-mb-7 relative z-10">
+            <h1 className="text-[13vw] sm:text-[15vw] md:text-[16vw] font-black tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-b from-white/25 via-white/12 to-indigo-400/10 select-none pointer-events-none">
+              PRISM
+            </h1>
           </div>
 
-          {/* Bottom bar */}
-          <div className="lp-footer-bar">
-            <p className="lp-footer-copy">© {new Date().getFullYear()} Prism. All rights reserved.</p>
-            <p className="lp-footer-copy">Built for the Global x402 Challenge · Algorand</p>
+          {/* Bottom Glass Bar Container */}
+          <div className="w-full max-w-6xl mx-auto px-4 md:px-8 relative z-20">
+            <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 border-t-white/20 rounded-2xl sm:rounded-full px-6 md:px-8 py-3.5 shadow-2xl shadow-black/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-300 font-light tracking-wide">
+              <span className="font-light text-slate-300/90">© {new Date().getFullYear()} PRISM. All rights reserved.</span>
+
+              {/* Social Icons (X & Instagram only) */}
+              <div className="flex items-center gap-2.5">
+                <a
+                  href="https://x.com/prismx402"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="X"
+                  className="w-7 h-7 rounded-full border border-white/10 bg-slate-950/60 flex items-center justify-center text-slate-300 hover:text-white hover:border-indigo-400/50 hover:bg-indigo-950/40 transition-all shadow-sm"
+                >
+                  <FiTwitter className="text-[11px]" />
+                </a>
+                <a
+                  href="https://www.instagram.com/prism.x402/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Instagram"
+                  className="w-7 h-7 rounded-full border border-white/10 bg-slate-950/60 flex items-center justify-center text-slate-300 hover:text-white hover:border-indigo-400/50 hover:bg-indigo-950/40 transition-all shadow-sm"
+                >
+                  <FiInstagram className="text-[11px]" />
+                </a>
+              </div>
+
+              <span className="text-slate-300/80 font-light uppercase text-[11px] tracking-wider">
+                Powered by <span className="text-indigo-300 font-normal">Algorand</span>
+              </span>
+            </div>
           </div>
         </footer>
       )}
