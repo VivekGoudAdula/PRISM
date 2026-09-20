@@ -3,7 +3,7 @@ import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
 import mongoose from 'mongoose';
 
 export interface RouteResult {
-  intent: 'TASK' | 'CONVERSATIONAL' | 'UNSUPPORTED';
+  intent: 'TASK' | 'CONVERSATIONAL' | 'UNSUPPORTED' | 'FOLLOW_UP' | 'CHAT';
   taskType?: string | null;
   activeTaskId?: string | null;
   referencedTaskIds: string[];
@@ -12,7 +12,7 @@ export interface RouteResult {
   message: string;
   groundedAnswer?: string;
   source?: {
-    type: 'task_history' | 'new_task' | 'unsupported';
+    type: 'task_history' | 'new_task' | 'unsupported' | 'chat';
     taskId?: string;
     taskIds?: string[];
   };
@@ -56,6 +56,24 @@ export async function processConversationalMessage(params: {
   // Step 2: Classify Intent
   const intentClass = classifyIntent(lowerMsg, hasFiles, historicalTasks);
 
+  // Structured Logging for PRISM Router
+  const hasUrl = lowerMsg.includes('http://') || lowerMsg.includes('https://') || lowerMsg.includes('github.com/');
+  console.log(`\n[PRISM ROUTER]
+Message: "${message}"
+URL detected: ${hasUrl}
+Task verb detected: ${intentClass.taskType ? true : false}
+Existing task reference: ${historicalTasks.length > 0}
+
+Intent: ${intentClass.intent}
+Task type: ${intentClass.taskType || 'N/A'}
+Task ID: ${intentClass.intent === 'TASK' ? 'NEW' : (historicalTasks[0]?._id || 'NONE')}
+
+Execute endpoint: ${intentClass.intent === 'TASK' ? 'YES' : 'NO'}
+Optimization: ${intentClass.intent === 'TASK' ? 'YES' : 'NO'}
+Payment: ${intentClass.intent === 'TASK' ? 'YES' : 'NO'}
+Source: ${intentClass.intent === 'TASK' ? 'new task execution' : (historicalTasks.length > 0 ? 'stored structured result' : 'general response')}
+`);
+
   // Step 3: Handle UNSUPPORTED intent
   if (intentClass.intent === 'UNSUPPORTED') {
     return {
@@ -77,12 +95,22 @@ export async function processConversationalMessage(params: {
     };
   }
 
-  // Step 5: Handle CONVERSATIONAL intent (follow-up or cross-task question)
+  // Handle CHAT intent
+  if (intentClass.intent === 'CHAT') {
+    return {
+      intent: 'CHAT',
+      referencedTaskIds: [],
+      message: "Hello! I'm Prism, your AI workspace assistant. You can ask me to review code, screen resumes, analyze contracts, or ask questions about completed tasks in this workspace!",
+      source: { type: 'chat' },
+    };
+  }
+
+  // Step 5: Handle FOLLOW_UP / CONVERSATIONAL intent (follow-up or cross-task question)
   if (historicalTasks.length === 0) {
     return {
       intent: 'CONVERSATIONAL',
       referencedTaskIds: [],
-      message: "I don't have a previous task result in this conversation to reference. Please run a task (such as code review, resume screening, or contract analysis) first!",
+      message: "I don't have a previous result to reference — could you clarify what you'd like me to look at?",
       source: { type: 'task_history' },
     };
   }
@@ -111,7 +139,7 @@ export async function processConversationalMessage(params: {
   const primaryTaskId = selectedTasks.length > 0 ? selectedTasks[0]._id.toString() : undefined;
 
   return {
-    intent: 'CONVERSATIONAL',
+    intent: 'FOLLOW_UP',
     activeTaskId: primaryTaskId,
     referencedTaskIds: resolved.matchedTaskIds,
     message: groundedAnswer,
@@ -125,23 +153,67 @@ export async function processConversationalMessage(params: {
 }
 
 /**
- * Classifies input message into TASK, CONVERSATIONAL, or UNSUPPORTED.
+ * Classifies input message into TASK, CONVERSATIONAL, CHAT, or UNSUPPORTED.
+ * 
+ * STRICT ROUTING PRIORITY ORDER:
+ * 1. EXPLICIT NEW TASK DETECTION (Task verbs + inputs like GitHub URLs, files, etc. ALWAYS win over history)
+ * 2. HISTORICAL / FOLLOW-UP DETECTION (Queries referencing existing completed task findings)
+ * 3. UNSUPPORTED / GENERAL CHAT
  */
 function classifyIntent(
   lowerMsg: string,
   hasFiles: boolean,
   historicalTasks: any[]
-): { intent: 'TASK' | 'CONVERSATIONAL' | 'UNSUPPORTED'; taskType?: string } {
-  // Unsupported triggers
-  const unsupportedKeywords = [
-    'weather', 'temperature', 'forecast', 'recipe', 'cook', 'sports', 'cricket',
-    'football', 'nba', 'joke', 'sing', 'movie', 'song', 'flight', 'hotel'
-  ];
-  if (unsupportedKeywords.some((k) => lowerMsg.includes(k))) {
-    return { intent: 'UNSUPPORTED' };
+): { intent: 'TASK' | 'CONVERSATIONAL' | 'FOLLOW_UP' | 'CHAT' | 'UNSUPPORTED'; taskType?: string } {
+  const hasGitHubUrl = lowerMsg.includes('github.com/');
+  const hasSiteUrl = lowerMsg.includes('http://') || lowerMsg.includes('https://') || lowerMsg.includes('www.');
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. EXPLICIT NEW TASK DETECTION (HIGHEST PRIORITY)
+  // ─────────────────────────────────────────────────────────────
+
+  // Code Review explicit task verbs & URL inputs
+  const codeReviewVerbs = ['review', 'analyze', 'audit', 'inspect', 'check', 'find issues', 'find bugs'];
+  const hasCodeReviewVerb = codeReviewVerbs.some((v) => lowerMsg.includes(v));
+
+  if (hasGitHubUrl) {
+    return { intent: 'TASK', taskType: 'code_review' };
   }
 
-  // If files are attached, check if it's a new task vs follow-up question
+  if (hasCodeReviewVerb && (lowerMsg.includes('code') || lowerMsg.includes('repo') || lowerMsg.includes('repository') || lowerMsg.includes('git'))) {
+    // Make sure it's not a follow up question like "go back to repository" or "what did you find in repo"
+    const isFollowUpPhrase = lowerMsg.includes('go back to') || lowerMsg.includes('what did you find') || lowerMsg.includes('what were') || lowerMsg.includes('what was');
+    if (!isFollowUpPhrase) {
+      return { intent: 'TASK', taskType: 'code_review' };
+    }
+  }
+
+  // Resume Screening explicit task verbs
+  const resumeVerbs = ['screen', 'shortlist', 'rank', 'evaluate candidates', 'compare candidates', 'find the best candidate'];
+  const hasResumeVerb = resumeVerbs.some((v) => lowerMsg.includes(v));
+  if (hasResumeVerb && (hasFiles || lowerMsg.includes('resume') || lowerMsg.includes('candidate') || lowerMsg.includes('applicant') || lowerMsg.includes('cv'))) {
+    const isFollowUpPhrase = lowerMsg.includes('who scored') || lowerMsg.includes('which candidate') || lowerMsg.includes('what was');
+    if (!isFollowUpPhrase) {
+      return { intent: 'TASK', taskType: 'resume_screening' };
+    }
+  }
+
+  // Contract Analysis explicit task verbs
+  if ((lowerMsg.includes('analyze contract') || lowerMsg.includes('review contract') || lowerMsg.includes('check agreement') || lowerMsg.includes('find risky clauses') || lowerMsg.includes('extract contract terms')) && !lowerMsg.includes('what did you find')) {
+    return { intent: 'TASK', taskType: 'contract_analysis' };
+  }
+
+  // Invoice Extraction explicit task verbs
+  if ((lowerMsg.includes('extract invoice') || lowerMsg.includes('read invoice') || lowerMsg.includes('process invoice') || lowerMsg.includes('extract invoice data')) && !lowerMsg.includes('what was')) {
+    return { intent: 'TASK', taskType: 'invoice_extraction' };
+  }
+
+  // SEO Audit explicit task verbs
+  if ((hasSiteUrl || lowerMsg.includes('seo audit') || lowerMsg.includes('audit website') || lowerMsg.includes('check seo') || lowerMsg.includes('analyze seo')) && !lowerMsg.includes('what was')) {
+    return { intent: 'TASK', taskType: 'seo_audit' };
+  }
+
+  // File attached new task fallback if not explicit follow-up
   if (hasFiles) {
     const isExplicitFollowUp =
       lowerMsg.includes('what did you find') || lowerMsg.includes('what were') ||
@@ -162,12 +234,16 @@ function classifyIntent(
     }
   }
 
-  // Explicit Conversational reference phrases
+  // ─────────────────────────────────────────────────────────────
+  // 2. HISTORICAL / FOLLOW-UP DETECTION (SECOND PRIORITY)
+  // ─────────────────────────────────────────────────────────────
+
+  // Explicit Conversational / Historical reference phrases
   const conversationalPhrases = [
-    'what was the issue', 'what were the issues', 'what was wrong with',
+    'what was the issue', 'what were the issues', 'what were main issues', 'what were the main issues', 'what was wrong with',
     'how many issues', 'overall quality score', 'quality score',
-    'who scored highest', 'top candidate', 'strongest', 'above 80',
-    'what was vivek', 'resume score', 'score of', 'what did you find', 'what were the', 'which candidate',
+    'who scored highest', 'top candidate', 'strongest', 'which candidate', 'above 80',
+    'what was vivek', 'resume score', 'score of', 'what did you find', 'what were the',
     'why did you flag', 'what did you say', 'go back to', 'what about the',
     'explain the', 'previous', 'earlier', 'above', 'that review', 'those resumes',
     'the repository', 'the contract', 'the invoice', 'compare the',
@@ -181,34 +257,10 @@ function classifyIntent(
     return { intent: 'CONVERSATIONAL' };
   }
 
-  // File name references (e.g. README.template.md, contributorsList.js) indicate conversational lookup if tasks exist
+  // File name references indicate historical lookup if tasks exist
   const hasFileNameRef = lowerMsg.includes('.md') || lowerMsg.includes('.js') || lowerMsg.includes('.ts') || lowerMsg.includes('.py') || lowerMsg.includes('.json');
   if (hasFileNameRef && historicalTasks.length > 0) {
     return { intent: 'CONVERSATIONAL' };
-  }
-
-  // Check for New Task signals
-  const hasGitHubUrl = lowerMsg.includes('github.com/');
-  const hasSiteUrl = lowerMsg.includes('http://') || lowerMsg.includes('https://') || lowerMsg.includes('www.');
-
-  if (hasGitHubUrl || (lowerMsg.startsWith('review') && lowerMsg.includes('repo'))) {
-    return { intent: 'TASK', taskType: 'code_review' };
-  }
-
-  if (hasSiteUrl || lowerMsg.includes('audit website') || lowerMsg.includes('seo audit')) {
-    return { intent: 'TASK', taskType: 'seo_audit' };
-  }
-
-  if (lowerMsg.startsWith('screen these resumes') || lowerMsg.startsWith('screen resumes')) {
-    return { intent: 'TASK', taskType: 'resume_screening' };
-  }
-
-  if (lowerMsg.startsWith('analyze this contract') || lowerMsg.startsWith('review this contract')) {
-    return { intent: 'TASK', taskType: 'contract_analysis' };
-  }
-
-  if (lowerMsg.startsWith('extract invoice') || lowerMsg.startsWith('extract this invoice')) {
-    return { intent: 'TASK', taskType: 'invoice_extraction' };
   }
 
   // Question triggers when historical tasks exist
@@ -226,12 +278,27 @@ function classifyIntent(
     return { intent: 'CONVERSATIONAL' };
   }
 
-  // Fallback check: if there are past tasks and command verbs aren't at start, treat as conversational
-  if (historicalTasks.length > 0 && !lowerMsg.startsWith('screen') && !lowerMsg.startsWith('analyze') && !lowerMsg.startsWith('review')) {
+  // Explicit Greetings / General Chat
+  if (lowerMsg === 'hi' || lowerMsg === 'hello' || lowerMsg === 'hey' || lowerMsg === 'thanks' || lowerMsg === 'thank you') {
+    return { intent: 'CHAT' };
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. UNSUPPORTED / GENERAL CHAT (FALLBACK)
+  // ─────────────────────────────────────────────────────────────
+  const unsupportedKeywords = [
+    'weather', 'temperature', 'forecast', 'recipe', 'cook', 'sports', 'cricket',
+    'football', 'nba', 'joke', 'sing', 'movie', 'song', 'flight', 'hotel'
+  ];
+  if (unsupportedKeywords.some((k) => lowerMsg.includes(k))) {
+    return { intent: 'UNSUPPORTED' };
+  }
+
+  if (historicalTasks.length > 0) {
     return { intent: 'CONVERSATIONAL' };
   }
 
-  return { intent: 'UNSUPPORTED' };
+  return { intent: 'CHAT' };
 }
 
 /**

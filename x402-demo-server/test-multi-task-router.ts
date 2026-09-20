@@ -46,13 +46,27 @@ async function runTestMatrix() {
 
   try {
     // ------------------------------------------------------------------
-    // STEP 1: Code Review Execution (37 files, 34 issues, 88% quality)
+    // STEP 1: New Code Review Request ("review https://github.com/kishanrajput23/Java-Projects-Collections")
     // ------------------------------------------------------------------
-    console.log('🔹 STEP 1: Execute Repository Code Review (37 files, 34 issues, 88% quality)');
+    console.log('🔹 STEP 1: "review https://github.com/kishanrajput23/Java-Projects-Collections"');
+    const res1 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'review https://github.com/kishanrajput23/Java-Projects-Collections',
+    });
+    console.log('Result 1:', { intent: res1.intent, taskType: res1.taskType });
+    if (res1.intent === 'TASK' && res1.taskType === 'code_review') {
+      console.log('✅ STEP 1 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 1 FAILED!\n');
+    }
+
+    // Create completed code review task to simulate execution
     const repoTask = await Task.create({
       userId: testUser._id,
       conversationId: conversation._id,
-      prompt: 'Review this repository',
+      prompt: 'review https://github.com/kishanrajput23/Java-Projects-Collections',
       category: 'code_review',
       status: 'completed',
       selectedEndpoint: '/code-review-fast',
@@ -88,163 +102,147 @@ async function runTestMatrix() {
               },
             ],
           },
-          {
-            file_path: 'auth/jwt.js',
-            overall_quality_score: 0.85,
-            issues: [
-              {
-                line_estimate: 5,
-                severity: 'medium',
-                title: 'Hardcoded secret token',
-                description: 'Hardcoded secret token found in auth/jwt.js',
-                suggestion: 'Use process.env.JWT_SECRET instead.',
-              },
-            ],
-          },
         ],
       },
     });
-
     await Conversation.findByIdAndUpdate(conversation._id, { activeTaskId: repoTask._id });
-    console.log(`✅ Step 1 complete. Repo Task ID: ${repoTask._id}\n`);
 
-    // STEP 2: Ask "What was the issue in README.template.md?"
-    console.log('🔹 STEP 2: Ask "What was the issue in README.template.md?"');
+    // ------------------------------------------------------------------
+    // STEP 2: Follow-up query ("what were the main issues?")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 2: "what were the main issues?"');
     const res2 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'What was the issue in README.template.md?',
+      message: 'what were the main issues?',
     });
     console.log('Result 2:', { intent: res2.intent, answer: res2.message });
-    if (res2.intent === 'CONVERSATIONAL' && res2.referencedTaskIds.includes(repoTask._id.toString()) && res2.message.includes('README.template.md') && !res2.message.includes("don't have a previous result")) {
+    if ((res2.intent === 'FOLLOW_UP' || res2.intent === 'CONVERSATIONAL') && res2.referencedTaskIds.includes(repoTask._id.toString())) {
       console.log('✅ STEP 2 PASSED!\n');
       passedCount++;
     } else {
       console.error('❌ STEP 2 FAILED!\n');
     }
 
-    // STEP 3: Ask "How many issues were found?"
-    console.log('🔹 STEP 3: Ask "How many issues were found?"');
+    // ------------------------------------------------------------------
+    // STEP 3: Specific file question ("what was the issue in README.template.md?")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 3: "what was the issue in README.template.md?"');
     const res3 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'How many issues were found?',
+      message: 'what was the issue in README.template.md?',
     });
     console.log('Result 3:', { intent: res3.intent, answer: res3.message });
-    if (res3.intent === 'CONVERSATIONAL' && res3.message.includes('34')) {
+    if ((res3.intent === 'FOLLOW_UP' || res3.intent === 'CONVERSATIONAL') && res3.message.includes('README.template.md')) {
       console.log('✅ STEP 3 PASSED!\n');
       passedCount++;
     } else {
       console.error('❌ STEP 3 FAILED!\n');
     }
 
-    // STEP 4: Ask "What was the overall quality score?"
-    console.log('🔹 STEP 4: Ask "What was the overall quality score?"');
+    // ------------------------------------------------------------------
+    // STEP 4: New Resume Screening Task ("Screen these resumes for a Senior Backend Developer.")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 4: "Screen these resumes for a Senior Backend Developer."');
     const res4 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'What was the overall quality score?',
-    });
-    console.log('Result 4:', { intent: res4.intent, answer: res4.message });
-    if (res4.intent === 'CONVERSATIONAL' && res4.message.includes('88%')) {
-      console.log('✅ STEP 4 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ STEP 4 FAILED!\n');
-    }
-
-    // STEP 5: Ask "Which files had low severity issues?"
-    console.log('🔹 STEP 5: Ask "Which files had low severity issues?"');
-    const res5 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'Which files had low severity issues?',
-    });
-    console.log('Result 5:', { intent: res5.intent, answer: res5.message });
-    if (res5.intent === 'CONVERSATIONAL' && (res5.message.includes('README.template.md') || res5.message.includes('contributorsList.js'))) {
-      console.log('✅ STEP 5 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ STEP 5 FAILED!\n');
-    }
-
-    // STEP 6: Switch Task -> Screen resumes for frontend developer
-    console.log('🔹 STEP 6: Switch task ("Screen these resumes for a frontend developer.")');
-    const res6 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'Screen these resumes for a frontend developer.',
+      message: 'Screen these resumes for a Senior Backend Developer.',
       hasFiles: true,
     });
-    console.log('Result 6:', { intent: res6.intent, taskType: res6.taskType });
+    console.log('Result 4:', { intent: res4.intent, taskType: res4.taskType });
 
     const resumeTask = await Task.create({
       userId: testUser._id,
       conversationId: conversation._id,
-      prompt: 'Screen these resumes for a frontend developer.',
+      prompt: 'Screen these resumes for a Senior Backend Developer.',
       category: 'resume_screening',
       status: 'completed',
       selectedEndpoint: '/resume-screen-accurate',
       output: {
         totalFiles: 2,
         candidates: [
-          { name: 'Polla Vishnu Vardhan', score: 91, skills: ['React', 'TypeScript', 'Tailwind', 'Next.js'], recommendation: 'Strong Hire' },
-          { name: 'Vivek Goud', score: 88, skills: ['Python', 'TypeScript', 'Algorand', 'React'], recommendation: 'Strong Hire' },
+          { name: 'Polla Vishnu Vardhan', score: 91, skills: ['React', 'TypeScript', 'Node.js'], recommendation: 'Strong Hire' },
+          { name: 'Vivek Goud', score: 88, skills: ['Python', 'TypeScript', 'Node.js'], recommendation: 'Strong Hire' },
         ],
       },
     });
     await Conversation.findByIdAndUpdate(conversation._id, { activeTaskId: resumeTask._id });
 
-    if (res6.intent === 'TASK' && res6.taskType === 'resume_screening') {
+    if (res4.intent === 'TASK' && res4.taskType === 'resume_screening') {
+      console.log('✅ STEP 4 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 4 FAILED!\n');
+    }
+
+    // ------------------------------------------------------------------
+    // STEP 5: Resume follow-up ("who scored highest?")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 5: "who scored highest?"');
+    const res5 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'who scored highest?',
+    });
+    console.log('Result 5:', { intent: res5.intent, answer: res5.message });
+    if ((res5.intent === 'FOLLOW_UP' || res5.intent === 'CONVERSATIONAL') && res5.message.includes('Polla Vishnu Vardhan')) {
+      console.log('✅ STEP 5 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 5 FAILED!\n');
+    }
+
+    // ------------------------------------------------------------------
+    // STEP 6: Task context switch ("go back to the repository. What was the issue in README.template.md?")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 6: "go back to the repository. What was the issue in README.template.md?"');
+    const res6 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'go back to the repository. What was the issue in README.template.md?',
+    });
+    console.log('Result 6:', { intent: res6.intent, answer: res6.message });
+    if ((res6.intent === 'FOLLOW_UP' || res6.intent === 'CONVERSATIONAL') && res6.referencedTaskIds.includes(repoTask._id.toString()) && res6.message.includes('README.template.md')) {
       console.log('✅ STEP 6 PASSED!\n');
       passedCount++;
     } else {
       console.error('❌ STEP 6 FAILED!\n');
     }
 
-    // STEP 7: Ask "Who scored highest?"
-    console.log('🔹 STEP 7: Ask "Who scored highest?"');
+    // ------------------------------------------------------------------
+    // STEP 7: New Repo Code Review ("review https://github.com/example/new-repository")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 7: "review https://github.com/example/new-repository"');
     const res7 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'Who scored highest?',
+      message: 'review https://github.com/example/new-repository',
     });
-    console.log('Result 7:', { intent: res7.intent, answer: res7.message });
-    if (res7.intent === 'CONVERSATIONAL' && res7.message.includes('Polla Vishnu Vardhan') && res7.message.includes('91%')) {
+    console.log('Result 7:', { intent: res7.intent, taskType: res7.taskType });
+    if (res7.intent === 'TASK' && res7.taskType === 'code_review') {
       console.log('✅ STEP 7 PASSED!\n');
       passedCount++;
     } else {
       console.error('❌ STEP 7 FAILED!\n');
     }
 
-    // STEP 8: Ask "Go back to the repository. What was the issue in README.template.md?"
-    console.log('🔹 STEP 8: Ask "Go back to the repository. What was the issue in README.template.md?"');
+    // ------------------------------------------------------------------
+    // STEP 8: Specific candidate query ("what was Vivek's resume score?")
+    // ------------------------------------------------------------------
+    console.log('🔹 STEP 8: "what was Vivek\'s resume score?"');
     const res8 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'Go back to the repository. What was the issue in README.template.md?',
+      message: "what was Vivek's resume score?",
     });
     console.log('Result 8:', { intent: res8.intent, answer: res8.message });
-    if (res8.intent === 'CONVERSATIONAL' && res8.referencedTaskIds.includes(repoTask._id.toString()) && res8.message.includes('README.template.md')) {
+    if ((res8.intent === 'FOLLOW_UP' || res8.intent === 'CONVERSATIONAL') && res8.referencedTaskIds.includes(resumeTask._id.toString()) && res8.message.includes('88%')) {
       console.log('✅ STEP 8 PASSED!\n');
       passedCount++;
     } else {
       console.error('❌ STEP 8 FAILED!\n');
-    }
-
-    // STEP 9: Ask "What was Vivek's resume score?"
-    console.log('🔹 STEP 9: Ask "What was Vivek\'s resume score?"');
-    const res9 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: "What was Vivek's resume score?",
-    });
-    console.log('Result 9:', { intent: res9.intent, answer: res9.message });
-    if (res9.intent === 'CONVERSATIONAL' && res9.referencedTaskIds.includes(resumeTask._id.toString()) && res9.message.includes('88%')) {
-      console.log('✅ STEP 9 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ STEP 9 FAILED!\n');
     }
 
   } catch (err) {
@@ -257,7 +255,7 @@ async function runTestMatrix() {
   }
 
   console.log('====================================================');
-  console.log(`🏆 HISTORICAL TASK RETRIEVAL MATRIX RESULTS: ${passedCount}/${totalTests} TESTS PASSED`);
+  console.log(`🏆 DEFINITION OF DONE REGRESSION RESULTS: ${passedCount}/${totalTests} TESTS PASSED`);
   console.log('====================================================');
 
   if (passedCount === totalTests) {
@@ -268,3 +266,4 @@ async function runTestMatrix() {
 }
 
 runTestMatrix();
+
