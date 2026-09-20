@@ -386,46 +386,7 @@ function resolveTaskContexts(
  * Generates grounded answer using OpenRouter or deterministic fallback generator.
  */
 async function generateGroundedAnswer(message: string, tasks: any[]): Promise<string> {
-  const taskDataSummaries = tasks.map((t) => ({
-    taskId: t._id,
-    taskType: t.category,
-    prompt: t.prompt,
-    selectedEndpoint: t.selectedEndpoint,
-    output: t.output,
-    createdAt: t.createdAt,
-  }));
-
-  const systemPrompt = `You are PRISM's intelligent conversational assistant.
-Answer the user's question accurately using ONLY the stored task results provided below.
-
-STORED HISTORICAL TASK RESULTS:
-${JSON.stringify(taskDataSummaries, null, 2)}
-
-STRICT GROUNDING RULES:
-1. Base your answer ONLY on actual data, findings, clauses, candidates, scores, or issues present in the STORED HISTORICAL TASK RESULTS.
-2. If the user asks for a detail, candidate, clause, or issue that DOES NOT exist in the stored task results, respond with:
-   "I don't have that detail in the stored result."
-3. Do NOT fabricate or hallucinate any findings, security issues, candidate names, or contract clauses.
-4. Keep your answer concise, direct, clear, and professional.`;
-
-  try {
-    const content = await callOpenRouter({
-      model: FAST_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ],
-      temperature: 0.1,
-      max_tokens: 350,
-    });
-
-    if (content && content.trim()) {
-      return content.trim();
-    }
-  } catch (err) {
-    // OpenRouter fallback to deterministic engine
-  }
-
+  // Use PRISM's deterministic local engine directly for zero-latency, offline historical answer retrieval
   return buildDeterministicGroundedAnswer(message, tasks);
 }
 
