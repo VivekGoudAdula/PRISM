@@ -296,12 +296,12 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       const hasPriorTaskResult = chatHistory.some((item) => item.result !== undefined && !item.isChatReply);
       const plan = await planTask(apiBaseUrl, promptToUse, filesToUse, hasPriorTaskResult, conversationId || undefined);
 
-      if (plan.category === 'conversational' || plan.isChat) {
+      if (plan.category === 'conversational' || plan.category === 'follow_up' || plan.isChat) {
         const newItem = {
           id: `msg-chat-${Date.now()}`,
           prompt: promptToUse,
           files: filesToUse,
-          reply: plan.reply || plan.message || "Hello! I'm Prism.",
+          reply: plan.reply || plan.message || (plan as any).groundedAnswer || "Hello! I'm Prism.",
           isChatReply: true as const,
           timestamp: new Date(),
         };
