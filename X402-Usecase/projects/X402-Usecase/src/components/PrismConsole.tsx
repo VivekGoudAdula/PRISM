@@ -1827,9 +1827,13 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
           )}
 
           {loading && execProgress && !showSummaryModal && (
-            <div className="w-full max-w-4xl animate-fade-in my-6 mx-auto">
-               {/* Hidden here since it is shown in the modal now */}
-            </div>
+            <ExecutionProgress
+              current={execProgress.current}
+              total={execProgress.total}
+              category={execProgress.category}
+              phase={execProgress.phase}
+              currentFilename={execProgress.currentFilename}
+            />
           )}
 
           {loading && !executionPlan && !showSummaryModal && (
