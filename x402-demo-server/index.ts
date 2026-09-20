@@ -335,6 +335,17 @@ app.get('/public/iconpng', servePublicImage('icon.png'));
 app.get('/public/logo.png', servePublicImage('logo.png'));
 app.get('/public/logopng', servePublicImage('logo.png'));
 
+// Root Health Check Endpoint
+app.get('/', (c) => {
+  return c.json({
+    status: 'online',
+    name: 'PRISM Backend AI Engine',
+    version: 'v1.0.2',
+    network: NETWORK_CONFIG.name,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Mount API routes
 app.route('/api/auth', authRouter);
 app.route('/api/chat', chatRouter);
