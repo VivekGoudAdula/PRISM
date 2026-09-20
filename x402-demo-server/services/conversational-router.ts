@@ -280,6 +280,19 @@ function classifyIntent(
     return { intent: 'CONVERSATIONAL' };
   }
 
+  // Single word / Entity name reference (e.g. "Vivek Goud Adula", "Polla Vishnu") when historical tasks exist
+  if (historicalTasks.length > 0) {
+    const allTaskOutputStr = JSON.stringify(historicalTasks.map((t) => t.output || {})).toLowerCase();
+    const cleanMsg = lowerMsg.replace(/[^a-z0-9\s._-]/gi, '').trim();
+    if (cleanMsg.length >= 3) {
+      const words = cleanMsg.split(/\s+/);
+      const isEntityMatch = words.some((w) => w.length >= 3 && allTaskOutputStr.includes(w));
+      if (isEntityMatch) {
+        return { intent: 'CONVERSATIONAL' };
+      }
+    }
+  }
+
   // Explicit Greetings / General Chat
   if (lowerMsg === 'hi' || lowerMsg === 'hello' || lowerMsg === 'hey' || lowerMsg === 'thanks' || lowerMsg === 'thank you') {
     return { intent: 'CHAT' };
