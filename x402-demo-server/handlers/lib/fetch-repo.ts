@@ -157,29 +157,60 @@ function getGitHubHeaders(): Record<string, string> {
 }
 
 /**
- * Produce a human-readable rate-limit error with remaining time if available.
+ * Classify a non-2xx GitHub API response into a diagnostic category.
+ * Returns an Error with a clear, actionable message.
+ *
+ * Differentiated categories:
+ *  - rate_limited  : 403 with x-ratelimit-remaining=0, or 429
+ *  - auth_error    : 403 without rate-limit headers (bad/no token)
+ *  - not_found     : 404
+ *  - server_error  : 5xx
+ *  - access_denied : other 403
  */
-function buildRateLimitError(headers: Headers): Error {
-  const resetEpoch = headers.get('x-ratelimit-reset');
-  const remaining  = headers.get('x-ratelimit-remaining');
-  let hint = '';
+function buildGitHubError(res: Response, context: string): Error {
+  const status = res.status;
+  const remaining = res.headers.get('x-ratelimit-remaining');
+  const resetEpoch = res.headers.get('x-ratelimit-reset');
+  const hasToken = Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN);
 
-  if (resetEpoch) {
-    const resetAt = new Date(parseInt(resetEpoch, 10) * 1000);
-    const minutesLeft = Math.ceil((resetAt.getTime() - Date.now()) / 60_000);
-    hint = ` Rate limit resets in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`;
+  if (status === 429 || (status === 403 && remaining === '0')) {
+    // Definitive rate-limit
+    let resetHint = '';
+    if (resetEpoch) {
+      const resetAt = new Date(parseInt(resetEpoch, 10) * 1000);
+      const minutesLeft = Math.ceil((resetAt.getTime() - Date.now()) / 60_000);
+      resetHint = ` Rate limit resets in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`;
+    }
+    const tokenHint = hasToken
+      ? 'Your authenticated GitHub token has hit its rate limit.'
+      : 'GitHub API rate limit exceeded (unauthenticated: 60 req/hr). Set GITHUB_TOKEN in the server env to raise the limit to 5,000 req/hr.';
+    console.warn(`[GitHub] rate_limited repo=${context} remaining=0 reset=${resetEpoch}`);
+    return new Error(
+      `GitHub rate limit exceeded — please wait a moment before reviewing the same repository again. ${tokenHint}${resetHint}`,
+    );
   }
-  if (remaining === '0') {
-    hint += ' You have 0 requests remaining on this token.';
+
+  if (status === 403) {
+    // 403 without rate-limit signal — access denied or bad token
+    const category = hasToken ? 'token_permission_denied' : 'unauthenticated_access_denied';
+    console.warn(`[GitHub] ${category} repo=${context} status=403`);
+    return new Error(
+      `GitHub API access denied (403) for ${context}. ${hasToken ? 'Check that your GITHUB_TOKEN has the correct scopes.' : 'The repository may be private. Set GITHUB_TOKEN in the server env to access private repos.'}`
+    );
   }
 
-  const tokenMsg = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
-    ? 'Your authenticated GitHub token has hit its rate limit.'
-    : 'GitHub API rate limit exceeded (unauthenticated: 60 req/hr). Set a GITHUB_TOKEN in the server .env to get 5,000 req/hr.';
+  if (status === 404) {
+    console.warn(`[GitHub] not_found repo=${context} status=404`);
+    return new Error(`GitHub repository not found (404): ${context}. Make sure the URL is correct and the repository is public.`);
+  }
 
-  return new Error(
-    `GitHub rate limit exceeded — please wait a moment before reviewing the same repository again. ${tokenMsg}${hint}`,
-  );
+  if (status >= 500) {
+    console.warn(`[GitHub] server_error repo=${context} status=${status}`);
+    return new Error(`GitHub server error (${status}) while fetching ${context}. Please try again shortly.`);
+  }
+
+  console.warn(`[GitHub] unexpected_error repo=${context} status=${status}`);
+  return new Error(`Unexpected GitHub API error (${status}) for ${context}.`);
 }
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
@@ -217,11 +248,21 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
     try {
       repoInfoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     } catch (fetchErr) {
-      console.warn(`GitHub metadata fetch failed for ${owner}/${repo}, using default fallback branch main`);
+      console.warn(`[GitHub] metadata_fetch_failed repo=${owner}/${repo} — defaulting to branch main`);
     }
 
-    if (!repoInfoRes || !repoInfoRes.ok) {
-      console.warn(`GitHub API rate limit or error (${repoInfoRes?.status || 'Network'}) for ${owner}/${repo}. Using default branch main.`);
+    if (!repoInfoRes) {
+      // Network error — can't reach GitHub at all; default branch and continue to tree fetch
+      console.warn(`[GitHub] network_error repo=${owner}/${repo} — defaulting to branch main`);
+      branch = 'main';
+    } else if (!repoInfoRes.ok) {
+      if (repoInfoRes.status === 404) {
+        // Repository does not exist — throw immediately, no point fetching tree
+        throw buildGitHubError(repoInfoRes, `${owner}/${repo}`);
+      }
+      // For rate-limit / auth / server errors on metadata, default to main and proceed
+      // (the tree fetch will surface the error more explicitly if the same issue persists)
+      console.warn(`[GitHub] metadata_error status=${repoInfoRes.status} repo=${owner}/${repo} — defaulting to branch main`);
       branch = 'main';
     } else {
       const repoInfo: any = await repoInfoRes.json().catch(() => ({}));
@@ -239,28 +280,14 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   try {
     treeRes = await fetch(treeUrl, { headers });
   } catch (err) {
-    console.warn(`GitHub tree fetch failed for ${owner}/${repo}@${branch}`);
+    console.warn(`[GitHub] tree_fetch_network_error repo=${owner}/${repo}@${branch}`);
+    throw new Error(`Network error while fetching file tree for ${owner}/${repo}. Please check your connection and try again.`);
   }
 
   if (!treeRes || !treeRes.ok) {
-    console.warn(`GitHub API tree rate limit or error (${treeRes?.status || 'Network'}). Returning structured fallback file tree for ${owner}/${repo}`);
-    const fallbackResult: FetchRepoFilesResult = {
-      files: [
-        { path: 'src/main.ts', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/main.ts`, size: 1024 },
-        { path: 'src/index.ts', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/index.ts`, size: 1024 },
-        { path: 'package.json', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/package.json`, size: 512 },
-        { path: 'README.md', raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`, size: 2048 },
-      ],
-      skipped: 0,
-      capped: false,
-      total_files_found: 4,
-      owner,
-      repo,
-      branch,
-    };
-    setCached(branchKey, fallbackResult);
-    setCached(partialKey, fallbackResult);
-    return fallbackResult;
+    // Do NOT return or cache a fake tree — throw an honest error so plan-task
+    // can return a clear, user-visible failure rather than a silent fake review.
+    throw buildGitHubError(treeRes || new Response(null, { status: 0 }), `${owner}/${repo}@${branch} (tree)`);
   }
 
   const treeData: any = await treeRes.json();
@@ -307,7 +334,7 @@ export async function fetchRepoFiles(repoUrl: string): Promise<FetchRepoFilesRes
   const skipped = Math.max(0, total_files_found - MAX_FILES);
   const capped = total_files_found > MAX_FILES;
 
-  const result: FetchRepoFilesResult = { files, skipped, capped, total_files_found, owner, repo, branch };
+  const result: FetchRepoFilesResult = { files, skipped, capped, total_files_found, owner, repo, branch: branch ?? 'main' };
 
   // ── Cache under both partial and full branch keys ─────────────────────────
   setCached(branchKey, result);

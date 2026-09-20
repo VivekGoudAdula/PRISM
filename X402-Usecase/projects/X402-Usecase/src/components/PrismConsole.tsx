@@ -351,20 +351,10 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    setIsPlanning(true);
-    setError('');
-    setTaskResult(null);
-
-    try {
-      // Step 1: Prompt Tutor optimization layer BEFORE plan-task
-      const analysis = await analyzePromptWithTutor(apiBaseUrl, taskDescription, attachedFiles);
-      setPromptAnalysis(analysis);
-      setShowPromptTutorModal(true);
-      setIsPlanning(false);
-    } catch (err) {
-      console.warn('Prompt Tutor analysis error (falling back to direct execution):', err);
-      await runPlanTask(taskDescription, attachedFiles);
-    }
+    // Go directly to plan-task — Prompt Tutor is a separate, user-initiated
+    // feature accessible via the Data Map / Prompt Tutor button.
+    // It must NOT run automatically on every task submission.
+    await runPlanTask(taskDescription, attachedFiles);
   };
 
   const handleOpenDataMap = async () => {

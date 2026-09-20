@@ -1,8 +1,6 @@
 import { config } from 'dotenv';
 import { extractText } from '../handlers/lib/extract-document';
 import { estimateTokens } from './tokenAnalytics';
-import { callOpenRouter, FAST_MODEL } from '../handlers/lib/openrouter-client';
-import { parseRobustJson } from '../handlers/lib/parse-json-robust';
 
 config();
 
@@ -27,8 +25,15 @@ export interface PromptAnalysisResult {
 }
 
 /**
- * Modular Prompt Tutor Service
- * Analyzes user prompts for clarity, specificity, completeness, constraints, and structure using OpenRouter.
+ * Modular Prompt Tutor Service.
+ *
+ * Analyzes user prompts for clarity, specificity, completeness, constraints,
+ * and structure using a deterministic rule-based engine.
+ *
+ * NOTE: This service intentionally does NOT call any external LLM (OpenRouter,
+ * Puter, etc.). Puter.js is a browser-only SDK and must not be invoked from
+ * Node.js / Render. The rule-based engine is fast, zero-latency, and sufficient
+ * for pre-execution prompt quality scoring.
  */
 export async function analyzePromptWithLLM(
   originalPrompt: string,
@@ -54,7 +59,7 @@ export async function analyzePromptWithLLM(
     };
   }
 
-  // Document Text Extraction (No base64 sent to LLM)
+  // Document Text Extraction — build file summaries for scoring
   const fileSummaries: string[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
@@ -63,7 +68,7 @@ export async function analyzePromptWithLLM(
       try {
         const ext = await extractText(f.filename || `file-${i + 1}`, f.content_base64);
         text = ext.text || '';
-      } catch (err) {
+      } catch (_err) {
         text = '';
       }
     }
@@ -75,106 +80,26 @@ export async function analyzePromptWithLLM(
     }
   }
 
-  const contextStr = fileSummaries.length > 0 ? `\n\nAttached Files Context:\n${fileSummaries.join('\n')}` : '';
+  const contextStr =
+    fileSummaries.length > 0
+      ? `\n\nAttached Files Context:\n${fileSummaries.join('\n')}`
+      : '';
   const fullUserPayload = `${promptText}${contextStr}`;
   const inputTokens = estimateTokens(fullUserPayload);
 
-  let analysis: PromptAnalysisResult | null = null;
-
-  const systemInstruction = `You are Prompt Tutor, an expert AI prompt optimization layer for PRISM.
-Your job is to analyze the user's task request BEFORE execution and provide structured feedback to improve prompt engineering.
-
-Evaluate:
-1. Clarity & Specificity: Is the request well-defined?
-2. Completeness: Are target roles, schemas, or criteria present?
-3. Constraints & Expected Output Format: Is the desired output structure specified?
-4. Inefficiencies or Redundancies: Are there conflicting or unnecessary instructions?
-5. Missing Context: What essential information is lacking?
-
-Scoring rules:
-- Score from 0 to 100 based on prompt quality.
-- High score (>80): Specific, well-structured, clear role/task, explicit output format.
-- Medium score (50-80): Understandable intent but missing evaluation criteria, role details, or output formatting.
-- Low score (<50): Vague, single phrase, or missing key parameters.
-
-Do NOT invent fake requirements. Distinguish required missing info from optional recommendations.
-The improvedPrompt MUST preserve the user's exact original intent and MUST NOT introduce unsupported facts.
-CRITICAL REQUIREMENT: The improvedPrompt MUST preserve all repository links (e.g. GitHub URLs like https://github.com/...), URLs, target names, file names, or specific parameters present in the original prompt. NEVER omit or remove user-provided URLs!
-
-Return ONLY a valid, single JSON object with this exact structure and NO Markdown formatting or markdown wrappers:
-{
-  "score": number,
-  "intent": "short 2-4 word intent summary",
-  "taskType": "news_research | source_comparison | claim_verification | claim_extraction | resume_screening | contract_analysis | invoice_extraction | code_review | general_query",
-  "issues": ["list of detected issues"],
-  "requiredInformation": ["list of missing required context/details"],
-  "irrelevantInformation": ["list of redundant/irrelevant parts, or empty"],
-  "constraints": ["key constraints identified"],
-  "suggestions": ["actionable recommendations to improve"],
-  "improvedPrompt": "full optimized prompt preserving intent and user URLs"
-}`;
-
-  try {
-    const rawContent = await callOpenRouter({
-      model: FAST_MODEL,
-      messages: [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: `Task Request: "${promptText}"${contextStr}` },
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-    });
-
-    const parsed = parseRobustJson(rawContent);
-    const sanitizeStringArray = (val: any): string[] => {
-      if (!val) return [];
-      if (Array.isArray(val)) {
-        return val.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).filter(Boolean);
-      }
-      if (typeof val === 'string') {
-        return [val];
-      }
-      return [JSON.stringify(val)];
-    };
-
-    let improvedPrompt = parsed.improvedPrompt || promptText;
-    const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
-    if (urlMatches) {
-      for (const url of urlMatches) {
-        if (!improvedPrompt.includes(url)) {
-          improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
-        }
-      }
-    }
-
-    analysis = {
-      score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
-      intent: parsed.intent || 'Task analysis',
-      taskType: parsed.taskType || hintCategory || 'general_query',
-      issues: sanitizeStringArray(parsed.issues),
-      requiredInformation: sanitizeStringArray(parsed.requiredInformation),
-      irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
-      constraints: sanitizeStringArray(parsed.constraints),
-      suggestions: sanitizeStringArray(parsed.suggestions),
-      improvedPrompt,
-      modelUsed: FAST_MODEL,
-      originalInputTokens: inputTokens,
-    };
-  } catch (err) {
-    console.warn('[PromptTutor] OpenRouter prompt analysis failed, using fallback:', err);
-  }
-
-  // Fallback to local rule-based heuristic if LLM API unavailable
-  if (!analysis) {
-    analysis = generateLocalFallbackAnalysis(promptText, files, hintCategory);
-    analysis.originalInputTokens = inputTokens;
-  }
+  // Use deterministic rule-based analysis — no external AI dependency
+  const analysis = generateLocalFallbackAnalysis(promptText, files, hintCategory);
+  analysis.originalInputTokens = inputTokens;
 
   return analysis;
 }
 
 /**
- * Rule-based heuristic fallback if LLM is offline/unreachable
+ * Rule-based heuristic prompt analysis engine.
+ *
+ * Classifies task type, scores prompt quality, identifies issues, and
+ * generates an improved prompt — all deterministically, with zero latency
+ * and no external dependencies.
  */
 function generateLocalFallbackAnalysis(
   prompt: string,
