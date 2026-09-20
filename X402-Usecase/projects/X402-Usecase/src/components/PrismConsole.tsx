@@ -87,6 +87,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
   const [dataMapSemanticCache, setDataMapSemanticCache] = useState<SemanticCacheData | null>(null);
   const [showDataMapModal, setShowDataMapModal] = useState(false);
   const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
   const [execProgress, setExecProgress] = useState<{
@@ -315,8 +316,8 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         return;
       }
       setExecutionPlan(plan);
-      // Automatically trigger execution & payment without waiting for user confirmation
-      await handleConfirmAndPay(filesToUse, plan, promptToUse);
+      setShowSummaryModal(true);
+      // Wait for the ExecutionMarketPanel to automatically trigger handleConfirmAndPay
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning failed.';
       // Only push the error into chatHistory — do NOT also call setError() to avoid duplicate display
@@ -423,6 +424,10 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
   const handleConfirmAndPay = async (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan, promptToUse: string) => {
     if (!updatedPlan || !activeAddress || !signTransactions) return;
+    
+    // Prevent double submissions while executing
+    if (loading) return;
+    isProcessingRef.current = true;
 
     setLoading(true);
     setError('');
@@ -1423,7 +1428,23 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         />
       )}
 
-
+      {showSummaryModal && executionPlan && (
+        <ExecutionMarketPanel
+          plan={executionPlan}
+          files={attachedFiles}
+          onConfirm={(filteredFiles, updatedPlan) => {
+            handleConfirmAndPay(filteredFiles, updatedPlan, promptAnalysis?.improvedPrompt || taskDescription);
+          }}
+          onCancel={() => {
+            setShowSummaryModal(false);
+            setExecutionPlan(null);
+            setIsPlanning(false);
+            isProcessingRef.current = false;
+          }}
+          execProgress={execProgress}
+          paymentStatus={paymentStatus}
+        />
+      )}
 
       {selectedAnalysisTask && (
         <TokenAnalysisModal
@@ -1804,17 +1825,13 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
             </div>
           )}
 
-          {loading && executionPlan && (
+          {loading && execProgress && !showSummaryModal && (
             <div className="w-full max-w-4xl animate-fade-in my-6 mx-auto">
-              <ExecutionMarketPanel
-                plan={executionPlan}
-                execProgress={execProgress}
-                paymentStatus={paymentStatus}
-              />
+               {/* Hidden here since it is shown in the modal now */}
             </div>
           )}
 
-          {loading && !executionPlan && (
+          {loading && !executionPlan && !showSummaryModal && (
             <div className="text-center my-4 flex flex-col items-center justify-center">
               <div className="loading loading-spinner loading-lg text-primary mb-3" />
               <h2 className="text-2xl font-bold text-indigo-700 animate-pulse">Prism is working…</h2>
