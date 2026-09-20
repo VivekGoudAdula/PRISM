@@ -191,114 +191,122 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
           )}
 
           {screen === 'summary' && (
-            <div className="flex flex-col gap-3 animate-fade-in">
-              {/* Category specific summary */}
-              {plan.category === 'seo_audit' && (
-                <div className="mb-0.5 flex flex-col gap-1">
-                  <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/40 p-2.5 text-[10px] text-indigo-200 flex flex-col gap-0.5 shadow-inner">
-                    <span className="font-extrabold text-[11px] text-white">Website SEO Audit Plan</span>
-                    <p>
-                      This will audit <strong className="text-emerald-400 font-bold">{selectedCount} pages</strong> for{' '}
-                      <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)}{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
-                    </p>
-                    {(plan.skipped || 0) > 0 && (
-                      <span className="text-[9px] text-indigo-300/80 font-medium">
-                        ℹ️ Note: {plan.skipped} additional pages skipped due to page limit cap.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {plan.category === 'code_review' && (
-                <div className="mb-0.5 flex flex-col gap-1">
-                  {plan.capped && (
-                    <div className="rounded-xl border border-amber-500/60 bg-amber-950/50 p-2.5 text-[10px] text-amber-200 flex flex-col gap-1 shadow-lg">
-                      <div className="flex items-center gap-1.5 text-amber-300 font-extrabold text-[9px] uppercase tracking-wider">
-                        <span className="text-xs">⚠️</span>
-                        <span>Repository File Limit Reached</span>
+            <div className="flex flex-col gap-2 animate-fade-in">
+              <div className="flex flex-col md:flex-row gap-3 items-stretch">
+                {/* LEFT SIDE: Plan & Metadata */}
+                <div className="flex flex-col gap-2 flex-1 justify-between">
+                  {/* Category specific summary */}
+                  {plan.category === 'seo_audit' && (
+                    <div className="flex flex-col gap-1">
+                      <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/40 p-2.5 text-[10px] text-indigo-200 flex flex-col gap-0.5 shadow-inner h-full">
+                        <span className="font-extrabold text-[11px] text-white">Website SEO Audit Plan</span>
+                        <p>
+                          This will audit <strong className="text-emerald-400 font-bold">{selectedCount} pages</strong> for{' '}
+                          <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> ({selectedCount} × ${plan.unitPrice.toFixed(2)}{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
+                        </p>
+                        {(plan.skipped || 0) > 0 && (
+                          <span className="text-[9px] text-indigo-300/80 font-medium mt-auto pt-1">
+                            ℹ️ Note: {plan.skipped} additional pages skipped due to page limit cap.
+                          </span>
+                        )}
                       </div>
-                      <p className="leading-relaxed font-medium text-[9px]">
-                        {plan.cap_message ||
-                          `This repo has ${plan.total_files_found || plan.executionQuantity + (plan.skipped || 0)} reviewable files. Reviewing the ${selectedCount} highest-priority source files first (${plan.skipped || 0} skipped).`}
-                      </p>
-                      <span className="text-[9px] text-amber-300/80 font-mono">
-                        Note: High-priority source files (.ts, .py, .go, .java, src/ folders) are prioritized first.
-                      </span>
                     </div>
                   )}
 
-                  <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/40 p-2.5 text-[10px] text-indigo-200 flex flex-col gap-0.5 shadow-inner">
-                    <span className="font-extrabold text-[11px] text-white">GitHub Repository Review Plan</span>
-                    <p>
-                      This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for{' '}
-                      <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> (workload-based pricing per file{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
-                    </p>
-                    {!plan.capped && (plan.skipped || 0) > 0 && (
-                      <span className="text-[9px] text-indigo-300/80 font-medium">
-                        ℹ️ Note: {plan.skipped} non-code/large files were automatically excluded.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+                  {plan.category === 'code_review' && (
+                    <div className="flex flex-col gap-1 h-full">
+                      {plan.capped && (
+                        <div className="rounded-xl border border-amber-500/60 bg-amber-950/50 p-2.5 text-[10px] text-amber-200 flex flex-col gap-1 shadow-lg mb-1">
+                          <div className="flex items-center gap-1.5 text-amber-300 font-extrabold text-[9px] uppercase tracking-wider">
+                            <span className="text-xs">⚠️</span>
+                            <span>Repository File Limit Reached</span>
+                          </div>
+                          <p className="leading-relaxed font-medium text-[9px]">
+                            {plan.cap_message ||
+                              `This repo has ${plan.total_files_found || plan.executionQuantity + (plan.skipped || 0)} reviewable files. Reviewing the ${selectedCount} highest-priority source files first (${plan.skipped || 0} skipped).`}
+                          </p>
+                          <span className="text-[9px] text-amber-300/80 font-mono">
+                            Note: High-priority source files (.ts, .py, .go, .java, src/ folders) are prioritized first.
+                          </span>
+                        </div>
+                      )}
 
-              {/* Compact Metadata Grid */}
-              <div className="grid grid-cols-2 gap-1 py-1 border-b border-white/5 text-[10px]">
-                <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-900/40 border border-slate-800/40">
-                  <div className="flex items-center gap-1 text-slate-400 font-medium">
-                    <FiCpu className="text-indigo-400 text-[10px]" />
-                    Category
-                  </div>
-                  <span className="font-semibold text-slate-200">{categoryLabel[plan.category] ?? plan.category}</span>
-                </div>
-                <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-900/40 border border-slate-800/40">
-                  <div className="flex items-center gap-1 text-slate-400 font-medium">
-                    <FiShield className="text-sky-400 text-[10px]" />
-                    Provider
-                  </div>
-                  <span className="font-semibold text-slate-200">{plan.providerName}</span>
-                </div>
-                <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-900/40 border border-slate-800/40">
-                  <div className="flex items-center gap-1 text-slate-400 font-medium">
-                    <FiDollarSign className="text-emerald-400 text-[10px]" />
-                    Unit Price
-                  </div>
-                  <span className="font-semibold text-slate-200">{plan.category === 'code_review' ? `Workload-based ($${plan.unitPrice.toFixed(3)} avg)` : `$${plan.unitPrice.toFixed(2)} / file`}</span>
-                </div>
-                <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-900/40 border border-slate-800/40">
-                  <div className="flex items-center gap-1 text-slate-400 font-medium">
-                    <FiZap className="text-amber-400 text-[10px]" />
-                    Executions
-                  </div>
-                  <span className="font-semibold text-slate-200">{selectedCount} file{selectedCount !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
+                      <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/40 p-2.5 text-[10px] text-indigo-200 flex flex-col gap-0.5 shadow-inner h-full">
+                        <span className="font-extrabold text-[11px] text-white">GitHub Repository Review Plan</span>
+                        <p>
+                          This will review <strong className="text-emerald-400 font-bold">{selectedCount} files</strong> for{' '}
+                          <strong className="text-emerald-400 font-bold">${totalCost.toFixed(2)} total</strong> (workload-based pricing per file{plan.platformFee > 0 ? ` + $${plan.platformFee.toFixed(2)} platform fee` : ''}). Continue?
+                        </p>
+                        {!plan.capped && (plan.skipped || 0) > 0 && (
+                          <span className="text-[9px] text-indigo-300/80 font-medium mt-auto pt-1">
+                            ℹ️ Note: {plan.skipped} non-code/large files were automatically excluded.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Dynamic Workload & Optimization Pricing Summary */}
-              <div className="rounded-xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-3 flex flex-col gap-1.5 shadow-md">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <FiZap className="text-emerald-400 text-xs" />
-                    <span className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
-                      PRISM OPTIMIZATION SAVINGS
-                    </span>
+                  {/* Compact Metadata Grid */}
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-900/40 border border-slate-800/40">
+                      <div className="flex items-center gap-1 text-slate-400 font-medium">
+                        <FiCpu className="text-indigo-400 text-[10px]" />
+                        Category
+                      </div>
+                      <span className="font-semibold text-slate-200">{categoryLabel[plan.category] ?? plan.category}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-900/40 border border-slate-800/40">
+                      <div className="flex items-center gap-1 text-slate-400 font-medium">
+                        <FiShield className="text-sky-400 text-[10px]" />
+                        Provider
+                      </div>
+                      <span className="font-semibold text-slate-200">{plan.providerName}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-900/40 border border-slate-800/40">
+                      <div className="flex items-center gap-1 text-slate-400 font-medium">
+                        <FiDollarSign className="text-emerald-400 text-[10px]" />
+                        Unit Price
+                      </div>
+                      <span className="font-semibold text-slate-200">{plan.category === 'code_review' ? `Workload-based ($${plan.unitPrice.toFixed(3)} avg)` : `$${plan.unitPrice.toFixed(2)} / file`}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-2 py-1 rounded bg-slate-900/40 border border-slate-800/40">
+                      <div className="flex items-center gap-1 text-slate-400 font-medium">
+                        <FiZap className="text-amber-400 text-[10px]" />
+                        Executions
+                      </div>
+                      <span className="font-semibold text-slate-200">{selectedCount} file{selectedCount !== 1 ? 's' : ''}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1 text-[11px]">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Original price</span>
-                    <span className="font-mono font-medium text-slate-300">${baseTotal.toFixed(4)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>Optimization savings</span>
-                    <span className="font-mono font-semibold text-emerald-400">-${totalSavings.toFixed(4)}</span>
-                  </div>
-                  <div className="my-0.5 border-t border-slate-700/60" />
-                  <div className="flex items-center justify-between font-extrabold text-xs text-white">
-                    <span>Final Base execution cost</span>
-                    <span className="font-mono text-emerald-300">${(baseTotal - totalSavings).toFixed(4)}</span>
+                {/* RIGHT SIDE: Optimization Savings */}
+                <div className="flex flex-col flex-1">
+                  {/* Dynamic Workload & Optimization Pricing Summary */}
+                  <div className="rounded-xl border border-emerald-500/35 bg-gradient-to-b from-emerald-950/30 to-slate-950/60 p-3 flex flex-col gap-1.5 shadow-md h-full">
+                    <div className="flex items-center justify-between border-b border-emerald-500/20 pb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <FiZap className="text-emerald-400 text-xs" />
+                        <span className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
+                          PRISM OPTIMIZATION SAVINGS
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 text-[11px] mt-1">
+                      <div className="flex items-center justify-between text-slate-400">
+                        <span>Original price</span>
+                        <span className="font-mono font-medium text-slate-300">${baseTotal.toFixed(4)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-400 mt-1">
+                        <span>Optimization savings</span>
+                        <span className="font-mono font-semibold text-emerald-400">-${totalSavings.toFixed(4)}</span>
+                      </div>
+                      <div className="my-1.5 border-t border-slate-700/60" />
+                      <div className="flex items-center justify-between font-extrabold text-[13px] text-white mt-auto">
+                        <span>Final Base cost</span>
+                        <span className="font-mono text-emerald-300">${(baseTotal - totalSavings).toFixed(4)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
