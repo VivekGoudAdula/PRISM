@@ -117,17 +117,24 @@ export function getFilePriorityScore(filePath: string): number {
 
 /**
  * Extract GitHub URL from text string if embedded within a prompt.
+ * Strips trailing punctuation (.,;:!?) that may be captured when the URL
+ * appears mid-sentence (e.g. "...on the repository https://github.com/owner/repo. Evaluate...").
  */
 export function extractGitHubUrl(text: string): string | null {
   const match = text.match(/https?:\/\/(?:www\.)?github\.com\/[^\s"'<>]+/i);
-  return match ? match[0] : null;
+  if (!match) return null;
+  // Strip trailing punctuation that may be attached from surrounding prose
+  const url = match[0].replace(/[.,;:!?)]+$/, '');
+  return url || null;
 }
 
 /**
  * Parse owner, repo, and optional branch from a GitHub URL.
  */
 export function parseGitHubUrl(url: string): { owner: string; repo: string; branch?: string } {
-  const match = url.match(
+  // Strip trailing punctuation before parsing
+  const cleanUrl = url.replace(/[.,;:!?)]+$/, '');
+  const match = cleanUrl.match(
     /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s]+)\/([^\/\s#\?]+)(?:\/tree\/([^\/\s#\?]+))?/i,
   );
   if (!match) {
@@ -135,7 +142,9 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string; bran
   }
   const owner = match[1];
   let repo = match[2];
+  // Strip .git suffix and any stray trailing punctuation
   if (repo.endsWith('.git')) repo = repo.slice(0, -4);
+  repo = repo.replace(/[.,;:!?)]+$/, '');
   const branch = match[3];
   return { owner, repo, branch };
 }

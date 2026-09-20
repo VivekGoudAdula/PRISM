@@ -179,28 +179,36 @@ function generateLocalFallbackAnalysis(
   if (wordCount < 4 && !hasFiles) score = 40;
 
   const urlMatches = prompt.match(/https?:\/\/[^\s]+/g);
-  const repoOrUrlStr = urlMatches ? urlMatches.join(' ') : prompt;
+  // Strip trailing punctuation from any URLs found
+  const cleanUrls = urlMatches ? urlMatches.map((u) => u.replace(/[.,;:!?)]+$/, '')) : [];
+  const repoUrl = cleanUrls.length > 0 ? cleanUrls[0] : '';
 
   let improvedPrompt = prompt;
+
   if (taskType === 'claim_extraction') {
-    improvedPrompt = `Extract all independently verifiable factual claims from the provided document (${prompt}). Preserve exact figures, dates, and attribution.`;
+    // Preserve the original prompt; append structured output requirements
+    improvedPrompt = `${prompt}\n\nExtract all independently verifiable factual claims from the provided document. For each claim: assign a unique claim ID, classify the claim type, note the source paragraph, preserve exact figures, dates, and attribution. Return structured JSON output.`;
   } else if (taskType === 'claim_verification') {
-    improvedPrompt = `Verify the factual claim (${prompt}) using the provided evidence documents. Identify supporting evidence, contradicting evidence, and conflicts.`;
+    improvedPrompt = `${prompt}\n\nVerify the factual claim using the provided evidence documents. Identify supporting evidence, contradicting evidence, and conflicts. Return a structured verification report with confidence level (HIGH / MEDIUM / LOW) and a concise assessment summary.`;
   } else if (taskType === 'source_comparison') {
-    improvedPrompt = `Compare the provided sources (${prompt}) to identify agreements, conflicting claims, and information gaps.`;
+    improvedPrompt = `${prompt}\n\nCompare the provided sources to identify: (1) cross-source agreements, (2) conflicting claims with source attribution, and (3) information gaps present in one source but absent from others. Structure the output with agreements, conflicts, and missing information sections.`;
   } else if (taskType === 'news_research') {
-    improvedPrompt = `Synthesize multi-source news research (${prompt}) into an executive summary, key findings, and factual verification queue.`;
+    improvedPrompt = `${prompt}\n\nSynthesize findings across all provided sources into: (1) an executive summary, (2) key verified facts with source citations, (3) conflicting or unverified claims flagged for editorial review, and (4) a factual verification queue sorted by importance.`;
   } else if (taskType === 'resume_screening') {
-    improvedPrompt = `Screen the uploaded resumes for the specified role (${prompt}). Evaluate candidates based on relevant technical skills, years of experience, programming ability, and key projects. Rank candidates and return candidate name, match score, strengths, missing skills, and recommendation.`;
+    // For resume screening, keep the original intent and add evaluation criteria
+    improvedPrompt = `${prompt}\n\nEvaluate each uploaded resume against the specified role requirements. For each candidate return: full name, overall match score (0-100), matched key skills, experience level, strengths, missing required skills, and a hire/no-hire recommendation with brief justification. Rank candidates from highest to lowest match score.`;
   } else if (taskType === 'code_review') {
-    improvedPrompt = `Perform a comprehensive code review on the repository ${repoOrUrlStr}. Evaluate code quality, detect potential bugs, check security vulnerabilities, and recommend actionable fixes with estimated line numbers.`;
+    // For code review, use the clean URL directly — never wrap in parentheses
+    const repoRef = repoUrl || prompt;
+    improvedPrompt = `Perform a comprehensive code review on the repository: ${repoRef}\n\nEvaluate: code quality and readability, potential bugs and edge cases, security vulnerabilities (OWASP top 10), performance bottlenecks, and architectural issues. For each finding provide: file path, line number estimate, severity (Critical/High/Medium/Low), description, and recommended fix.`;
   } else if (taskType === 'contract_analysis') {
-    improvedPrompt = `Analyze the uploaded legal contract (${prompt}). Extract key clauses, classify risk levels (High/Medium/Low), summarize key terms, and provide risk mitigation recommendations for flagged clauses.`;
+    improvedPrompt = `${prompt}\n\nAnalyze the uploaded legal contract. Extract all key clauses, classify the risk level of each clause (High / Medium / Low), summarize key obligations and rights for each party, flag ambiguous or missing clauses, and provide specific risk mitigation recommendations for flagged items.`;
   } else if (taskType === 'invoice_extraction') {
-    improvedPrompt = `Extract vendor information, invoice number, date, total amount, and itemized line items (description, quantity, unit price, total) from the document (${prompt}).`;
+    improvedPrompt = `${prompt}\n\nExtract the following from the uploaded invoice document: vendor name, vendor address, invoice number, invoice date, due date, subtotal, tax amount, total amount due, and a complete itemized line-item table (description, quantity, unit price, line total). Return as structured JSON.`;
   } else if (issues.length > 0) {
-    improvedPrompt = `${prompt}. Please analyze thoroughly, structure the response clearly, and outline key findings, actionable takeaways, and recommendations.`;
+    improvedPrompt = `${prompt}\n\nPlease analyze thoroughly, structure the response clearly, and outline key findings, actionable takeaways, and recommendations.`;
   }
+
 
   return {
     score,
