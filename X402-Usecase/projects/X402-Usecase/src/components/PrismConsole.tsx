@@ -429,6 +429,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     if (loading) return;
     isProcessingRef.current = true;
 
+    setShowSummaryModal(false);
     setLoading(true);
     setError('');
 

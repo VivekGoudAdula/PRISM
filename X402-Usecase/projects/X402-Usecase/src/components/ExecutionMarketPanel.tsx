@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FiZap, FiCpu, FiCheckCircle, FiDollarSign, FiShield } from 'react-icons/fi';
+import React, { useState } from 'react';
+import { FiZap, FiDollarSign } from 'react-icons/fi';
 import type { ExecutionPlan, AttachedFile, PaymentPreviewItem } from '../utils/prismApi';
 
 export interface ExecutionMarketPanelProps {
@@ -7,14 +7,8 @@ export interface ExecutionMarketPanelProps {
   files: AttachedFile[];
   onConfirm: (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan) => void;
   onCancel: () => void;
-  execProgress: {
-    current: number;
-    total: number;
-    category: string;
-    phase: 'payment' | 'executing' | 'verifying' | 'completed';
-    currentFilename?: string;
-  } | null;
-  paymentStatus: string;
+  execProgress?: any;
+  paymentStatus?: string;
 }
 
 const categoryLabel: Record<string, string> = {
@@ -34,8 +28,6 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
   files,
   onConfirm,
   onCancel,
-  execProgress,
-  paymentStatus,
 }) => {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set(
@@ -44,31 +36,45 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
         : Array.from({ length: plan.executionQuantity }, (_, i) => i)
     )
   );
-  
-  // Progression state: 'market' -> 'optimizing' -> 'ready' -> 'paying' -> 'settling' -> 'verified'
-  const [stage, setStage] = useState<'market' | 'optimizing' | 'ready' | 'paying' | 'settling' | 'verified'>('market');
 
+  const toggleSelectFile = (idx: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
+  const totalExecutionItems = Math.max(
+    files.length,
+    plan.executionQuantity,
+    ((plan as any).pages || []).length,
+    ((plan as any).files || []).length
+  );
 
-  useEffect(() => {
-    // React to external execution progress from PrismConsole
-    if (execProgress) {
-      if (execProgress.phase === 'payment') setStage('paying');
-      else if (execProgress.phase === 'executing' || execProgress.phase === 'verifying') setStage('settling');
-      else if (execProgress.phase === 'completed') setStage('verified');
+  const isAllSelected = totalExecutionItems > 0 && selectedIndices.size === totalExecutionItems;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(Array.from({ length: totalExecutionItems }, (_, i) => i)));
     }
-  }, [execProgress]);
+  };
 
   const selectedCount = selectedIndices.size;
   const executionCost = selectedCount * plan.unitPrice;
   const totalCost = selectedCount > 0 ? executionCost + plan.platformFee : 0;
-  
   const baseTotal = plan.baseTotal ?? ((plan.basePrice ?? plan.unitPrice) * selectedCount);
-  const totalSavings = plan.totalOptimizationDiscount ?? ((plan.optimizationDiscount ?? 0) * selectedCount);
-  const finalTotal = totalCost;
-
+  
   // Find the static price of the selected candidate to scale prices properly
   const winnerStaticPrice = plan.candidates?.find((c) => c.endpoint_path === plan.endpointPath)?.price || plan.unitPrice;
+
+  const preview: PaymentPreviewItem[] = plan.paymentPreview ?? [];
 
   const handleConfirm = () => {
     if (selectedCount === 0) return;
@@ -87,24 +93,15 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
       pages: (plan as any).pages
         ? (plan as any).pages.filter((_: any, idx: number) => selectedIndices.has(idx))
         : undefined,
+      paymentPreview: plan.paymentPreview
+        ? plan.paymentPreview.filter((item) => {
+            if (item.type === 'platform_fee') return true;
+            return item.index !== undefined && selectedIndices.has(item.index - 1);
+          })
+        : [],
     };
     onConfirm(filteredFiles, updatedPlan);
   };
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (stage === 'market') {
-      timer = setTimeout(() => setStage('optimizing'), 800);
-    } else if (stage === 'optimizing') {
-      timer = setTimeout(() => setStage('ready'), 1200);
-    } else if (stage === 'ready') {
-      // Automate the "Confirm & Pay" click after a brief delay so the user can see Prism's selection
-      timer = setTimeout(() => handleConfirm(), 1500);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [stage, selectedCount, files]);
 
   const getCandidateLabel = (endpoint: string) => {
     if (endpoint.includes('-fast')) return '⚡ FAST';
@@ -133,7 +130,7 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
           boxShadow: '0 0 80px rgba(99,102,241,0.15), 0 25px 50px rgba(0,0,0,0.6)',
         }}
       >
-        <div className="px-5 py-3 border-b border-white/5 shrink-0 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-white/5 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
               <FiZap className="text-indigo-400 text-xs" />
@@ -150,31 +147,10 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-4 overflow-y-auto flex-1">
-          {/* Dynamic Routing State Flow */}
-          <div className="flex justify-between items-center px-4 py-2 bg-slate-900/60 rounded-xl border border-slate-800/80 mb-2">
-             <div className="flex flex-col items-center flex-1">
-                <span className={`text-[10px] font-black uppercase ${stage !== 'market' ? 'text-emerald-400' : 'text-slate-400'}`}>Understood</span>
-                <div className={`h-1 w-full mt-1 ${stage !== 'market' ? 'bg-emerald-400' : 'bg-slate-700'}`}></div>
-             </div>
-             <div className="flex flex-col items-center flex-1">
-                <span className={`text-[10px] font-black uppercase ${stage === 'ready' || stage === 'paying' || stage === 'settling' || stage === 'verified' ? 'text-emerald-400' : 'text-slate-400'}`}>Optimized</span>
-                <div className={`h-1 w-full mt-1 ${stage === 'ready' || stage === 'paying' || stage === 'settling' || stage === 'verified' ? 'bg-emerald-400' : 'bg-slate-700'}`}></div>
-             </div>
-             <div className="flex flex-col items-center flex-1">
-                <span className={`text-[10px] font-black uppercase ${stage === 'settling' || stage === 'verified' ? 'text-emerald-400' : (stage === 'paying' ? 'text-indigo-400' : 'text-slate-400')}`}>x402</span>
-                <div className={`h-1 w-full mt-1 ${stage === 'settling' || stage === 'verified' ? 'bg-emerald-400' : (stage === 'paying' ? 'bg-indigo-400 animate-pulse' : 'bg-slate-700')}`}></div>
-             </div>
-             <div className="flex flex-col items-center flex-1">
-                <span className={`text-[10px] font-black uppercase ${stage === 'verified' ? 'text-emerald-400' : (stage === 'settling' ? 'text-indigo-400' : 'text-slate-400')}`}>Algorand</span>
-                <div className={`h-1 w-full mt-1 ${stage === 'verified' ? 'bg-emerald-400' : (stage === 'settling' ? 'bg-indigo-400 animate-pulse' : 'bg-slate-700')}`}></div>
-             </div>
-          </div>
-
           {/* Candidates / Capabilities */}
           <div className="flex gap-3">
              {(plan.candidates || []).map((candidate, idx) => {
                const isSelected = plan.endpointPath === candidate.endpoint_path;
-               // Scale the candidate's static price to match the dynamic baseTotal
                const displayPrice = winnerStaticPrice > 0 ? (candidate.price / winnerStaticPrice) * baseTotal : candidate.price;
                
                return (
@@ -183,7 +159,6 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
                    <div className={`text-sm font-black mt-1 ${isSelected ? 'text-emerald-300' : 'text-slate-300'}`}>
                      {getCandidateLabel(candidate.endpoint_path)}
                    </div>
-                   <div className="text-xs font-mono text-slate-300 mt-0.5">${displayPrice.toFixed(4)}</div>
                    <div className="text-[10px] text-slate-500 mt-2 mb-3">{getCandidateDesc(candidate.endpoint_path)}</div>
                    <div className="mt-auto">
                      <div className={`text-[10px] font-bold px-2 py-1 rounded inline-block uppercase ${isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
@@ -195,151 +170,108 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
              })}
           </div>
 
-          {/* Optimization Layer */}
-          {(stage === 'optimizing' || stage === 'ready' || stage === 'paying' || stage === 'settling' || stage === 'verified') && (
-            <div className="animate-fade-in rounded-xl border border-indigo-500/30 bg-gradient-to-b from-indigo-950/30 to-slate-950/60 p-4 flex flex-col gap-3">
-               <div className="flex items-center gap-1.5 border-b border-indigo-500/20 pb-2">
-                  <FiCpu className="text-indigo-400 text-xs" />
-                  <span className="text-[10px] font-extrabold text-indigo-300 uppercase tracking-wider">PRISM OPTIMIZATION</span>
-               </div>
-               
-               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px]">
-                 <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Original request</span>
-                    <span className="font-mono text-slate-300">{plan.originalInputTokens || 0} tokens</span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Semantic Cache</span>
-                    <span className={`font-black uppercase ${plan.semanticCache?.cacheHit ? 'text-emerald-400' : 'text-slate-500'}`}>
-                      {plan.semanticCache?.cacheHit ? '✓ HIT' : 'MISS'}
-                    </span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Tokens saved</span>
-                    <span className="font-mono text-emerald-400">{plan.totalTokensSaved || 0}</span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Prompt Optimizer</span>
-                    <span className={`font-black uppercase ${plan.optimizationApplied ? 'text-emerald-400' : 'text-slate-500'}`}>
-                      {plan.optimizationApplied ? 'APPLIED' : 'BYPASSED'}
-                    </span>
-                 </div>
-                 <div className="flex justify-between items-center border-t border-slate-700/50 pt-2 mt-1 col-span-2">
-                    <span className="text-slate-300 font-bold">Final execution input</span>
-                    <span className="font-mono text-indigo-300 font-bold">{plan.optimizedInputTokens || 0} tokens</span>
-                 </div>
-               </div>
-            </div>
-          )}
-
-          {/* Pricing Math */}
-          {(stage === 'ready' || stage === 'paying' || stage === 'settling' || stage === 'verified') && (
-            <div className="animate-fade-in flex flex-col gap-2 bg-slate-900/60 rounded-xl border border-slate-800/80 p-4">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-400 uppercase font-bold tracking-wider">BASE PRICE</span>
-                  <span className="font-mono text-slate-300">${baseTotal.toFixed(4)}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-400 uppercase font-bold tracking-wider">OPTIMIZATION DISCOUNT</span>
-                  <span className="font-mono text-emerald-400">-${totalSavings.toFixed(4)}</span>
-                </div>
-                <div className="border-t border-slate-700/50 my-1"></div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-white uppercase font-black tracking-wider flex items-center gap-2">
-                    FINAL x402 PRICE
+          {/* Payment Breakdown Box */}
+          {preview.length > 0 && (
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/95 overflow-hidden shadow-xl flex flex-col min-h-[140px] max-h-56 mt-2">
+              <div className="px-3.5 py-2 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/80 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <FiDollarSign className="text-indigo-400 text-xs" />
+                  <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">
+                    PAYMENT BREAKDOWN
                   </span>
-                  <span className="font-mono text-emerald-400 font-black">${finalTotal.toFixed(4)}</span>
                 </div>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950"
+                  />
+                  <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
+                </label>
+              </div>
+              <div className="flex flex-col divide-y divide-slate-800/50 max-h-48 overflow-y-auto">
+                {preview.map((item, idx) => {
+                  const isChecked =
+                    item.type === 'execution'
+                      ? item.index !== undefined
+                        ? selectedIndices.has(item.index - 1)
+                        : false
+                      : true;
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between px-3.5 py-1.5 transition-opacity duration-200 ${
+                        item.type === 'execution' && !isChecked ? 'opacity-40' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {item.type === 'execution' ? (
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => item.index !== undefined && toggleSelectFile(item.index - 1)}
+                            className="checkbox checkbox-xs checkbox-primary border-indigo-500/40 rounded bg-slate-950 cursor-pointer"
+                          />
+                        ) : (
+                          <span className="w-4 h-4 rounded bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-[8px] font-black text-violet-400">
+                            ₱
+                          </span>
+                        )}
+                        {item.type === 'execution' && (
+                          <span className="w-4 h-4 rounded bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-[8px] font-black text-indigo-400">
+                            {item.index}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-200 font-semibold truncate max-w-[260px]">
+                          {item.label}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[11px] font-mono font-bold ${
+                          item.type === 'platform_fee' ? 'text-violet-300' : 'text-emerald-400'
+                        }`}
+                      >
+                        ${item.amount.toFixed(4)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Execution Progress display */}
-          {(stage === 'paying' || stage === 'settling' || stage === 'verified') && (
-            <div className="animate-fade-in rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 flex flex-col gap-3 text-xs">
-               {stage === 'paying' && (
-                 <div className="flex flex-col gap-1">
-                   <div className="font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                     <span className="loading loading-spinner loading-xs"></span> x402 PAYMENT REQUEST
-                   </div>
-                   <div className="text-slate-300">${finalTotal.toFixed(4)} USDC</div>
-                   <div className="text-slate-500 mt-1">Network: Algorand MainNet</div>
-                   <div className="text-slate-500">Status: Awaiting payment via wallet</div>
-                 </div>
-               )}
-               {stage === 'settling' && (
-                 <>
-                   <div className="flex flex-col gap-1">
-                     <div className="font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                       <FiCheckCircle /> PAYMENT VERIFIED
-                     </div>
-                     <div className="text-slate-400">x402 Payment confirmed</div>
-                   </div>
-                   <div className="border-t border-emerald-900/50 my-1"></div>
-                   <div className="flex flex-col gap-1">
-                     <div className="font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                       <span className="loading loading-spinner loading-xs"></span> ALGORAND SETTLEMENT
-                     </div>
-                     <div className="text-slate-400">Executing capability via smart contract</div>
-                     <div className="text-slate-500 mt-1">{paymentStatus || 'Processing...'}</div>
-                   </div>
-                 </>
-               )}
-               {stage === 'verified' && (
-                 <div className="flex flex-col gap-2">
-                   <div className="font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                     <FiCheckCircle /> VERIFIED EXECUTION
-                   </div>
-                   <div className="text-slate-300 font-bold">{plan.providerName}</div>
-                   <div className="grid grid-cols-1 gap-1 text-slate-400 mt-1 pl-1">
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> Task understood</div>
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> Capability selected</div>
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> Optimization applied</div>
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> x402 payment verified</div>
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> Algorand settlement confirmed</div>
-                     <div className="flex items-center gap-2"><FiCheckCircle className="text-emerald-500"/> Result generated</div>
-                   </div>
-                 </div>
-               )}
+          {/* Total */}
+          <div className="mt-1 rounded-xl border border-indigo-500/30 bg-indigo-500/8 px-4 py-3 flex items-center justify-between shrink-0">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-indigo-300">Total Payment</span>
+              <span className="text-xs text-slate-500 font-medium">
+                One wallet approval — consolidated Algorand tx
+              </span>
             </div>
-          )}
-
+            <div className="flex flex-col items-end">
+              <span className="text-xl font-black text-white">${totalCost.toFixed(4)}</span>
+              <span className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider">USDC on Algorand</span>
+            </div>
+          </div>
         </div>
 
-      {/* Actions Footer */}
-      <div className="px-5 py-3 border-t border-white/5 flex gap-2 shrink-0">
-        {stage === 'ready' || stage === 'market' || stage === 'optimizing' ? (
-          <>
-            <button
-              className="flex-1 btn btn-ghost text-slate-400 hover:text-white border border-slate-800/60 rounded-xl text-xs font-bold py-2"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-            <button
-              className="flex-[2] btn btn-primary rounded-xl text-xs font-extrabold shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform py-2"
-              onClick={handleConfirm}
-              disabled={stage !== 'ready' || selectedCount === 0}
-            >
-              {stage !== 'ready' ? 'Evaluating Options...' : `Confirm & Pay $${finalTotal.toFixed(2)}`}
-            </button>
-          </>
-        ) : stage === 'verified' ? (
+        {/* Actions Footer */}
+        <div className="px-5 py-3 border-t border-white/5 flex gap-2 shrink-0">
           <button
-            className="w-full btn btn-primary rounded-xl text-xs font-extrabold shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform py-2"
-            onClick={onCancel} // Closes the panel and reveals the underlying console with the result
+            className="flex-1 btn btn-ghost text-slate-400 hover:text-white border border-slate-800/60 rounded-xl text-xs font-bold py-2"
+            onClick={onCancel}
           >
-            [ VIEW RESULT ]
+            Cancel
           </button>
-        ) : stage === 'paying' || stage === 'settling' ? (
-          <div className="w-full flex justify-center items-center text-xs font-bold text-slate-400 py-2">
-            <span className="loading loading-spinner loading-xs mr-2 text-indigo-400"></span> Processing x402 payment & execution...
-          </div>
-        ) : (
-          <div className="w-full flex justify-center items-center text-xs font-bold text-slate-400 py-2">
-            Automating selection...
-          </div>
-        )}
-      </div>
+          <button
+            className="flex-[2] btn btn-primary rounded-xl text-xs font-extrabold shadow-lg shadow-indigo-500/20 hover:scale-105 transition-transform py-2"
+            onClick={handleConfirm}
+            disabled={selectedCount === 0}
+          >
+            Confirm & Pay ${totalCost.toFixed(2)}
+          </button>
+        </div>
       </div>
     </div>
   );
