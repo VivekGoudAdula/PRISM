@@ -3,6 +3,7 @@ import { Schema, model, Types } from 'mongoose';
 export interface IConversation {
   userId: Types.ObjectId;
   title: string;
+  activeTaskId?: Types.ObjectId;
   /** Serialized chatHistory array — full thread including task results, replies, and errors */
   thread: any[];
   createdAt: Date;
@@ -19,6 +20,7 @@ export interface IMessage {
 const ConversationSchema = new Schema<IConversation>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   title: { type: String, required: true },
+  activeTaskId: { type: Schema.Types.ObjectId, ref: 'Task' },
   thread: { type: Schema.Types.Mixed, default: [] },
 }, {
   timestamps: true

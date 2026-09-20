@@ -55,7 +55,8 @@ export async function handlePlanTaskRequest(c: Context) {
   try {
     const body = await c.req.json().catch(() => ({}));
     // files may include content_base64 for non-code-review categories (resume, contract, invoice)
-    const { task_description, files = [], has_prior_task_result = false } = body;
+    const { task_description, files = [], has_prior_task_result = false, conversationId, conversation_id } = body;
+    const targetConversationId = conversationId || conversation_id;
 
     if (!task_description || typeof task_description !== 'string') {
       return c.json({ error: 'task_description is required' }, 400);
@@ -448,6 +449,7 @@ export async function handlePlanTaskRequest(c: Context) {
     // ── Step 8: Persist the plan as a 'planned' Task document ────────────────
     const taskRecord = await Task.create({
       userId,
+      conversationId: targetConversationId && mongoose.isValidObjectId(targetConversationId) ? targetConversationId : undefined,
       prompt: task_description,
       category,
       status: 'planned',
