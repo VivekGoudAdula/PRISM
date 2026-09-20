@@ -795,16 +795,7 @@ const Home: React.FC<HomeProps> = () => {
               </button>
             )}
 
-            {/* 2. Data Maps */}
-            {viewState === 'app' && userRole !== 'admin' && (
-              <button
-                className="btn h-10 min-h-[40px] text-indigo-300 hover:text-white rounded-full border border-indigo-500/30 px-4 text-xs font-bold flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/22 transition-all"
-                onClick={() => window.dispatchEvent(new CustomEvent('prism_toggle_data_maps_view'))}
-              >
-                <FiMap className="text-sm text-indigo-400" />
-                <span>Data Maps</span>
-              </button>
-            )}
+
 
             {/* 3. History */}
             {viewState === 'app' && userRole !== 'admin' && (
