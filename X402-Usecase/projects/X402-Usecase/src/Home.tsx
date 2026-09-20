@@ -1690,7 +1690,7 @@ const Home: React.FC<HomeProps> = () => {
               <img
                 src="/metrics.png"
                 alt="PRISM Metrics Visual"
-                className="w-auto h-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg object-contain opacity-40 translate-x-6 translate-y-6"
+                className="w-auto h-auto max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg object-contain translate-x-6 translate-y-6"
               />
             </div>
 
