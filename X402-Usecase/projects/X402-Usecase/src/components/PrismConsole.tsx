@@ -22,6 +22,7 @@ import CacheHistoryPanel from './CacheHistoryPanel';
 import PromptTutorModal from './PromptTutorModal';
 import DataMapModal from './DataMapModal';
 import DataMapsView from './DataMapsView';
+import ExecutionMarketPanel from './ExecutionMarketPanel';
 
 export interface PrismConsoleProps {
   activeTab: 'terminal' | 'history' | 'chats';
@@ -425,7 +426,8 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    setShowSummaryModal(false);
+    // Do NOT close the summary/market panel yet, so we can show the payment/execution progress
+    // setShowSummaryModal(false);
     setLoading(true);
     setError('');
 
@@ -1429,13 +1431,15 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       )}
 
       {showSummaryModal && executionPlan && (
-        <ExecutionSummaryModal
+        <ExecutionMarketPanel
           plan={executionPlan}
           files={attachedFiles}
           onConfirm={(filteredFiles, updatedPlan) => {
             handleConfirmAndPay(filteredFiles, updatedPlan);
           }}
           onCancel={handleCancelSummary}
+          execProgress={execProgress}
+          paymentStatus={paymentStatus}
         />
       )}
 
@@ -1818,7 +1822,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
             </div>
           )}
 
-          {loading && execProgress && (
+          {loading && execProgress && !showSummaryModal && (
             <ExecutionProgress
               current={execProgress.current}
               total={execProgress.total}
