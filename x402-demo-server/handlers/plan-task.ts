@@ -66,13 +66,13 @@ export async function handlePlanTaskRequest(c: Context) {
     const has_files: boolean = Array.isArray(files) && files.length > 0;
 
     // ── Step 1: Classify the task ────────────────────────────────────────────
-    // Pass file + history context so the classifier can short-circuit without calling LLM
     const mockCtxClassify = {
       req: {
         json: async () => ({
           task_description,
           has_files,
           has_prior_task_result,
+          conversationId: targetConversationId,
         }),
       },
       json: (data: any) => data,
@@ -81,15 +81,25 @@ export async function handlePlanTaskRequest(c: Context) {
     const classifyResult: any = await handleClassifyTaskRequest(mockCtxClassify);
     const category: string = classifyResult?.category || 'unsupported';
 
-    // ── Pre-Classification Branch 1: Conversational Chat ─────────────────────
+    // ── Pre-Classification Branch 1: Conversational Chat ($0 Cost, No Execution) ──
     if (category === 'conversational') {
-      const { generateChatReply } = await import('./chat-reply');
-      const reply = await generateChatReply(task_description);
+      const { processConversationalMessage } = await import('../services/conversational-router');
+      const routeRes = await processConversationalMessage({
+        conversationId: targetConversationId,
+        message: task_description,
+        hasFiles: has_files,
+      });
+
       return c.json({
         category: 'conversational',
-        reply,
-        message: reply,
+        intent: 'CONVERSATIONAL',
+        reply: routeRes.message,
+        message: routeRes.message,
         isChat: true,
+        referencedTaskIds: routeRes.referencedTaskIds,
+        isAmbiguous: routeRes.isAmbiguous,
+        clarificationQuestion: routeRes.clarificationQuestion,
+        source: routeRes.source,
       });
     }
 

@@ -23,19 +23,34 @@ export async function handleClassifyTaskRequest(c: Context) {
       task_description,
       has_files = false,
       has_prior_task_result = false,
+      conversationId,
+      conversation_id,
     } = body;
+    const targetConversationId = conversationId || conversation_id;
 
     if (!task_description || typeof task_description !== 'string') {
       return c.json({ error: 'task_description is required' }, 400);
     }
 
-    // ── Hard Pre-Check: Bypass LLM for clear-cut cases ────────────────────────
+    // Check through conversational router service if context is available
+    if (targetConversationId || has_prior_task_result) {
+      const { processConversationalMessage } = await import('../services/conversational-router');
+      const routeRes = await processConversationalMessage({
+        conversationId: targetConversationId,
+        message: task_description,
+        hasFiles: has_files,
+      });
 
-    // Case 1: No files attached AND a prior task result exists in conversation
-    // → Must be a conversational follow-up about already-returned results.
-    if (!has_files && has_prior_task_result) {
-      console.log('[classify-task] Pre-check: no files + prior result → conversational');
-      return c.json({ category: 'conversational', raw_input: task_description });
+      if (routeRes.intent === 'CONVERSATIONAL') {
+        console.log('[classify-task] Router matched CONVERSATIONAL intent');
+        return c.json({ category: 'conversational', raw_input: task_description, routeResult: routeRes });
+      } else if (routeRes.intent === 'UNSUPPORTED') {
+        console.log('[classify-task] Router matched UNSUPPORTED intent');
+        return c.json({ category: 'unsupported', raw_input: task_description });
+      } else if (routeRes.intent === 'TASK' && routeRes.taskType) {
+        console.log(`[classify-task] Router matched TASK intent: ${routeRes.taskType}`);
+        return c.json({ category: routeRes.taskType, raw_input: task_description });
+      }
     }
 
     // Case 2: No files attached AND no prior result

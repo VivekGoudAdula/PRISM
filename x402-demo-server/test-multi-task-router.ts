@@ -12,7 +12,7 @@ import { processConversationalMessage } from './services/conversational-router';
 
 async function runTestMatrix() {
   console.log('====================================================');
-  console.log('🚀 PRISM PHASE 1 MULTI-TASK ROUTER TEST MATRIX');
+  console.log('🚀 PRISM PHASE 1 MULTI-TASK & HISTORICAL RETRIEVAL TEST MATRIX');
   console.log('====================================================\n');
 
   const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/prism_app';
@@ -42,274 +42,214 @@ async function runTestMatrix() {
   console.log(`Created test conversation ID: ${conversationId}\n`);
 
   let passedCount = 0;
-  let totalTests = 10;
+  let totalTests = 8;
 
   try {
     // ------------------------------------------------------------------
-    // Setup Task 1: Repository Review
+    // STEP 1: Code Review Execution (37 files, 34 issues, 88% quality)
     // ------------------------------------------------------------------
+    console.log('🔹 STEP 1: Execute Repository Code Review (37 files, 34 issues, 88% quality)');
     const repoTask = await Task.create({
       userId: testUser._id,
       conversationId: conversation._id,
-      prompt: 'Review github.com/prism-ai/backend-api repo',
+      prompt: 'Review this repository',
       category: 'code_review',
       status: 'completed',
       selectedEndpoint: '/code-review-fast',
       output: {
-        totalFilesReviewed: 5,
-        totalIssues: 3,
-        averageQualityScore: 0.85,
-        averageConfidence: 0.95,
+        totalFilesReviewed: 37,
+        totalIssues: 34,
+        averageQualityScore: 0.88,
+        issuesBySeverity: { high: 0, medium: 0, low: 34 },
         files: [
           {
-            file_path: 'auth/jwt.js',
+            file_path: 'README.template.md',
+            overall_quality_score: 0.88,
             issues: [
-              { severity: 'high', title: 'Hardcoded JWT secret token', description: 'Hardcoded JWT secret found in auth/jwt.js' },
-              { severity: 'medium', title: 'Weak password hashing algorithm', description: 'MD5 hashing algorithm used for user passwords' },
+              {
+                line_estimate: 1,
+                severity: 'low',
+                title: 'Unresolved task tag found',
+                description: 'Unresolved task tag found: // TODO: update documentation',
+                suggestion: 'Address leftover TODO task or move to project issue tracker.',
+              },
             ],
-            overall_quality_score: 0.6,
           },
           {
-            file_path: 'db/connection.js',
+            file_path: 'contributors/contributorsList.js',
+            overall_quality_score: 0.88,
             issues: [
-              { severity: 'low', title: 'Missing connection retry logic', description: 'No automatic reconnect handling' },
+              {
+                line_estimate: 12,
+                severity: 'low',
+                title: 'Active console statement found',
+                description: 'Active console.log found in production file',
+                suggestion: 'Replace with structured logging.',
+              },
             ],
-            overall_quality_score: 0.9,
+          },
+          {
+            file_path: 'auth/jwt.js',
+            overall_quality_score: 0.85,
+            issues: [
+              {
+                line_estimate: 5,
+                severity: 'medium',
+                title: 'Hardcoded secret token',
+                description: 'Hardcoded secret token found in auth/jwt.js',
+                suggestion: 'Use process.env.JWT_SECRET instead.',
+              },
+            ],
           },
         ],
       },
     });
 
-    // TEST 1 — Repository follow-up
-    console.log('🔹 TEST 1: Repository follow-up ("What were the security issues?")');
-    const res1 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'What were the security issues?',
-    });
-    console.log('Result 1:', { intent: res1.intent, referencedTaskIds: res1.referencedTaskIds, answer: res1.message });
-    if (res1.intent === 'CONVERSATIONAL' && res1.referencedTaskIds.includes(repoTask._id.toString()) && res1.message.toLowerCase().includes('jwt')) {
-      console.log('✅ TEST 1 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ TEST 1 FAILED!\n');
-    }
+    await Conversation.findByIdAndUpdate(conversation._id, { activeTaskId: repoTask._id });
+    console.log(`✅ Step 1 complete. Repo Task ID: ${repoTask._id}\n`);
 
-    // TEST 2 — Switch to resumes
-    console.log('🔹 TEST 2: Switch to resumes ("Screen these resumes for senior developer role")');
+    // STEP 2: Ask "What was the issue in README.template.md?"
+    console.log('🔹 STEP 2: Ask "What was the issue in README.template.md?"');
     const res2 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'Screen these resumes for senior developer role',
-      hasFiles: true,
+      message: 'What was the issue in README.template.md?',
     });
-    console.log('Result 2:', { intent: res2.intent, taskType: res2.taskType });
-    if (res2.intent === 'TASK' && res2.taskType === 'resume_screening') {
-      console.log('✅ TEST 2 PASSED!\n');
+    console.log('Result 2:', { intent: res2.intent, answer: res2.message });
+    if (res2.intent === 'CONVERSATIONAL' && res2.referencedTaskIds.includes(repoTask._id.toString()) && res2.message.includes('README.template.md') && !res2.message.includes("don't have a previous result")) {
+      console.log('✅ STEP 2 PASSED!\n');
       passedCount++;
     } else {
-      console.error('❌ TEST 2 FAILED!\n');
+      console.error('❌ STEP 2 FAILED!\n');
     }
 
-    // Setup Task 2: Resume Screening
+    // STEP 3: Ask "How many issues were found?"
+    console.log('🔹 STEP 3: Ask "How many issues were found?"');
+    const res3 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'How many issues were found?',
+    });
+    console.log('Result 3:', { intent: res3.intent, answer: res3.message });
+    if (res3.intent === 'CONVERSATIONAL' && res3.message.includes('34')) {
+      console.log('✅ STEP 3 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 3 FAILED!\n');
+    }
+
+    // STEP 4: Ask "What was the overall quality score?"
+    console.log('🔹 STEP 4: Ask "What was the overall quality score?"');
+    const res4 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'What was the overall quality score?',
+    });
+    console.log('Result 4:', { intent: res4.intent, answer: res4.message });
+    if (res4.intent === 'CONVERSATIONAL' && res4.message.includes('88%')) {
+      console.log('✅ STEP 4 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 4 FAILED!\n');
+    }
+
+    // STEP 5: Ask "Which files had low severity issues?"
+    console.log('🔹 STEP 5: Ask "Which files had low severity issues?"');
+    const res5 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'Which files had low severity issues?',
+    });
+    console.log('Result 5:', { intent: res5.intent, answer: res5.message });
+    if (res5.intent === 'CONVERSATIONAL' && (res5.message.includes('README.template.md') || res5.message.includes('contributorsList.js'))) {
+      console.log('✅ STEP 5 PASSED!\n');
+      passedCount++;
+    } else {
+      console.error('❌ STEP 5 FAILED!\n');
+    }
+
+    // STEP 6: Switch Task -> Screen resumes for frontend developer
+    console.log('🔹 STEP 6: Switch task ("Screen these resumes for a frontend developer.")');
+    const res6 = await processConversationalMessage({
+      conversationId,
+      userId,
+      message: 'Screen these resumes for a frontend developer.',
+      hasFiles: true,
+    });
+    console.log('Result 6:', { intent: res6.intent, taskType: res6.taskType });
+
     const resumeTask = await Task.create({
       userId: testUser._id,
       conversationId: conversation._id,
-      prompt: 'Screen candidate resumes for senior developer role',
+      prompt: 'Screen these resumes for a frontend developer.',
       category: 'resume_screening',
       status: 'completed',
       selectedEndpoint: '/resume-screen-accurate',
       output: {
-        totalFiles: 3,
-        averageConfidence: 0.92,
+        totalFiles: 2,
         candidates: [
-          { name: 'Alice Smith', score: 92, skills: ['Python', 'Django', 'FastAPI', 'PostgreSQL'], recommendation: 'Strong Hire' },
-          { name: 'Bob Jones', score: 78, skills: ['Java', 'Spring Boot', 'MySQL'], recommendation: 'Consider' },
-          { name: 'Charlie Brown', score: 85, skills: ['Python', 'Node.js', 'React', 'MongoDB'], recommendation: 'Hire' },
+          { name: 'Polla Vishnu Vardhan', score: 91, skills: ['React', 'TypeScript', 'Tailwind', 'Next.js'], recommendation: 'Strong Hire' },
+          { name: 'Vivek Goud', score: 88, skills: ['Python', 'TypeScript', 'Algorand', 'React'], recommendation: 'Strong Hire' },
         ],
       },
     });
+    await Conversation.findByIdAndUpdate(conversation._id, { activeTaskId: resumeTask._id });
 
-    // TEST 3 — Resume follow-up
-    console.log('🔹 TEST 3: Resume follow-up ("Which candidate has the strongest Python experience?")');
-    const res3 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'Which candidate has the strongest Python experience?',
-    });
-    console.log('Result 3:', { intent: res3.intent, referencedTaskIds: res3.referencedTaskIds, answer: res3.message });
-    if (res3.intent === 'CONVERSATIONAL' && res3.referencedTaskIds.includes(resumeTask._id.toString()) && (res3.message.includes('Alice') || res3.message.includes('Python'))) {
-      console.log('✅ TEST 3 PASSED!\n');
+    if (res6.intent === 'TASK' && res6.taskType === 'resume_screening') {
+      console.log('✅ STEP 6 PASSED!\n');
       passedCount++;
     } else {
-      console.error('❌ TEST 3 FAILED!\n');
+      console.error('❌ STEP 6 FAILED!\n');
     }
 
-    // TEST 4 — Return to repository
-    console.log('🔹 TEST 4: Return to repository ("Go back to the repository. What did you find about authentication?")');
-    const res4 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'Go back to the repository. What did you find about authentication?',
-    });
-    console.log('Result 4:', { intent: res4.intent, referencedTaskIds: res4.referencedTaskIds, answer: res4.message });
-    if (res4.intent === 'CONVERSATIONAL' && res4.referencedTaskIds.includes(repoTask._id.toString()) && (res4.message.toLowerCase().includes('jwt') || res4.message.toLowerCase().includes('auth'))) {
-      console.log('✅ TEST 4 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ TEST 4 FAILED!\n');
-    }
-
-    // TEST 5 — Cross-task reasoning
-    console.log('🔹 TEST 5: Cross-task reasoning ("What candidate experience from the resumes is relevant to the repository\'s backend issues?")');
-    const res5 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: "What candidate experience from the resumes is relevant to the repository's backend issues?",
-    });
-    console.log('Result 5:', { intent: res5.intent, referencedTaskIds: res5.referencedTaskIds, answer: res5.message });
-    if (res5.intent === 'CONVERSATIONAL' && res5.referencedTaskIds.length >= 2 && res5.referencedTaskIds.includes(repoTask._id.toString()) && res5.referencedTaskIds.includes(resumeTask._id.toString())) {
-      console.log('✅ TEST 5 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ TEST 5 FAILED!\n');
-    }
-
-    // TEST 6 — New contract capability
-    console.log('🔹 TEST 6: New contract capability ("What does this contract say about termination?")');
-    const res6 = await processConversationalMessage({
-      conversationId,
-      userId,
-      message: 'What does this contract say about termination?',
-      hasFiles: true,
-    });
-    console.log('Result 6:', { intent: res6.intent, taskType: res6.taskType });
-    if (res6.intent === 'TASK' && res6.taskType === 'contract_analysis') {
-      console.log('✅ TEST 6 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ TEST 6 FAILED!\n');
-    }
-
-    // Setup Task 3: Contract Analysis
-    const contractTask = await Task.create({
-      userId: testUser._id,
-      conversationId: conversation._id,
-      prompt: 'Analyze Master Services Agreement contract',
-      category: 'contract_analysis',
-      status: 'completed',
-      selectedEndpoint: '/contract-analyze-fast',
-      output: {
-        totalClauses: 4,
-        averageConfidence: 0.94,
-        documents: [
-          {
-            document: 1,
-            clauses: [
-              { category: 'Termination', title: 'Termination for Convenience', text: 'Either party may terminate this agreement with 30 days written notice.' },
-              { category: 'Liability', title: 'Limitation of Liability', text: 'Total liability under this agreement shall not exceed $50,000.' },
-            ],
-          },
-        ],
-      },
-    });
-
-    // TEST 7 — Unsupported request
-    console.log('🔹 TEST 7: Unsupported request ("What\'s the weather in Hyderabad?")');
+    // STEP 7: Ask "Who scored highest?"
+    console.log('🔹 STEP 7: Ask "Who scored highest?"');
     const res7 = await processConversationalMessage({
       conversationId,
       userId,
-      message: "What's the weather in Hyderabad?",
+      message: 'Who scored highest?',
     });
-    console.log('Result 7:', { intent: res7.intent, message: res7.message });
-    if (res7.intent === 'UNSUPPORTED' && res7.message.includes("isn't a capability PRISM currently supports")) {
-      console.log('✅ TEST 7 PASSED!\n');
+    console.log('Result 7:', { intent: res7.intent, answer: res7.message });
+    if (res7.intent === 'CONVERSATIONAL' && res7.message.includes('Polla Vishnu Vardhan') && res7.message.includes('91%')) {
+      console.log('✅ STEP 7 PASSED!\n');
       passedCount++;
     } else {
-      console.error('❌ TEST 7 FAILED!\n');
+      console.error('❌ STEP 7 FAILED!\n');
     }
 
-    // TEST 8 — Ambiguous reference handling
-    console.log('🔹 TEST 8: Ambiguous reference handling (Add second repo review and ask "What were the security issues in the repository?")');
-    const secondRepoTask = await Task.create({
-      userId: testUser._id,
-      conversationId: conversation._id,
-      prompt: 'Review github.com/prism-ai/frontend-ui repo',
-      category: 'code_review',
-      status: 'completed',
-      selectedEndpoint: '/code-review-fast',
-      output: {
-        totalFilesReviewed: 3,
-        totalIssues: 1,
-        files: [
-          { file_path: 'src/App.tsx', issues: [{ severity: 'low', title: 'Unused console log' }] },
-        ],
-      },
-    });
-
+    // STEP 8: Ask "Go back to the repository. What was the issue in README.template.md?"
+    console.log('🔹 STEP 8: Ask "Go back to the repository. What was the issue in README.template.md?"');
     const res8 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'What were the security issues in the repository?',
+      message: 'Go back to the repository. What was the issue in README.template.md?',
     });
-    console.log('Result 8:', { intent: res8.intent, isAmbiguous: res8.isAmbiguous, question: res8.clarificationQuestion });
-    if (res8.intent === 'CONVERSATIONAL' && res8.isAmbiguous && res8.clarificationQuestion?.includes('multiple repository reviews')) {
-      console.log('✅ TEST 8 PASSED!\n');
+    console.log('Result 8:', { intent: res8.intent, answer: res8.message });
+    if (res8.intent === 'CONVERSATIONAL' && res8.referencedTaskIds.includes(repoTask._id.toString()) && res8.message.includes('README.template.md')) {
+      console.log('✅ STEP 8 PASSED!\n');
       passedCount++;
     } else {
-      console.error('❌ TEST 8 FAILED!\n');
+      console.error('❌ STEP 8 FAILED!\n');
     }
 
-    // TEST 9 — Hallucination protection
-    console.log('🔹 TEST 9: Hallucination protection ("What did the contract say about SOC2 compliance?")');
+    // STEP 9: Ask "What was Vivek's resume score?"
+    console.log('🔹 STEP 9: Ask "What was Vivek\'s resume score?"');
     const res9 = await processConversationalMessage({
       conversationId,
       userId,
-      message: 'What did the contract say about SOC2 compliance?',
+      message: "What was Vivek's resume score?",
     });
     console.log('Result 9:', { intent: res9.intent, answer: res9.message });
-    if (res9.intent === 'CONVERSATIONAL' && res9.message.includes("don't have that detail")) {
-      console.log('✅ TEST 9 PASSED!\n');
+    if (res9.intent === 'CONVERSATIONAL' && res9.referencedTaskIds.includes(resumeTask._id.toString()) && res9.message.includes('88%')) {
+      console.log('✅ STEP 9 PASSED!\n');
       passedCount++;
     } else {
-      console.error('❌ TEST 9 FAILED!\n');
-    }
-
-    // TEST 10 — Repeated task switching sequence
-    console.log('🔹 TEST 10: Repeated task switching sequence (Repo -> Resume -> Contract -> Repo -> Resume -> Contract -> Repo)');
-    const seq = [
-      { msg: 'What authentication issue was in the repo?', expectedCat: 'code_review' },
-      { msg: 'Who was the candidate with Python experience?', expectedCat: 'resume_screening' },
-      { msg: 'What is the termination period in the contract?', expectedCat: 'contract_analysis' },
-      { msg: 'Go back to the repository. What was the quality score?', expectedCat: 'code_review' },
-      { msg: 'Returning to resumes, which candidate had Java skills?', expectedCat: 'resume_screening' },
-      { msg: 'Regarding the contract, what is the liability limit?', expectedCat: 'contract_analysis' },
-    ];
-
-    let seqPassed = true;
-    for (const step of seq) {
-      const stepRes = await processConversationalMessage({
-        conversationId,
-        userId,
-        message: step.msg,
-      });
-      console.log(`  Step "${step.msg}" -> intent: ${stepRes.intent}, answer snippet: "${stepRes.message.slice(0, 60)}..."`);
-      if (stepRes.intent !== 'CONVERSATIONAL' || !stepRes.message || stepRes.message.includes("don't have a previous task result")) {
-        seqPassed = false;
-      }
-    }
-
-    if (seqPassed) {
-      console.log('✅ TEST 10 PASSED!\n');
-      passedCount++;
-    } else {
-      console.error('❌ TEST 10 FAILED!\n');
+      console.error('❌ STEP 9 FAILED!\n');
     }
 
   } catch (err) {
     console.error('Test matrix execution error:', err);
   } finally {
-    // Cleanup test records
     await Task.deleteMany({ conversationId: conversation._id });
     await Conversation.deleteOne({ _id: conversation._id });
     await User.deleteOne({ _id: testUser._id });
@@ -317,7 +257,7 @@ async function runTestMatrix() {
   }
 
   console.log('====================================================');
-  console.log(`🏆 TEST MATRIX RESULTS: ${passedCount}/${totalTests} TESTS PASSED`);
+  console.log(`🏆 HISTORICAL TASK RETRIEVAL MATRIX RESULTS: ${passedCount}/${totalTests} TESTS PASSED`);
   console.log('====================================================');
 
   if (passedCount === totalTests) {

@@ -215,7 +215,7 @@ chatRouter.post('/message', async (c) => {
     const { processConversationalMessage } = await import('../services/conversational-router');
     const result = await processConversationalMessage({
       conversationId,
-      userId: user.userId,
+      userId: user?.userId,
       message,
       hasFiles,
     });
