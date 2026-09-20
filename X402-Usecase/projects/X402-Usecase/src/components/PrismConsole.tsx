@@ -398,8 +398,14 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
   const handleUseImprovedPrompt = async (improvedPrompt: string) => {
     setShowPromptTutorModal(false);
+    
+    // Display the improved prompt in the UI as requested by the user
     setTaskDescription(improvedPrompt);
-    await runPlanTask(improvedPrompt, attachedFiles);
+    
+    // ALWAYS process using the ORIGINAL prompt to ensure GitHub URLs and attachments 
+    // are parsed cleanly without any of the extra Prompt Tutor text breaking it.
+    // (Note: taskDescription here is still the original prompt because setState is async)
+    await runPlanTask(taskDescription, attachedFiles);
   };
 
   const handleKeepOriginalPrompt = async () => {
