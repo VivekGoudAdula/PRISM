@@ -100148,10 +100148,13 @@ function getFilePriorityScore(filePath) {
 }
 function extractGitHubUrl(text) {
   const match2 = text.match(/https?:\/\/(?:www\.)?github\.com\/[^\s"'<>]+/i);
-  return match2 ? match2[0] : null;
+  if (!match2) return null;
+  const url = match2[0].replace(/[.,;:!?)]+$/, "");
+  return url || null;
 }
 function parseGitHubUrl(url) {
-  const match2 = url.match(
+  const cleanUrl = url.replace(/[.,;:!?)]+$/, "");
+  const match2 = cleanUrl.match(
     /(?:https?:\/\/)?(?:www\.)?github\.com\/([^\/\s]+)\/([^\/\s#\?]+)(?:\/tree\/([^\/\s#\?]+))?/i
   );
   if (!match2) {
@@ -100160,6 +100163,7 @@ function parseGitHubUrl(url) {
   const owner = match2[1];
   let repo = match2[2];
   if (repo.endsWith(".git")) repo = repo.slice(0, -4);
+  repo = repo.replace(/[.,;:!?)]+$/, "");
   const branch = match2[3];
   return { owner, repo, branch };
 }
@@ -100173,6 +100177,42 @@ function getGitHubHeaders() {
     headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
+}
+function buildGitHubError(res, context) {
+  const status = res.status;
+  const remaining = res.headers.get("x-ratelimit-remaining");
+  const resetEpoch = res.headers.get("x-ratelimit-reset");
+  const hasToken = Boolean(process.env.GITHUB_TOKEN || process.env.GH_TOKEN);
+  if (status === 429 || status === 403 && remaining === "0") {
+    let resetHint = "";
+    if (resetEpoch) {
+      const resetAt = new Date(parseInt(resetEpoch, 10) * 1e3);
+      const minutesLeft = Math.ceil((resetAt.getTime() - Date.now()) / 6e4);
+      resetHint = ` Rate limit resets in ~${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""}.`;
+    }
+    const tokenHint = hasToken ? "Your authenticated GitHub token has hit its rate limit." : "GitHub API rate limit exceeded (unauthenticated: 60 req/hr). Set GITHUB_TOKEN in the server env to raise the limit to 5,000 req/hr.";
+    console.warn(`[GitHub] rate_limited repo=${context} remaining=0 reset=${resetEpoch}`);
+    return new Error(
+      `GitHub rate limit exceeded \u2014 please wait a moment before reviewing the same repository again. ${tokenHint}${resetHint}`
+    );
+  }
+  if (status === 403) {
+    const category = hasToken ? "token_permission_denied" : "unauthenticated_access_denied";
+    console.warn(`[GitHub] ${category} repo=${context} status=403`);
+    return new Error(
+      `GitHub API access denied (403) for ${context}. ${hasToken ? "Check that your GITHUB_TOKEN has the correct scopes." : "The repository may be private. Set GITHUB_TOKEN in the server env to access private repos."}`
+    );
+  }
+  if (status === 404) {
+    console.warn(`[GitHub] not_found repo=${context} status=404`);
+    return new Error(`GitHub repository not found (404): ${context}. Make sure the URL is correct and the repository is public.`);
+  }
+  if (status >= 500) {
+    console.warn(`[GitHub] server_error repo=${context} status=${status}`);
+    return new Error(`GitHub server error (${status}) while fetching ${context}. Please try again shortly.`);
+  }
+  console.warn(`[GitHub] unexpected_error repo=${context} status=${status}`);
+  return new Error(`Unexpected GitHub API error (${status}) for ${context}.`);
 }
 async function fetchRepoFiles(repoUrl) {
   const { owner, repo, branch: specifiedBranch } = parseGitHubUrl(repoUrl);
@@ -100192,10 +100232,16 @@ async function fetchRepoFiles(repoUrl) {
     try {
       repoInfoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     } catch (fetchErr) {
-      console.warn(`GitHub metadata fetch failed for ${owner}/${repo}, using default fallback branch main`);
+      console.warn(`[GitHub] metadata_fetch_failed repo=${owner}/${repo} \u2014 defaulting to branch main`);
     }
-    if (!repoInfoRes || !repoInfoRes.ok) {
-      console.warn(`GitHub API rate limit or error (${repoInfoRes?.status || "Network"}) for ${owner}/${repo}. Using default branch main.`);
+    if (!repoInfoRes) {
+      console.warn(`[GitHub] network_error repo=${owner}/${repo} \u2014 defaulting to branch main`);
+      branch = "main";
+    } else if (!repoInfoRes.ok) {
+      if (repoInfoRes.status === 404) {
+        throw buildGitHubError(repoInfoRes, `${owner}/${repo}`);
+      }
+      console.warn(`[GitHub] metadata_error status=${repoInfoRes.status} repo=${owner}/${repo} \u2014 defaulting to branch main`);
       branch = "main";
     } else {
       const repoInfo = await repoInfoRes.json().catch(() => ({}));
@@ -100210,27 +100256,11 @@ async function fetchRepoFiles(repoUrl) {
   try {
     treeRes = await fetch(treeUrl, { headers });
   } catch (err2) {
-    console.warn(`GitHub tree fetch failed for ${owner}/${repo}@${branch}`);
+    console.warn(`[GitHub] tree_fetch_network_error repo=${owner}/${repo}@${branch}`);
+    throw new Error(`Network error while fetching file tree for ${owner}/${repo}. Please check your connection and try again.`);
   }
   if (!treeRes || !treeRes.ok) {
-    console.warn(`GitHub API tree rate limit or error (${treeRes?.status || "Network"}). Returning structured fallback file tree for ${owner}/${repo}`);
-    const fallbackResult = {
-      files: [
-        { path: "src/main.ts", raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/main.ts`, size: 1024 },
-        { path: "src/index.ts", raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/src/index.ts`, size: 1024 },
-        { path: "package.json", raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/package.json`, size: 512 },
-        { path: "README.md", raw_url: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`, size: 2048 }
-      ],
-      skipped: 0,
-      capped: false,
-      total_files_found: 4,
-      owner,
-      repo,
-      branch
-    };
-    setCached(branchKey, fallbackResult);
-    setCached(partialKey, fallbackResult);
-    return fallbackResult;
+    throw buildGitHubError(treeRes || new Response(null, { status: 0 }), `${owner}/${repo}@${branch} (tree)`);
   }
   const treeData = await treeRes.json();
   const treeItems = Array.isArray(treeData.tree) ? treeData.tree : [];
@@ -100260,7 +100290,7 @@ async function fetchRepoFiles(repoUrl) {
   const files = filtered.slice(0, MAX_FILES);
   const skipped = Math.max(0, total_files_found - MAX_FILES);
   const capped = total_files_found > MAX_FILES;
-  const result = { files, skipped, capped, total_files_found, owner, repo, branch };
+  const result = { files, skipped, capped, total_files_found, owner, repo, branch: branch ?? "main" };
   setCached(branchKey, result);
   setCached(partialKey, result);
   return result;
@@ -105312,8 +105342,6 @@ adminRouter.get("/analytics/tasks/:taskId", async (c) => {
 var import_dotenv7 = __toESM(require_main());
 init_extract_document();
 init_tokenAnalytics();
-init_openrouter_client();
-init_parse_json_robust();
 (0, import_dotenv7.config)();
 async function analyzePromptWithLLM(originalPrompt, files = [], hintCategory) {
   const promptText = (originalPrompt || "").trim();
@@ -105340,7 +105368,7 @@ async function analyzePromptWithLLM(originalPrompt, files = [], hintCategory) {
       try {
         const ext = await extractText(f.filename || `file-${i + 1}`, f.content_base64);
         text = ext.text || "";
-      } catch (err2) {
+      } catch (_err) {
         text = "";
       }
     }
@@ -105357,89 +105385,8 @@ Attached Files Context:
 ${fileSummaries.join("\n")}` : "";
   const fullUserPayload = `${promptText}${contextStr}`;
   const inputTokens = estimateTokens(fullUserPayload);
-  let analysis = null;
-  const systemInstruction = `You are Prompt Tutor, an expert AI prompt optimization layer for PRISM.
-Your job is to analyze the user's task request BEFORE execution and provide structured feedback to improve prompt engineering.
-
-Evaluate:
-1. Clarity & Specificity: Is the request well-defined?
-2. Completeness: Are target roles, schemas, or criteria present?
-3. Constraints & Expected Output Format: Is the desired output structure specified?
-4. Inefficiencies or Redundancies: Are there conflicting or unnecessary instructions?
-5. Missing Context: What essential information is lacking?
-
-Scoring rules:
-- Score from 0 to 100 based on prompt quality.
-- High score (>80): Specific, well-structured, clear role/task, explicit output format.
-- Medium score (50-80): Understandable intent but missing evaluation criteria, role details, or output formatting.
-- Low score (<50): Vague, single phrase, or missing key parameters.
-
-Do NOT invent fake requirements. Distinguish required missing info from optional recommendations.
-The improvedPrompt MUST preserve the user's exact original intent and MUST NOT introduce unsupported facts.
-CRITICAL REQUIREMENT: The improvedPrompt MUST preserve all repository links (e.g. GitHub URLs like https://github.com/...), URLs, target names, file names, or specific parameters present in the original prompt. NEVER omit or remove user-provided URLs!
-
-Return ONLY a valid, single JSON object with this exact structure and NO Markdown formatting or markdown wrappers:
-{
-  "score": number,
-  "intent": "short 2-4 word intent summary",
-  "taskType": "news_research | source_comparison | claim_verification | claim_extraction | resume_screening | contract_analysis | invoice_extraction | code_review | general_query",
-  "issues": ["list of detected issues"],
-  "requiredInformation": ["list of missing required context/details"],
-  "irrelevantInformation": ["list of redundant/irrelevant parts, or empty"],
-  "constraints": ["key constraints identified"],
-  "suggestions": ["actionable recommendations to improve"],
-  "improvedPrompt": "full optimized prompt preserving intent and user URLs"
-}`;
-  try {
-    const rawContent = await callOpenRouter({
-      model: FAST_MODEL2,
-      messages: [
-        { role: "system", content: systemInstruction },
-        { role: "user", content: `Task Request: "${promptText}"${contextStr}` }
-      ],
-      temperature: 0.1,
-      response_format: { type: "json_object" }
-    });
-    const parsed = parseRobustJson(rawContent);
-    const sanitizeStringArray = (val) => {
-      if (!val) return [];
-      if (Array.isArray(val)) {
-        return val.map((item) => typeof item === "string" ? item : JSON.stringify(item)).filter(Boolean);
-      }
-      if (typeof val === "string") {
-        return [val];
-      }
-      return [JSON.stringify(val)];
-    };
-    let improvedPrompt = parsed.improvedPrompt || promptText;
-    const urlMatches = promptText.match(/https?:\/\/[^\s]+/g);
-    if (urlMatches) {
-      for (const url of urlMatches) {
-        if (!improvedPrompt.includes(url)) {
-          improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
-        }
-      }
-    }
-    analysis = {
-      score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
-      intent: parsed.intent || "Task analysis",
-      taskType: parsed.taskType || hintCategory || "general_query",
-      issues: sanitizeStringArray(parsed.issues),
-      requiredInformation: sanitizeStringArray(parsed.requiredInformation),
-      irrelevantInformation: sanitizeStringArray(parsed.irrelevantInformation),
-      constraints: sanitizeStringArray(parsed.constraints),
-      suggestions: sanitizeStringArray(parsed.suggestions),
-      improvedPrompt,
-      modelUsed: FAST_MODEL2,
-      originalInputTokens: inputTokens
-    };
-  } catch (err2) {
-    console.warn("[PromptTutor] OpenRouter prompt analysis failed, using fallback:", err2);
-  }
-  if (!analysis) {
-    analysis = generateLocalFallbackAnalysis(promptText, files, hintCategory);
-    analysis.originalInputTokens = inputTokens;
-  }
+  const analysis = generateLocalFallbackAnalysis(promptText, files, hintCategory);
+  analysis.originalInputTokens = inputTokens;
   return analysis;
 }
 function generateLocalFallbackAnalysis(prompt, files, hintCategory) {
@@ -105495,26 +105442,46 @@ function generateLocalFallbackAnalysis(prompt, files, hintCategory) {
   if (issues.length >= 2) score = 58;
   if (wordCount < 4 && !hasFiles) score = 40;
   const urlMatches = prompt.match(/https?:\/\/[^\s]+/g);
-  const repoOrUrlStr = urlMatches ? urlMatches.join(" ") : prompt;
+  const cleanUrls = urlMatches ? urlMatches.map((u) => u.replace(/[.,;:!?)]+$/, "")) : [];
+  const repoUrl = cleanUrls.length > 0 ? cleanUrls[0] : "";
   let improvedPrompt = prompt;
   if (taskType === "claim_extraction") {
-    improvedPrompt = `Extract all independently verifiable factual claims from the provided document (${prompt}). Preserve exact figures, dates, and attribution.`;
+    improvedPrompt = `${prompt}
+
+Extract all independently verifiable factual claims from the provided document. For each claim: assign a unique claim ID, classify the claim type, note the source paragraph, preserve exact figures, dates, and attribution. Return structured JSON output.`;
   } else if (taskType === "claim_verification") {
-    improvedPrompt = `Verify the factual claim (${prompt}) using the provided evidence documents. Identify supporting evidence, contradicting evidence, and conflicts.`;
+    improvedPrompt = `${prompt}
+
+Verify the factual claim using the provided evidence documents. Identify supporting evidence, contradicting evidence, and conflicts. Return a structured verification report with confidence level (HIGH / MEDIUM / LOW) and a concise assessment summary.`;
   } else if (taskType === "source_comparison") {
-    improvedPrompt = `Compare the provided sources (${prompt}) to identify agreements, conflicting claims, and information gaps.`;
+    improvedPrompt = `${prompt}
+
+Compare the provided sources to identify: (1) cross-source agreements, (2) conflicting claims with source attribution, and (3) information gaps present in one source but absent from others. Structure the output with agreements, conflicts, and missing information sections.`;
   } else if (taskType === "news_research") {
-    improvedPrompt = `Synthesize multi-source news research (${prompt}) into an executive summary, key findings, and factual verification queue.`;
+    improvedPrompt = `${prompt}
+
+Synthesize findings across all provided sources into: (1) an executive summary, (2) key verified facts with source citations, (3) conflicting or unverified claims flagged for editorial review, and (4) a factual verification queue sorted by importance.`;
   } else if (taskType === "resume_screening") {
-    improvedPrompt = `Screen the uploaded resumes for the specified role (${prompt}). Evaluate candidates based on relevant technical skills, years of experience, programming ability, and key projects. Rank candidates and return candidate name, match score, strengths, missing skills, and recommendation.`;
+    improvedPrompt = `${prompt}
+
+Evaluate each uploaded resume against the specified role requirements. For each candidate return: full name, overall match score (0-100), matched key skills, experience level, strengths, missing required skills, and a hire/no-hire recommendation with brief justification. Rank candidates from highest to lowest match score.`;
   } else if (taskType === "code_review") {
-    improvedPrompt = `Perform a comprehensive code review on the repository ${repoOrUrlStr}. Evaluate code quality, detect potential bugs, check security vulnerabilities, and recommend actionable fixes with estimated line numbers.`;
+    const repoRef = repoUrl || prompt;
+    improvedPrompt = `Perform a comprehensive code review on the repository: ${repoRef}
+
+Evaluate: code quality and readability, potential bugs and edge cases, security vulnerabilities (OWASP top 10), performance bottlenecks, and architectural issues. For each finding provide: file path, line number estimate, severity (Critical/High/Medium/Low), description, and recommended fix.`;
   } else if (taskType === "contract_analysis") {
-    improvedPrompt = `Analyze the uploaded legal contract (${prompt}). Extract key clauses, classify risk levels (High/Medium/Low), summarize key terms, and provide risk mitigation recommendations for flagged clauses.`;
+    improvedPrompt = `${prompt}
+
+Analyze the uploaded legal contract. Extract all key clauses, classify the risk level of each clause (High / Medium / Low), summarize key obligations and rights for each party, flag ambiguous or missing clauses, and provide specific risk mitigation recommendations for flagged items.`;
   } else if (taskType === "invoice_extraction") {
-    improvedPrompt = `Extract vendor information, invoice number, date, total amount, and itemized line items (description, quantity, unit price, total) from the document (${prompt}).`;
+    improvedPrompt = `${prompt}
+
+Extract the following from the uploaded invoice document: vendor name, vendor address, invoice number, invoice date, due date, subtotal, tax amount, total amount due, and a complete itemized line-item table (description, quantity, unit price, line total). Return as structured JSON.`;
   } else if (issues.length > 0) {
-    improvedPrompt = `${prompt}. Please analyze thoroughly, structure the response clearly, and outline key findings, actionable takeaways, and recommendations.`;
+    improvedPrompt = `${prompt}
+
+Please analyze thoroughly, structure the response clearly, and outline key findings, actionable takeaways, and recommendations.`;
   }
   return {
     score,

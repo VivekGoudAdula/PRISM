@@ -423,8 +423,6 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
   const handleConfirmAndPay = async (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan, promptToUse: string) => {
     if (!updatedPlan || !activeAddress || !signTransactions) return;
-    if (isProcessingRef.current) return;
-    isProcessingRef.current = true;
 
     setLoading(true);
     setError('');
