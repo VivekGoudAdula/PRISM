@@ -13,11 +13,15 @@ promptTutorRouter.use('*', optionalAuth);
  * POST /api/prompt-tutor/analyze
  * Analyzes a user's prompt BEFORE task execution and returns quality score,
  * detected intent, missing requirements, inefficiencies, and an improved prompt.
+ *
+ * When called with a `preComputedAnalysis` body field (from the frontend
+ * Puter.js path), the route skips its own AI/rule-based call and persists
+ * the pre-computed result directly to MongoDB.
  */
 promptTutorRouter.post('/analyze', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { originalPrompt = '', files = [], category, taskId } = body;
+    const { originalPrompt = '', files = [], category, taskId, preComputedAnalysis } = body;
 
     // Resolve user ID (authenticated token or fallback guest user)
     let userId: any = null;
@@ -39,8 +43,10 @@ promptTutorRouter.post('/analyze', async (c) => {
       userId = guestUser._id;
     }
 
-    // Call modular Prompt Tutor service
-    const analysisResult = await analyzePromptWithLLM(originalPrompt, files, category);
+    // Use pre-computed Puter.js result if provided; otherwise run rule-based engine
+    const analysisResult = preComputedAnalysis
+      ? preComputedAnalysis
+      : await analyzePromptWithLLM(originalPrompt, files, category);
 
     // Persist analysis record in MongoDB (avoiding duplicates if taskId provided)
     let savedDoc: any = null;

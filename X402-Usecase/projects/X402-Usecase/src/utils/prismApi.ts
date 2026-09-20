@@ -627,40 +627,196 @@ export async function executeTaskWithPayment(
   }
 }
 
-// ─── Phase 0: Prompt Tutor (pre-routing prompt optimization) ─────────────────
+// ─── Phase 0: Prompt Tutor (client-side Puter.js AI analysis) ────────────────
 
+/**
+ * System instruction for Puter.js Prompt Tutor analysis.
+ * Mirrors the same schema the backend expects and the PromptTutorModal renders.
+ */
+const PROMPT_TUTOR_SYSTEM = `You are Prompt Tutor, an expert AI prompt optimization layer for PRISM.
+Your job is to analyze the user's task request BEFORE execution and provide structured feedback to improve prompt engineering.
+
+Evaluate:
+1. Clarity & Specificity: Is the request well-defined?
+2. Completeness: Are target roles, schemas, or criteria present?
+3. Constraints & Expected Output Format: Is the desired output structure specified?
+4. Inefficiencies or Redundancies: Are there conflicting or unnecessary instructions?
+5. Missing Context: What essential information is lacking?
+
+Scoring rules:
+- Score from 0 to 100 based on prompt quality.
+- High score (>80): Specific, well-structured, clear role/task, explicit output format.
+- Medium score (50-80): Understandable intent but missing evaluation criteria, role details, or output formatting.
+- Low score (<50): Vague, single phrase, or missing key parameters.
+
+Do NOT invent fake requirements. Distinguish required missing info from optional recommendations.
+The improvedPrompt MUST preserve the user's exact original intent and MUST NOT introduce unsupported facts.
+CRITICAL REQUIREMENT: The improvedPrompt MUST preserve all repository links (e.g. GitHub URLs like https://github.com/...), URLs, target names, file names, or specific parameters present in the original prompt. NEVER omit or remove user-provided URLs!
+
+Return ONLY a valid, single JSON object with this exact structure and NO Markdown formatting or markdown wrappers:
+{
+  "score": number,
+  "intent": "short 2-4 word intent summary",
+  "taskType": "news_research | source_comparison | claim_verification | claim_extraction | resume_screening | contract_analysis | invoice_extraction | code_review | general_query",
+  "issues": ["list of detected issues"],
+  "requiredInformation": ["list of missing required context/details"],
+  "irrelevantInformation": ["list of redundant/irrelevant parts, or empty"],
+  "constraints": ["key constraints identified"],
+  "suggestions": ["actionable recommendations to improve"],
+  "improvedPrompt": "full optimized prompt preserving intent and user URLs"
+}`;
+
+/**
+ * Calls Puter.js AI (browser-side) to analyze a prompt.
+ * Puter.js is loaded as window.puter via <script src="https://js.puter.com/v2/"> in index.html.
+ * Falls back to the backend rule-based analysis if Puter.js is unavailable.
+ */
+async function analyzeWithPuterAI(
+  prompt: string,
+  category?: string
+): Promise<PromptAnalysisResult> {
+  const puter = (window as any).puter;
+
+  if (!puter?.ai?.chat) {
+    throw new Error('Puter.js not available');
+  }
+
+  const userMessage = `Task Request: "${prompt}"${category ? `\nHint category: ${category}` : ''}`;
+
+  // puter.ai.chat returns the assistant message content as a string
+  const rawContent: string = await puter.ai.chat(userMessage, {
+    model: 'gpt-4o-mini',
+    system: PROMPT_TUTOR_SYSTEM,
+  });
+
+  // Parse JSON — strip any accidental markdown fences
+  const jsonStr = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const parsed = JSON.parse(jsonStr);
+
+  const sanitizeArray = (val: any): string[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map((v: any) => (typeof v === 'string' ? v : JSON.stringify(v))).filter(Boolean);
+    if (typeof val === 'string') return [val];
+    return [JSON.stringify(val)];
+  };
+
+  // Re-inject any URLs the LLM may have dropped from the improved prompt
+  let improvedPrompt: string = parsed.improvedPrompt || prompt;
+  const urlMatches = prompt.match(/https?:\/\/[^\s]+/g);
+  if (urlMatches) {
+    for (const url of urlMatches) {
+      if (!improvedPrompt.includes(url)) {
+        improvedPrompt = `${improvedPrompt} (Repository/Target URL: ${url})`;
+      }
+    }
+  }
+
+  return {
+    score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
+    intent: parsed.intent || 'Task analysis',
+    taskType: parsed.taskType || category || 'general_query',
+    issues: sanitizeArray(parsed.issues),
+    requiredInformation: sanitizeArray(parsed.requiredInformation),
+    irrelevantInformation: sanitizeArray(parsed.irrelevantInformation),
+    constraints: sanitizeArray(parsed.constraints),
+    suggestions: sanitizeArray(parsed.suggestions),
+    improvedPrompt,
+    modelUsed: 'puter/gpt-4o-mini',
+  };
+}
+
+/**
+ * Analyzes a prompt using Puter.js AI in the browser.
+ *
+ * Architecture:
+ *   1. Call window.puter.ai.chat() client-side (free, no backend key needed).
+ *   2. Persist the result to the backend for MongoDB storage.
+ *   3. If Puter.js fails, fall back to backend rule-based analysis.
+ *
+ * The backend /api/prompt-tutor/analyze endpoint is used ONLY for persistence
+ * — it no longer performs any AI call itself.
+ */
 export async function analyzePromptWithTutor(
   baseUrl: string,
   taskDescription: string,
   files: AttachedFile[],
   category?: string
 ): Promise<PromptAnalysisResult> {
-  const url = `${baseUrl}/api/prompt-tutor/analyze`;
-  const token = localStorage.getItem('prism_access_token');
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  let analysis: PromptAnalysisResult | null = null;
+
+  // Step 1: Try Puter.js client-side AI (primary path)
+  try {
+    analysis = await analyzeWithPuterAI(taskDescription, category);
+  } catch (puterErr) {
+    console.warn('[PromptTutor] Puter.js analysis failed, falling back to backend rule-based:', puterErr);
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      originalPrompt: taskDescription,
-      files: files.map((f) => ({ filename: f.filename, content_base64: f.content_base64 || '' })),
-      category,
-    }),
-  });
+  // Step 2: Fall back to backend rule-based analysis if Puter.js failed
+  if (!analysis) {
+    try {
+      const url = `${baseUrl}/api/prompt-tutor/analyze`;
+      const token = localStorage.getItem('prism_access_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error((errData as any).error || `Prompt analysis failed: HTTP ${response.status}`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          originalPrompt: taskDescription,
+          files: files.map((f) => ({ filename: f.filename, content_base64: f.content_base64 || '' })),
+          category,
+        }),
+      });
+
+      if (response.ok) {
+        analysis = await response.json();
+      }
+    } catch (backendErr) {
+      console.warn('[PromptTutor] Backend fallback also failed:', backendErr);
+    }
   }
 
-  return await response.json();
+  // Step 3: Last resort — minimal placeholder so the modal still opens
+  if (!analysis) {
+    analysis = {
+      score: 70,
+      intent: 'Task execution',
+      taskType: category || 'general_query',
+      issues: [],
+      requiredInformation: [],
+      irrelevantInformation: [],
+      constraints: [],
+      suggestions: [],
+      improvedPrompt: taskDescription,
+      modelUsed: 'fallback',
+    };
+  }
+
+  // Step 4: Persist to backend asynchronously (fire-and-forget, non-blocking)
+  // This stores the Puter.js result to MongoDB for analytics without blocking the UI.
+  if (analysis.modelUsed !== 'fallback') {
+    const url = `${baseUrl}/api/prompt-tutor/analyze`;
+    const token = localStorage.getItem('prism_access_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        originalPrompt: taskDescription,
+        files: files.map((f) => ({ filename: f.filename })), // no base64 for persistence call
+        category,
+        // Pass pre-computed analysis so backend skips its own AI call
+        preComputedAnalysis: analysis,
+      }),
+    }).catch(() => {}); // non-blocking, ignore errors
+  }
+
+  return analysis;
 }
+
 
 // ─── Phase 0.5: Data Map (Interactive Semantic Graph) ───────────────────────
 
