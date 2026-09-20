@@ -87,7 +87,6 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
   const [dataMapSemanticCache, setDataMapSemanticCache] = useState<SemanticCacheData | null>(null);
   const [showDataMapModal, setShowDataMapModal] = useState(false);
   const [executionPlan, setExecutionPlan] = useState<ExecutionPlan | null>(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
   const [execProgress, setExecProgress] = useState<{
@@ -316,7 +315,8 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         return;
       }
       setExecutionPlan(plan);
-      setShowSummaryModal(true);
+      // Automatically trigger execution & payment without waiting for user confirmation
+      await handleConfirmAndPay(filesToUse, plan, promptToUse);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Planning failed.';
       // Only push the error into chatHistory — do NOT also call setError() to avoid duplicate display
@@ -421,13 +421,11 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     isProcessingRef.current = false;
   };
 
-  const handleConfirmAndPay = async (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan) => {
-    if (!executionPlan || !activeAddress || !signTransactions) return;
+  const handleConfirmAndPay = async (filteredFiles: AttachedFile[], updatedPlan: ExecutionPlan, promptToUse: string) => {
+    if (!updatedPlan || !activeAddress || !signTransactions) return;
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    // Do NOT close the summary/market panel yet, so we can show the payment/execution progress
-    // setShowSummaryModal(false);
     setLoading(true);
     setError('');
 
@@ -443,7 +441,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
       const data = await executeTaskWithPayment(
         apiBaseUrl,
         updatedPlan,
-        taskDescription,
+        promptToUse,
         filteredFiles,
         signer,
         (current, phase) => {
@@ -521,10 +519,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     }
   };
 
-  const handleCancelSummary = () => {
-    setShowSummaryModal(false);
-    setExecutionPlan(null);
-  };
+
 
   const handleCreateConvo = async () => {
     try {
@@ -1430,18 +1425,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
         />
       )}
 
-      {showSummaryModal && executionPlan && (
-        <ExecutionMarketPanel
-          plan={executionPlan}
-          files={attachedFiles}
-          onConfirm={(filteredFiles, updatedPlan) => {
-            handleConfirmAndPay(filteredFiles, updatedPlan);
-          }}
-          onCancel={handleCancelSummary}
-          execProgress={execProgress}
-          paymentStatus={paymentStatus}
-        />
-      )}
+
 
       {selectedAnalysisTask && (
         <TokenAnalysisModal
@@ -1822,17 +1806,17 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
             </div>
           )}
 
-          {loading && execProgress && !showSummaryModal && (
-            <ExecutionProgress
-              current={execProgress.current}
-              total={execProgress.total}
-              category={execProgress.category}
-              phase={execProgress.phase}
-              currentFilename={execProgress.currentFilename}
-            />
+          {loading && executionPlan && (
+            <div className="w-full max-w-4xl animate-fade-in my-6 mx-auto">
+              <ExecutionMarketPanel
+                plan={executionPlan}
+                execProgress={execProgress}
+                paymentStatus={paymentStatus}
+              />
+            </div>
           )}
 
-          {loading && !execProgress && (
+          {loading && !executionPlan && (
             <div className="text-center my-4 flex flex-col items-center justify-center">
               <div className="loading loading-spinner loading-lg text-primary mb-3" />
               <h2 className="text-2xl font-bold text-indigo-700 animate-pulse">Prism is working…</h2>
