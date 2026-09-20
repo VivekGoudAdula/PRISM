@@ -241,9 +241,11 @@ function classifyIntent(
   // Explicit Conversational / Historical reference phrases
   const conversationalPhrases = [
     'what was the issue', 'what were the issues', 'what were main issues', 'what were the main issues', 'what was wrong with',
+    'whats the problem', "what's the problem", 'whats problem', 'problem in', 'issues in',
     'how many issues', 'overall quality score', 'quality score',
     'who scored highest', 'top candidate', 'strongest', 'which candidate', 'above 80',
-    'what was vivek', 'resume score', 'score of', 'what did you find', 'what were the',
+    'which role', 'role vivek', 'suitable', 'fit for', 'suitable for',
+    'what was vivek', 'whats vivek', "what's vivek", 'resume score', 'score of', 'what did you find', 'what were the',
     'why did you flag', 'what did you say', 'go back to', 'what about the',
     'explain the', 'previous', 'earlier', 'above', 'that review', 'those resumes',
     'the repository', 'the contract', 'the invoice', 'compare the',
@@ -501,13 +503,34 @@ function buildDeterministicGroundedAnswer(message: string, tasks: any[]): string
 
     // ── Resume Screening Findings Search ──
     else if (category === 'resume_screening') {
-      const candidates = output.candidates || [];
+      const rawCandidates = output.candidates || [];
+      const candidates = rawCandidates.map((c: any) => {
+        const rawScore = c.score !== undefined ? c.score : (c.match_score !== undefined ? (c.match_score <= 1 ? Math.round(c.match_score * 100) : c.match_score) : 0);
+        const name = c.name || 'Candidate';
+        const role = c.role || c.targetRole || c.target_role || c.matchedRole || 'N/A';
+        const primaryDomain = c.primary_domain || c.primaryDomain || 'N/A';
+        const altFits = Array.isArray(c.alternative_roles) ? c.alternative_roles : (Array.isArray(c.alternativeFits) ? c.alternativeFits : []);
+        const skills = Array.isArray(c.key_skills) ? c.key_skills : (Array.isArray(c.skills) ? c.skills : []);
+        const recommendation = c.recommendation || (rawScore >= 85 ? 'Strong Hire' : (rawScore >= 70 ? 'Hire' : 'Consider'));
+        return { name, score: rawScore, role, primaryDomain, altFits, skills, recommendation };
+      });
 
       if (lowerMsg.includes('highest') || lowerMsg.includes('top') || lowerMsg.includes('best') || lowerMsg.includes('strongest')) {
         const sorted = [...candidates].sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
         if (sorted.length > 0) {
           const top = sorted[0];
-          parts.push(`Top candidate: ${top.name} with a score of ${top.score}% (Recommendation: ${top.recommendation || 'Strong Hire'}).`);
+          parts.push(`Top candidate: ${top.name} with a score of ${top.score}% for ${top.role} (Recommendation: ${top.recommendation}).`);
+        }
+      } else if (lowerMsg.includes('which role') || lowerMsg.includes('suitable') || lowerMsg.includes('best fit') || lowerMsg.includes('role')) {
+        const words = lowerMsg.split(/\s+/).map((w) => w.replace(/['’]s$/i, '').replace(/[^a-z0-9]/gi, '')).filter((w) => w.length > 2 && !['which', 'role', 'suitable', 'best', 'fit', 'what', 'for', 'is'].includes(w));
+        const matchedCand = words.length > 0 ? candidates.find((c: any) => words.some((w) => c.name.toLowerCase().includes(w))) : candidates[0];
+
+        if (matchedCand) {
+          const altText = matchedCand.altFits.length > 0 ? ` (Alternative fits: ${matchedCand.altFits.join(', ')})` : '';
+          parts.push(`${matchedCand.name} is best suited for ${matchedCand.role} in ${matchedCand.primaryDomain} with a score of ${matchedCand.score}%${altText}.`);
+        } else {
+          const list = candidates.map((c: any) => `${c.name} → ${c.role} (${c.score}%)`).join('; ');
+          parts.push(`Candidate role suitability: ${list}.`);
         }
       } else if (lowerMsg.includes('python') || lowerMsg.includes('react') || lowerMsg.includes('java')) {
         const skill = lowerMsg.includes('python') ? 'python' : (lowerMsg.includes('react') ? 'react' : 'java');
@@ -522,11 +545,11 @@ function buildDeterministicGroundedAnswer(message: string, tasks: any[]): string
         parts.push(`Candidates scoring above 80%: ${highScorers.map((c: any) => `${c.name} (${c.score}%)`).join(', ')}.`);
       } else {
         // Strip possessive 's and punctuation when searching candidate names
-        const words = lowerMsg.split(/\s+/).map((w) => w.replace(/['’]s$/i, '').replace(/[^a-z0-9]/gi, '')).filter((w) => w.length > 2 && !['score', 'candidate', 'resumes', 'which', 'what', 'show', 'resume', 'was'].includes(w));
+        const words = lowerMsg.split(/\s+/).map((w) => w.replace(/['’]s$/i, '').replace(/[^a-z0-9]/gi, '')).filter((w) => w.length > 2 && !['score', 'candidate', 'resumes', 'which', 'what', 'show', 'resume', 'was', 'whats', 'is'].includes(w));
         const matchedCand = words.length > 0 ? candidates.find((c: any) => words.some((w) => c.name.toLowerCase().includes(w))) : null;
 
         if (matchedCand) {
-          parts.push(`${matchedCand.name}'s resume score is ${matchedCand.score}% (Recommendation: ${matchedCand.recommendation || 'Hire'}).`);
+          parts.push(`${matchedCand.name}'s resume score is ${matchedCand.score}% for ${matchedCand.role} (Recommendation: ${matchedCand.recommendation}). Key Skills: ${matchedCand.skills.join(', ') || 'N/A'}.`);
         } else {
           const list = candidates.map((c: any) => `${c.name} (${c.score}%)`).join('; ');
           parts.push(`In the resume screening results: ${list}.`);
