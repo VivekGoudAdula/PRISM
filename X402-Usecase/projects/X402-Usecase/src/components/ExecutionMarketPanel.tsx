@@ -82,8 +82,12 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
   const selectedCount = selectedIndices.size;
   const executionCost = selectedCount * plan.unitPrice;
   const totalCost = selectedCount > 0 ? executionCost + plan.platformFee : 0;
-  const baseTotal = plan.baseTotal ?? ((plan.basePrice ?? plan.unitPrice) * selectedCount);
-  const totalSavings = plan.totalOptimizationDiscount ?? ((plan.optimizationDiscount ?? 0) * selectedCount);
+  const originalQuantity = plan.executionQuantity || 1;
+  const unitBasePrice = plan.baseTotal ? plan.baseTotal / originalQuantity : (plan.basePrice ?? plan.unitPrice);
+  const unitDiscount = plan.totalOptimizationDiscount ? plan.totalOptimizationDiscount / originalQuantity : (plan.optimizationDiscount ?? 0);
+
+  const baseTotal = unitBasePrice * selectedCount;
+  const totalSavings = unitDiscount * selectedCount;
   
   // Find the static price of the selected candidate to scale prices properly
   const winnerStaticPrice = plan.candidates?.find((c) => c.endpoint_path === plan.endpointPath)?.price || plan.unitPrice;
