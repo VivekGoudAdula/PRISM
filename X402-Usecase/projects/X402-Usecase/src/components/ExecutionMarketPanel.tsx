@@ -80,19 +80,38 @@ export const ExecutionMarketPanel: React.FC<ExecutionMarketPanelProps> = ({
   };
 
   const selectedCount = selectedIndices.size;
-  const executionCost = selectedCount * plan.unitPrice;
-  const totalCost = selectedCount > 0 ? executionCost + plan.platformFee : 0;
+  const preview: PaymentPreviewItem[] = plan.paymentPreview ?? [];
+
+  let exactExecutionCost = 0;
+  let exactPlatformFee = 0;
+  
+  if (preview.length > 0) {
+    preview.forEach((item) => {
+      if (item.type === 'platform_fee') {
+        exactPlatformFee += item.amount;
+      } else if (item.type === 'execution') {
+        if (item.index === undefined || selectedIndices.has(item.index - 1)) {
+          exactExecutionCost += item.amount;
+        }
+      }
+    });
+  } else {
+    exactExecutionCost = selectedCount * plan.unitPrice;
+    exactPlatformFee = plan.platformFee || 0;
+  }
+
+  const executionCost = exactExecutionCost;
+  const totalCost = selectedCount > 0 ? executionCost + exactPlatformFee : 0;
+  
   const originalQuantity = plan.executionQuantity || 1;
   const unitBasePrice = plan.baseTotal ? plan.baseTotal / originalQuantity : (plan.basePrice ?? plan.unitPrice);
-  const unitDiscount = plan.totalOptimizationDiscount ? plan.totalOptimizationDiscount / originalQuantity : (plan.optimizationDiscount ?? 0);
-
+  
   const baseTotal = unitBasePrice * selectedCount;
-  const totalSavings = unitDiscount * selectedCount;
+  // Ensure "Final Base cost" exactly matches executionCost
+  const totalSavings = baseTotal - executionCost;
   
   // Find the static price of the selected candidate to scale prices properly
   const winnerStaticPrice = plan.candidates?.find((c) => c.endpoint_path === plan.endpointPath)?.price || plan.unitPrice;
-
-  const preview: PaymentPreviewItem[] = plan.paymentPreview ?? [];
 
   const handleConfirm = () => {
     if (selectedCount === 0) return;
