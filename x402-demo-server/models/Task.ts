@@ -2,17 +2,12 @@ import { Schema, model, Types } from 'mongoose';
 
 export interface ITask {
   userId: Types.ObjectId;
-  conversationId?: Types.ObjectId;
   prompt: string;
   category: string;
   plannerOutput?: any;
   selectedEndpoint?: string;
   allCandidateEndpoints?: any;
   endpointChosenReason?: string;
-
-  // Context & Summary fields
-  resultSummary?: string;
-  references?: string[];
 
   // --- Dynamic Pricing Fields ---
   /** Price per single execution unit (one file or one call) */
@@ -59,16 +54,12 @@ export interface ITask {
 
 const TaskSchema = new Schema<ITask>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  conversationId: { type: Schema.Types.ObjectId, ref: 'Conversation', index: true },
   prompt: { type: String, required: true },
-  category: { type: String, required: true, index: true },
+  category: { type: String, required: true },
   plannerOutput: { type: Schema.Types.Mixed },
   selectedEndpoint: { type: String },
   allCandidateEndpoints: { type: Schema.Types.Mixed },
   endpointChosenReason: { type: String },
-
-  resultSummary: { type: String },
-  references: [{ type: String }],
 
   // Dynamic pricing
   unitPrice: { type: Number, default: 0 },

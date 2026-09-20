@@ -413,8 +413,7 @@ export async function planTask(
   baseUrl: string,
   taskDescription: string,
   files: AttachedFile[],
-  hasPriorTaskResult: boolean = false,
-  conversationId?: string
+  hasPriorTaskResult: boolean = false
 ): Promise<ExecutionPlan> {
   const url = `${baseUrl}/plan-task`;
   const token = localStorage.getItem('prism_access_token');
@@ -432,7 +431,6 @@ export async function planTask(
       task_description: taskDescription,
       files: files.map((f) => ({ filename: f.filename, content_base64: f.content_base64 || '' })),
       has_prior_task_result: hasPriorTaskResult,
-      conversationId,
     }),
   });
 

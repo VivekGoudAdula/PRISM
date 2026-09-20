@@ -294,14 +294,14 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
 
     try {
       const hasPriorTaskResult = chatHistory.some((item) => item.result !== undefined && !item.isChatReply);
-      const plan = await planTask(apiBaseUrl, promptToUse, filesToUse, hasPriorTaskResult, conversationId || undefined);
+      const plan = await planTask(apiBaseUrl, promptToUse, filesToUse, hasPriorTaskResult);
 
-      if (plan.category === 'conversational' || plan.category === 'follow_up' || plan.isChat) {
+      if (plan.category === 'conversational' || plan.isChat) {
         const newItem = {
           id: `msg-chat-${Date.now()}`,
           prompt: promptToUse,
           files: filesToUse,
-          reply: plan.reply || plan.message || (plan as any).groundedAnswer || "Hello! I'm Prism.",
+          reply: plan.reply || plan.message || "Hello! I'm Prism.",
           isChatReply: true as const,
           timestamp: new Date(),
         };
@@ -356,13 +356,7 @@ export const PrismConsole: React.FC<PrismConsoleProps> = ({
     setTaskResult(null);
 
     try {
-      // If no files attached, bypass Prompt Tutor modal and go straight to plan-task (which handles conversational follow-ups instantly at $0 cost)
-      if (attachedFiles.length === 0) {
-        await runPlanTask(taskDescription, attachedFiles);
-        return;
-      }
-
-      // Step 1: Prompt Tutor optimization layer BEFORE plan-task for file-attached new tasks
+      // Step 1: Prompt Tutor optimization layer BEFORE plan-task
       const analysis = await analyzePromptWithTutor(apiBaseUrl, taskDescription, attachedFiles);
       setPromptAnalysis(analysis);
       setShowPromptTutorModal(true);

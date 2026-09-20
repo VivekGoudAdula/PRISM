@@ -21,7 +21,6 @@ import { verifyOutput } from './lib/verify-output';
 import { updateReputation } from './lib/reputation-store';
 import { extractText } from './lib/extract-document';
 import { Task } from '../models/Task';
-import { Conversation } from '../models/Chat';
 import { Payments } from '../models/Payments';
 import { NETWORK_CONFIG } from '../endpoints.config';
 import { EndpointUsage } from '../models/EndpointUsage';
@@ -449,13 +448,6 @@ export async function handleExecuteTaskRequest(c: Context) {
     }));
     taskRecord.executionProgressLog = progressLog;
     await taskRecord.save();
-
-    if (taskRecord.conversationId) {
-      await Conversation.findByIdAndUpdate(taskRecord.conversationId, {
-        activeTaskId: taskRecord._id,
-        updatedAt: new Date(),
-      }).catch((err) => console.error('Failed to update Conversation activeTaskId:', err));
-    }
 
     // ── Step 8: Create Payment record ────────────────────────────────────────
     await Payments.create({

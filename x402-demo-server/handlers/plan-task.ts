@@ -55,8 +55,7 @@ export async function handlePlanTaskRequest(c: Context) {
   try {
     const body = await c.req.json().catch(() => ({}));
     // files may include content_base64 for non-code-review categories (resume, contract, invoice)
-    const { task_description, files = [], has_prior_task_result = false, conversationId, conversation_id } = body;
-    const targetConversationId = conversationId || conversation_id;
+    const { task_description, files = [], has_prior_task_result = false } = body;
 
     if (!task_description || typeof task_description !== 'string') {
       return c.json({ error: 'task_description is required' }, 400);
@@ -66,13 +65,13 @@ export async function handlePlanTaskRequest(c: Context) {
     const has_files: boolean = Array.isArray(files) && files.length > 0;
 
     // ── Step 1: Classify the task ────────────────────────────────────────────
+    // Pass file + history context so the classifier can short-circuit without calling LLM
     const mockCtxClassify = {
       req: {
         json: async () => ({
           task_description,
           has_files,
           has_prior_task_result,
-          conversationId: targetConversationId,
         }),
       },
       json: (data: any) => data,
@@ -81,25 +80,15 @@ export async function handlePlanTaskRequest(c: Context) {
     const classifyResult: any = await handleClassifyTaskRequest(mockCtxClassify);
     const category: string = classifyResult?.category || 'unsupported';
 
-    // ── Pre-Classification Branch 1: Conversational Chat ($0 Cost, No Execution) ──
+    // ── Pre-Classification Branch 1: Conversational Chat ─────────────────────
     if (category === 'conversational') {
-      const { processConversationalMessage } = await import('../services/conversational-router');
-      const routeRes = await processConversationalMessage({
-        conversationId: targetConversationId,
-        message: task_description,
-        hasFiles: has_files,
-      });
-
+      const { generateChatReply } = await import('./chat-reply');
+      const reply = await generateChatReply(task_description);
       return c.json({
         category: 'conversational',
-        intent: 'CONVERSATIONAL',
-        reply: routeRes.message,
-        message: routeRes.message,
+        reply,
+        message: reply,
         isChat: true,
-        referencedTaskIds: routeRes.referencedTaskIds,
-        isAmbiguous: routeRes.isAmbiguous,
-        clarificationQuestion: routeRes.clarificationQuestion,
-        source: routeRes.source,
       });
     }
 
@@ -459,7 +448,6 @@ export async function handlePlanTaskRequest(c: Context) {
     // ── Step 8: Persist the plan as a 'planned' Task document ────────────────
     const taskRecord = await Task.create({
       userId,
-      conversationId: targetConversationId && mongoose.isValidObjectId(targetConversationId) ? targetConversationId : undefined,
       prompt: task_description,
       category,
       status: 'planned',
