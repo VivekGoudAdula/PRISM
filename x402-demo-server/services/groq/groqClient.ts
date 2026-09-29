@@ -131,8 +131,8 @@ export async function generateAIResponse(
         max_tokens: maxTokens,
       };
 
-      if (responseFormat) {
-        requestBody.response_format = responseFormat;
+      if (options.responseFormat) {
+        requestBody.response_format = options.responseFormat;
       }
 
       const response = await client.chat.completions.create(requestBody);
@@ -172,6 +172,12 @@ export async function generateAIResponse(
         groqKeyManager.reportRateLimit(keyIndex);
         triedKeys.add(keyIndex);
         console.log(`[PRISM AI] Key ${keyIndex} rate limited, switching to next key`);
+        continue;
+      }
+
+      if (status === 400 && (message.includes('json_validate_failed') || message.includes('JSON'))) {
+        console.warn(`[PRISM AI] Key ${keyIndex} JSON validation failed (400), removing response_format constraint for retry`);
+        options.responseFormat = undefined;
         continue;
       }
 
