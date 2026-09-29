@@ -55,7 +55,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
           messages: [
             {
               role: 'system',
-              content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score, especially when match_score is low or skills detail is missing. Do not wrap in markdown codeblocks (e.g. no ```json). Do not explain outside JSON.',
+              content: 'Evaluate the candidate based on their structured resume semantic map. Return ONLY a valid JSON object matching this schema: { "name": string, "match_score": number, "role": string, "key_skills": string[], "primary_domain": string, "alternative_roles": string[], "reason": string }. For "match_score", return a decimal float between 0.0 and 1.0 (for example 0.85 for 85% match, 0.25 for 25% match). DO NOT return values greater than 1.0. For "name", use the candidate name provided in the semantic map. For "reason", provide a concise explanation for the assigned match_score. Do not wrap in markdown codeblocks. Do not explain outside JSON.',
             },
             {
               role: 'user',
@@ -70,14 +70,21 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
         const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('No JSON object found in response');
         const parsed = JSON.parse(jsonMatch[0]);
+
+        let matchScore = typeof parsed.match_score === 'number' ? parsed.match_score : 0.5;
+        if (matchScore > 1.0) {
+          matchScore = matchScore / 100;
+        }
+        matchScore = Math.min(1.0, Math.max(0.0, matchScore));
+
         candidateInfo = {
           name: parsed.name && parsed.name !== 'Candidate' && parsed.name !== 'Not Provided' ? parsed.name : (semantic_map?.name || file.filename),
-          match_score: typeof parsed.match_score === 'number' ? parsed.match_score : 0.5,
+          match_score: matchScore,
           role: parsed.role || 'Unknown',
           key_skills: Array.isArray(parsed.key_skills) ? parsed.key_skills : [],
           primary_domain: parsed.primary_domain || 'Unknown',
           alternative_roles: Array.isArray(parsed.alternative_roles) ? parsed.alternative_roles : [],
-          reason: parsed.reason || (parsed.match_score < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
+          reason: parsed.reason || (matchScore < 0.5 ? 'Resume shows limited experience relative to the target role requirements.' : 'Candidate profile evaluated against target role.'),
         };
       } catch (err) {
         console.warn(`Fallback active for candidate processing of file: ${file.filename}`, err);
