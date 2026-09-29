@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { resolveFiles } from './lib/resolve-files';
-import { callOpenRouter } from './lib/openrouter-client';
+import { callOpenRouter, ACCURATE_MODEL } from './lib/openrouter-client';
 import { parseRobustJson } from './lib/parse-json-robust';
 
 /**
@@ -197,7 +197,7 @@ export async function handleCodeReviewAccurateRequest(c: Context) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: 'meta-llama/llama-3.3-70b-instruct',
+        model: ACCURATE_MODEL,
         messages: [
           {
             role: 'system',

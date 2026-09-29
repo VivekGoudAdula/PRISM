@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { callOpenRouter, FAST_MODEL } from './lib/openrouter-client';
 
 export interface SeoIssue {
   category: 'metadata' | 'heading' | 'images' | 'links' | 'content';
@@ -187,7 +188,7 @@ export async function analyzeHtmlSeoRules(html: string, pageUrl: string): Promis
 
 /**
  * POST /seo-audit-fast
- * Fast rule-based SEO audit for a single page URL (no LLM call).
+ * Fast SEO audit with rule-based checks enhanced by Groq LLM content analysis.
  */
 export async function handleSeoAuditFastRequest(c: Context) {
   const startTime = Date.now();
@@ -210,15 +211,67 @@ export async function handleSeoAuditFastRequest(c: Context) {
     }
 
     const html = await pageRes.text();
-    const { issues, seo_score } = await analyzeHtmlSeoRules(html, targetUrl);
+    const { issues: ruleIssues, seo_score: ruleScore } = await analyzeHtmlSeoRules(html, targetUrl);
+
+    // Extract clean text for LLM content analysis
+    const cleanText = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .slice(0, 3000)
+      .trim();
+
+    let llmIssues: SeoIssue[] = [];
+    let llmScore = ruleScore;
+    let usedLlm = false;
+
+    try {
+      const content = await callOpenRouter({
+        model: FAST_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an SEO specialist. Analyze the provided webpage text content for readability, content engagement, keyword relevance, and content depth. Return ONLY valid JSON: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number }. seo_score must be a float between 0.0 and 1.0.',
+          },
+          {
+            role: 'user',
+            content: `Page URL: ${targetUrl}\n\nWebpage Extract:\n${cleanText}`,
+          },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      });
+
+      let cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.llm_issues)) {
+          llmIssues = parsed.llm_issues;
+        }
+        if (typeof parsed.seo_score === 'number') {
+          llmScore = Math.max(0, Math.min(1, parsed.seo_score));
+        }
+        usedLlm = true;
+      }
+    } catch (err) {
+      console.warn(`[seo-audit-fast] LLM content analysis unavailable — using rule-based analysis only:`, err);
+    }
+
+    // Combine rule-based and LLM issues
+    const combinedIssues = [...ruleIssues, ...llmIssues];
+    const finalScore = usedLlm
+      ? parseFloat(((ruleScore * 0.5) + (llmScore * 0.5)).toFixed(2))
+      : ruleScore;
 
     const latency_ms = Date.now() - startTime;
 
     return c.json({
       page_url: targetUrl,
-      issues,
-      seo_score,
-      confidence: 0.78,
+      issues: combinedIssues,
+      seo_score: finalScore,
+      confidence: usedLlm ? 0.85 : 0.78,
       latency_ms,
       timestamp: new Date().toISOString(),
     });
@@ -227,3 +280,4 @@ export async function handleSeoAuditFastRequest(c: Context) {
     return c.json({ error: 'Internal server error', message: error.message }, 500);
   }
 }
+

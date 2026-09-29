@@ -62,6 +62,7 @@ import { getCanonicalResourceUrl } from './endpoints.registry';
 
 // Import Middlewares and Routers
 import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
+import { initializeGroqService } from './services/groq';
 import { requireAuth, optionalAuth } from './middleware/auth';
 import authRouter from './routes/auth';
 import chatRouter from './routes/chat';
@@ -466,7 +467,7 @@ app.notFound((c) => {
 // SERVER STARTUP
 // ════════════════════════════════════════════════════════════════════
 
-serve({ fetch: app.fetch, port }, () => {
+serve({ fetch: app.fetch, port }, async () => {
   console.log('\n✅ x402 Resource Server is running!\n');
   console.log('═'.repeat(60));
   console.log('Endpoints:');
@@ -474,6 +475,16 @@ serve({ fetch: app.fetch, port }, () => {
   console.log(`  Health:  http://localhost:${port}/health`);
   console.log(`  Info:    http://localhost:${port}/info`);
   console.log('═'.repeat(60));
+
+  // Initialize Groq AI Service (validate API keys)
+  try {
+    await initializeGroqService();
+    console.log('✅ Groq AI Service initialized');
+  } catch (err) {
+    console.warn('⚠ Groq AI Service initialization warning:', err);
+    console.warn('   AI endpoints will use fallback behavior');
+  }
+
   console.log('\n📚 QUICK COMMANDS:\n');
   console.log('Test health endpoint (no payment):');
   console.log(`  curl http://localhost:${port}/health\n`);

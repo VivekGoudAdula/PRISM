@@ -4141,7 +4141,7 @@ var init_types = __esm({
         ...processCreateParams(params)
       });
     };
-    BRAND = /* @__PURE__ */ Symbol("zod_brand");
+    BRAND = Symbol("zod_brand");
     ZodBranded = class extends ZodType {
       _parse(input) {
         const { ctx } = this._processInputParams(input);
@@ -13604,7 +13604,7 @@ var init_address = __esm({
     init_sha2();
     MALFORMED_ADDRESS_ERROR_MSG = "address seems to be malformed";
     CHECKSUM_ADDRESS_ERROR_MSG = "wrong checksum for address";
-    ADDR_SYMBOL = /* @__PURE__ */ Symbol.for("algokit_common:Address");
+    ADDR_SYMBOL = Symbol.for("algokit_common:Address");
     Address = class Address2 {
       /**
       * The binary form of the address. For standard accounts, this is the public key.
@@ -16973,7 +16973,7 @@ var init_transaction = __esm({
     init_transaction_type();
     init_transaction_meta();
     import_hi_base322 = __toESM(require_base32(), 1);
-    TXN_SYMBOL = /* @__PURE__ */ Symbol.for("algokit_transact:Transaction");
+    TXN_SYMBOL = Symbol.for("algokit_transact:Transaction");
     Transaction = class {
       /** @internal */
       [TXN_SYMBOL];
@@ -34702,7 +34702,7 @@ var require_bn = __commonJS({
       };
       if (typeof Symbol !== "undefined" && typeof Symbol.for === "function") {
         try {
-          BN2.prototype[/* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom")] = inspect2;
+          BN2.prototype[Symbol.for("nodejs.util.inspect.custom")] = inspect2;
         } catch (e) {
           BN2.prototype.inspect = inspect2;
         }
@@ -37687,6 +37687,7 @@ var init_transaction4 = __esm({
 });
 
 // node_modules/@x402/avm/dist/esm/index.mjs
+var ALGOKIT_SIGNER;
 var init_esm = __esm({
   "node_modules/@x402/avm/dist/esm/index.mjs"() {
     init_chunk_OMKK3QVS();
@@ -37699,6 +37700,7 @@ var init_esm = __esm({
     init_transaction4();
     init_common2();
     init_amount();
+    ALGOKIT_SIGNER = Symbol("algokit-signer");
   }
 });
 
@@ -37880,112 +37882,574 @@ var init_Task = __esm({
   }
 });
 
-// handlers/lib/puter-client.ts
-async function callPuterAI(options) {
-  const model16 = options.model || "gpt-4o-mini";
-  const prompt = options.messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500);
-  try {
-    const response = await fetch("https://api.puter.com/v2/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+// services/groq/groqKeyManager.ts
+var import_groq_sdk, RATE_LIMIT_COOLDOWN_MS, MAX_CONSECUTIVE_FAILURES, GroqKeyManager, groqKeyManager;
+var init_groqKeyManager = __esm({
+  "services/groq/groqKeyManager.ts"() {
+    "use strict";
+    import_groq_sdk = __toESM(require("groq-sdk"));
+    RATE_LIMIT_COOLDOWN_MS = 6e4;
+    MAX_CONSECUTIVE_FAILURES = 5;
+    GroqKeyManager = class {
+      keys = [];
+      currentKeyIndex = 0;
+      initialized = false;
+      /**
+       * Loads API keys from environment variables and creates Groq client instances.
+       * Call this once during server startup.
+       */
+      initialize() {
+        if (this.initialized) return;
+        const envKeys = [
+          process.env.GROQ_API_KEY_1 || process.env.GROQ_API_KEY,
+          process.env.GROQ_API_KEY_2,
+          process.env.GROQ_API_KEY_3
+        ];
+        this.keys = envKeys.map((apiKey, idx) => {
+          if (!apiKey || !apiKey.trim()) return null;
+          return {
+            index: idx + 1,
+            client: new import_groq_sdk.default({ apiKey: apiKey.trim() }),
+            health: "UNCHECKED",
+            rateLimitedAt: null,
+            consecutiveFailures: 0,
+            lastSuccessAt: null
+          };
+        }).filter(Boolean);
+        this.initialized = true;
+        console.log(`[PRISM AI] Groq Key Manager initialized with ${this.keys.length} key(s)`);
+      }
+      /**
+       * Validates all configured keys by sending a minimal test request.
+       * Logs health status for each key without exposing the actual key values.
+       */
+      async validateAllKeys() {
+        if (this.keys.length === 0) {
+          console.warn("[PRISM AI] No Groq API keys configured");
+          return;
+        }
+        console.log("[PRISM AI] Validating Groq API keys...");
+        for (const key of this.keys) {
+          try {
+            await key.client.chat.completions.create({
+              model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+              messages: [{ role: "user", content: "hi" }],
+              max_tokens: 5
+            });
+            key.health = "HEALTHY";
+            key.consecutiveFailures = 0;
+            key.lastSuccessAt = Date.now();
+            console.log(`[PRISM AI] Key ${key.index}: healthy`);
+          } catch (err2) {
+            const status = err2?.status || err2?.statusCode || 0;
+            if (status === 401 || status === 403) {
+              key.health = "INVALID";
+              console.warn(`[PRISM AI] Key ${key.index}: invalid (auth error ${status})`);
+            } else if (status === 429) {
+              key.health = "RATE_LIMITED";
+              key.rateLimitedAt = Date.now();
+              console.warn(`[PRISM AI] Key ${key.index}: rate limited`);
+            } else {
+              key.health = "ERROR";
+              console.warn(`[PRISM AI] Key ${key.index}: unavailable (${err2?.message || "unknown error"})`);
+            }
+          }
+        }
+        const healthyCount = this.keys.filter((k) => k.health === "HEALTHY").length;
+        if (healthyCount === 0) {
+          console.error("[PRISM AI] \u26A0 No healthy Groq API keys available");
+        } else {
+          console.log(`[PRISM AI] ${healthyCount}/${this.keys.length} Groq key(s) healthy`);
+        }
+      }
+      /**
+       * Returns the number of configured keys.
+       */
+      getKeyCount() {
+        return this.keys.length;
+      }
+      /**
+       * Returns a summary of key health states for diagnostics.
+       */
+      getHealthSummary() {
+        return this.keys.map((k) => ({ key: k.index, health: k.health }));
+      }
+      /**
+       * Checks if any healthy key is available for requests.
+       */
+      hasHealthyKey() {
+        this.refreshCooldowns();
+        return this.keys.some((k) => k.health === "HEALTHY");
+      }
+      /**
+       * Gets the next available Groq client, preferring the currently healthy key.
+       * Implements sticky key selection with failover on rate-limit.
+       *
+       * @returns The Groq client and key index, or null if no key is available
+       */
+      getClient() {
+        if (this.keys.length === 0) return null;
+        this.refreshCooldowns();
+        const current = this.keys[this.currentKeyIndex];
+        if (current && current.health === "HEALTHY") {
+          return { client: current.client, keyIndex: current.index };
+        }
+        for (let i = 0; i < this.keys.length; i++) {
+          if (this.keys[i].health === "HEALTHY") {
+            this.currentKeyIndex = i;
+            return { client: this.keys[i].client, keyIndex: this.keys[i].index };
+          }
+        }
+        return null;
+      }
+      /**
+       * Gets the next available client, excluding the specified key index.
+       * Used during failover when the primary key fails.
+       *
+       * @param excludeKeyIndex - The 1-based key index to skip
+       */
+      getNextClient(excludeKeyIndex) {
+        if (this.keys.length === 0) return null;
+        this.refreshCooldowns();
+        for (const key of this.keys) {
+          if (key.index !== excludeKeyIndex && key.health === "HEALTHY") {
+            this.currentKeyIndex = this.keys.indexOf(key);
+            return { client: key.client, keyIndex: key.index };
+          }
+        }
+        return null;
+      }
+      /**
+       * Reports a successful request for a specific key.
+       *
+       * @param keyIndex - The 1-based key index
+       */
+      reportSuccess(keyIndex) {
+        const key = this.keys.find((k) => k.index === keyIndex);
+        if (key) {
+          key.health = "HEALTHY";
+          key.consecutiveFailures = 0;
+          key.lastSuccessAt = Date.now();
+          key.rateLimitedAt = null;
+        }
+      }
+      /**
+       * Reports a rate-limit error (HTTP 429) for a specific key.
+       * Places the key on cooldown.
+       *
+       * @param keyIndex - The 1-based key index
+       */
+      reportRateLimit(keyIndex) {
+        const key = this.keys.find((k) => k.index === keyIndex);
+        if (key) {
+          key.health = "RATE_LIMITED";
+          key.rateLimitedAt = Date.now();
+          key.consecutiveFailures++;
+          console.log(`[PRISM AI] Key ${keyIndex} rate limited, cooldown ${RATE_LIMIT_COOLDOWN_MS / 1e3}s`);
+        }
+      }
+      /**
+       * Reports an authentication failure for a specific key.
+       * Permanently marks the key as invalid.
+       *
+       * @param keyIndex - The 1-based key index
+       */
+      reportAuthFailure(keyIndex) {
+        const key = this.keys.find((k) => k.index === keyIndex);
+        if (key) {
+          key.health = "INVALID";
+          console.warn(`[PRISM AI] Key ${keyIndex} marked as invalid (auth failure)`);
+        }
+      }
+      /**
+       * Reports a transient/network error for a specific key.
+       * Increments failure counter and may mark key as error if threshold exceeded.
+       *
+       * @param keyIndex - The 1-based key index
+       */
+      reportTransientError(keyIndex) {
+        const key = this.keys.find((k) => k.index === keyIndex);
+        if (key) {
+          key.consecutiveFailures++;
+          if (key.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            key.health = "ERROR";
+            console.warn(`[PRISM AI] Key ${keyIndex} marked as ERROR after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
+          }
+        }
+      }
+      /**
+       * Re-checks rate-limited keys and restores them if cooldown has elapsed.
+       */
+      refreshCooldowns() {
+        const now = Date.now();
+        for (const key of this.keys) {
+          if (key.health === "RATE_LIMITED" && key.rateLimitedAt && now - key.rateLimitedAt >= RATE_LIMIT_COOLDOWN_MS) {
+            key.health = "HEALTHY";
+            key.rateLimitedAt = null;
+            key.consecutiveFailures = 0;
+            console.log(`[PRISM AI] Key ${key.index} cooldown expired, restored to HEALTHY`);
+          }
+        }
+      }
+    };
+    groqKeyManager = new GroqKeyManager();
+  }
+});
+
+// services/groq/groqRateLimiter.ts
+var DEFAULT_CONFIG, GroqRateLimiter, groqRateLimiter;
+var init_groqRateLimiter = __esm({
+  "services/groq/groqRateLimiter.ts"() {
+    "use strict";
+    DEFAULT_CONFIG = {
+      maxRequestsPerSecond: 5,
+      maxRequestsPerMinute: 25,
+      maxConcurrent: 8,
+      maxQueueDepth: 20
+    };
+    GroqRateLimiter = class {
+      config;
+      secondWindow;
+      minuteWindow;
+      concurrentCount = 0;
+      queue = [];
+      constructor(config9 = {}) {
+        this.config = { ...DEFAULT_CONFIG, ...config9 };
+        this.secondWindow = {
+          timestamps: [],
+          windowMs: 1e3,
+          maxRequests: this.config.maxRequestsPerSecond
+        };
+        this.minuteWindow = {
+          timestamps: [],
+          windowMs: 6e4,
+          maxRequests: this.config.maxRequestsPerMinute
+        };
+      }
+      /**
+       * Checks if a new request is allowed under current rate limits.
+       * Does NOT consume a slot — call `acquire()` for that.
+       */
+      check() {
+        this.pruneWindows();
+        if (this.concurrentCount >= this.config.maxConcurrent) {
+          return {
+            allowed: false,
+            waitMs: 500,
+            reason: `Concurrent limit reached (${this.concurrentCount}/${this.config.maxConcurrent})`
+          };
+        }
+        if (this.secondWindow.timestamps.length >= this.secondWindow.maxRequests) {
+          const oldestInWindow = this.secondWindow.timestamps[0];
+          const waitMs = Math.max(0, oldestInWindow + this.secondWindow.windowMs - Date.now());
+          return {
+            allowed: false,
+            waitMs,
+            reason: `Per-second limit reached (${this.secondWindow.timestamps.length}/${this.secondWindow.maxRequests})`
+          };
+        }
+        if (this.minuteWindow.timestamps.length >= this.minuteWindow.maxRequests) {
+          const oldestInWindow = this.minuteWindow.timestamps[0];
+          const waitMs = Math.max(0, oldestInWindow + this.minuteWindow.windowMs - Date.now());
+          return {
+            allowed: false,
+            waitMs,
+            reason: `Per-minute limit reached (${this.minuteWindow.timestamps.length}/${this.minuteWindow.maxRequests})`
+          };
+        }
+        return { allowed: true, waitMs: 0 };
+      }
+      /**
+       * Acquires a rate-limit slot. If the limit is hit, waits up to a timeout
+       * before rejecting. Returns a release function to call when the request completes.
+       *
+       * @param timeoutMs - Maximum milliseconds to wait for a slot (default: 30s)
+       * @returns A release function to call when the Groq request finishes
+       * @throws If the queue is full or the timeout is exceeded
+       */
+      async acquire(timeoutMs = 3e4) {
+        const checkResult = this.check();
+        if (checkResult.allowed) {
+          return this.consumeSlot();
+        }
+        if (this.queue.length >= this.config.maxQueueDepth) {
+          throw new Error(
+            `[PRISM AI] Rate limiter queue full (${this.queue.length}/${this.config.maxQueueDepth}). Try again later. ${checkResult.reason}`
+          );
+        }
+        return new Promise((resolve, reject) => {
+          const entry = {
+            resolve: () => resolve(this.consumeSlot()),
+            reject,
+            timestamp: Date.now()
+          };
+          this.queue.push(entry);
+          const timer = setTimeout(() => {
+            const idx = this.queue.indexOf(entry);
+            if (idx !== -1) {
+              this.queue.splice(idx, 1);
+              reject(new Error(`[PRISM AI] Rate limiter timeout after ${timeoutMs}ms`));
+            }
+          }, timeoutMs);
+          setTimeout(() => this.drainQueue(), Math.max(100, checkResult.waitMs));
+          const origResolve = entry.resolve;
+          entry.resolve = () => {
+            clearTimeout(timer);
+            origResolve();
+          };
+        });
+      }
+      /**
+       * Returns current rate limiter statistics for diagnostics.
+       */
+      getStats() {
+        this.pruneWindows();
+        return {
+          requestsThisSecond: this.secondWindow.timestamps.length,
+          requestsThisMinute: this.minuteWindow.timestamps.length,
+          concurrentRequests: this.concurrentCount,
+          queueDepth: this.queue.length
+        };
+      }
+      /**
+       * Consumes a rate-limit slot and returns a release function.
+       */
+      consumeSlot() {
+        const now = Date.now();
+        this.secondWindow.timestamps.push(now);
+        this.minuteWindow.timestamps.push(now);
+        this.concurrentCount++;
+        let released = false;
+        return () => {
+          if (!released) {
+            released = true;
+            this.concurrentCount = Math.max(0, this.concurrentCount - 1);
+            this.drainQueue();
+          }
+        };
+      }
+      /**
+       * Processes queued requests when slots become available.
+       */
+      drainQueue() {
+        while (this.queue.length > 0) {
+          const checkResult = this.check();
+          if (!checkResult.allowed) break;
+          const entry = this.queue.shift();
+          if (entry) {
+            entry.resolve();
+          }
+        }
+      }
+      /**
+       * Removes expired timestamps from sliding windows.
+       */
+      pruneWindows() {
+        const now = Date.now();
+        this.secondWindow.timestamps = this.secondWindow.timestamps.filter(
+          (t) => now - t < this.secondWindow.windowMs
+        );
+        this.minuteWindow.timestamps = this.minuteWindow.timestamps.filter(
+          (t) => now - t < this.minuteWindow.windowMs
+        );
+      }
+    };
+    groqRateLimiter = new GroqRateLimiter();
+  }
+});
+
+// services/groq/groqClient.ts
+async function generateAIResponse(options) {
+  const {
+    systemPrompt,
+    userPrompt,
+    model: model16 = DEFAULT_MODEL,
+    temperature = 0.2,
+    maxTokens = 2500,
+    responseFormat,
+    endpointName = "unknown"
+  } = options;
+  const startTime = Date.now();
+  let lastError = null;
+  const triedKeys = /* @__PURE__ */ new Set();
+  console.log(`[PRISM AI] Endpoint: ${endpointName}`);
+  console.log(`[PRISM AI] Model: ${model16}`);
+  for (let attempt = 0; attempt < MAX_TOTAL_ATTEMPTS; attempt++) {
+    let clientInfo = groqKeyManager.getClient();
+    if (clientInfo && triedKeys.has(clientInfo.keyIndex)) {
+      clientInfo = groqKeyManager.getNextClient(clientInfo.keyIndex);
+    }
+    if (!clientInfo) {
+      if (attempt > 0) {
+        const backoffMs = Math.min(1e3 * Math.pow(2, attempt - 1), 1e4);
+        console.log(`[PRISM AI] All keys exhausted, waiting ${backoffMs}ms before retry`);
+        await sleep(backoffMs);
+        clientInfo = groqKeyManager.getClient();
+        if (!clientInfo) break;
+      } else {
+        break;
+      }
+    }
+    if (!clientInfo) break;
+    const { client, keyIndex } = clientInfo;
+    console.log(`[PRISM AI] Key: ${keyIndex} (attempt ${attempt + 1})`);
+    let releaseSlot = null;
+    try {
+      releaseSlot = await groqRateLimiter.acquire(REQUEST_TIMEOUT_MS);
+    } catch (rateLimitErr) {
+      console.warn(`[PRISM AI] Rate limiter rejected request: ${rateLimitErr.message}`);
+      lastError = rateLimitErr;
+      continue;
+    }
+    try {
+      const requestBody = {
         model: model16,
-        messages: options.messages,
-        prompt,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500,
-        stream: false
-      }),
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      throw new Error(`Puter AI HTTP ${response.status}`);
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature,
+        max_tokens: maxTokens
+      };
+      if (responseFormat) {
+        requestBody.response_format = responseFormat;
+      }
+      const response = await client.chat.completions.create(requestBody);
+      const content = response.choices?.[0]?.message?.content;
+      if (!content || !content.trim()) {
+        throw new Error("Groq returned empty response content");
+      }
+      groqKeyManager.reportSuccess(keyIndex);
+      const latencyMs = Date.now() - startTime;
+      console.log(`[PRISM AI] Result: success (${latencyMs}ms)`);
+      return {
+        content: content.trim(),
+        keyUsed: keyIndex,
+        latencyMs,
+        model: model16
+      };
+    } catch (err2) {
+      lastError = err2;
+      const status = err2?.status || err2?.statusCode || 0;
+      const message = err2?.message || "Unknown error";
+      if (status === 401 || status === 403) {
+        groqKeyManager.reportAuthFailure(keyIndex);
+        triedKeys.add(keyIndex);
+        console.warn(`[PRISM AI] Key ${keyIndex} auth failure (${status}), trying next key`);
+        continue;
+      }
+      if (status === 429) {
+        groqKeyManager.reportRateLimit(keyIndex);
+        triedKeys.add(keyIndex);
+        console.log(`[PRISM AI] Key ${keyIndex} rate limited, switching to next key`);
+        continue;
+      }
+      if (status >= 500 || message.includes("network") || message.includes("timeout") || message.includes("ECONNREFUSED")) {
+        groqKeyManager.reportTransientError(keyIndex);
+        const backoffMs = Math.min(500 * Math.pow(2, attempt), 8e3);
+        console.warn(`[PRISM AI] Key ${keyIndex} transient error (${status || message}), retrying in ${backoffMs}ms`);
+        await sleep(backoffMs);
+        continue;
+      }
+      groqKeyManager.reportTransientError(keyIndex);
+      console.error(`[PRISM AI] Key ${keyIndex} unexpected error: ${message}`);
+      continue;
+    } finally {
+      if (releaseSlot) releaseSlot();
     }
-    const data = await response.json();
-    let content = void 0;
-    if (typeof data === "string") content = data;
-    else if (data.message?.content) content = data.message.content;
-    else if (data.choices?.[0]?.message?.content) content = data.choices[0].message.content;
-    if (!content || !content.trim()) {
-      throw new Error("Puter AI returned empty content");
-    }
-    return content.trim();
-  } finally {
-    clearTimeout(timeoutId);
+  }
+  const errorMessage = lastError?.message || "All Groq API keys failed";
+  console.error(`[PRISM AI] All attempts failed for ${endpointName}: ${errorMessage}`);
+  throw new Error(`[PRISM AI] AI execution failed: ${sanitizeErrorMessage(errorMessage)}`);
+}
+function sanitizeErrorMessage(message) {
+  let sanitized = message.replace(/gsk_[A-Za-z0-9_-]+/g, "[REDACTED]");
+  sanitized = sanitized.replace(/sk-[A-Za-z0-9_-]+/g, "[REDACTED]");
+  sanitized = sanitized.replace(/Bearer\s+[A-Za-z0-9_-]+/g, "Bearer [REDACTED]");
+  sanitized = sanitized.replace(/\n\s+at\s+.+/g, "");
+  return sanitized;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+var DEFAULT_MODEL, MAX_TOTAL_ATTEMPTS, REQUEST_TIMEOUT_MS;
+var init_groqClient = __esm({
+  "services/groq/groqClient.ts"() {
+    "use strict";
+    init_groqKeyManager();
+    init_groqRateLimiter();
+    DEFAULT_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+    MAX_TOTAL_ATTEMPTS = 6;
+    REQUEST_TIMEOUT_MS = 6e4;
+  }
+});
+
+// services/groq/index.ts
+async function initializeGroqService() {
+  groqKeyManager.initialize();
+  if (groqKeyManager.getKeyCount() === 0) {
+    console.warn("[PRISM AI] No GROQ_API_KEY_* environment variables set. AI will use fallback behavior.");
+    return;
+  }
+  await groqKeyManager.validateAllKeys();
+  const healthSummary = groqKeyManager.getHealthSummary();
+  console.log("[PRISM AI] Groq Service initialized:");
+  for (const entry of healthSummary) {
+    console.log(`  Key ${entry.key}: ${entry.health.toLowerCase()}`);
   }
 }
-var FAST_MODEL, ACCURATE_MODEL;
-var init_puter_client = __esm({
-  "handlers/lib/puter-client.ts"() {
+var init_groq = __esm({
+  "services/groq/index.ts"() {
     "use strict";
-    FAST_MODEL = process.env.FAST_MODEL || "gpt-4o-mini";
-    ACCURATE_MODEL = process.env.ACCURATE_MODEL || "gpt-4o";
+    init_groqKeyManager();
+    init_groqRateLimiter();
+    init_groqClient();
+    init_groqKeyManager();
   }
 });
 
 // handlers/lib/openrouter-client.ts
-function getOpenRouterKeys() {
-  const keys = [];
-  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
-    keys.push(process.env.OPENROUTER_API_KEY.trim());
-  }
-  return keys;
-}
 async function callOpenRouter(options) {
-  const keys = getOpenRouterKeys();
-  const requestedModel = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL2;
-  if (keys.length > 0) {
-    const apiKey = keys[0];
-    try {
-      console.log(`[AI Router] Sending request to model: ${requestedModel}`);
-      const bodyPayload = {
-        model: requestedModel,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500
-      };
-      if (options.response_format) {
-        bodyPayload.response_format = options.response_format;
-      }
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://prism.ai",
-          "X-OpenRouter-Title": "PRISM AI Router"
-        },
-        body: JSON.stringify(bodyPayload)
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content && content.trim()) {
-          return content.trim();
-        }
-      } else {
-        const errText = await response.text();
-        console.warn(`[AI Router] OpenRouter HTTP ${response.status}: ${errText}`);
-      }
-    } catch (err2) {
-      console.warn(`[AI Router] OpenRouter attempt failed:`, err2);
-    }
-  }
-  try {
-    return await callPuterAI(options);
-  } catch (err2) {
-    throw new Error("AI Provider unavailable in backend mode. PRISM Static Engine engaged.");
-  }
+  const requestedModel = options.model || FAST_MODEL;
+  const systemMessages = options.messages.filter((m) => m.role === "system");
+  const userMessages = options.messages.filter((m) => m.role === "user");
+  const systemPrompt = systemMessages.map((m) => m.content).join("\n\n") || "You are a helpful AI assistant.";
+  const userPrompt = userMessages.map((m) => m.content).join("\n\n") || "";
+  const endpointName = deriveEndpointName(systemPrompt);
+  console.log(`[AI Router] Routing request to Groq model: ${requestedModel}`);
+  const result = await generateAIResponse({
+    systemPrompt,
+    userPrompt,
+    model: requestedModel,
+    temperature: options.temperature ?? 0.2,
+    maxTokens: options.max_tokens ?? 2500,
+    responseFormat: options.response_format,
+    endpointName
+  });
+  return result.content;
 }
-var FAST_MODEL2, ACCURATE_MODEL2;
+function deriveEndpointName(systemPrompt) {
+  const lower = systemPrompt.toLowerCase();
+  if (lower.includes("code review") || lower.includes("code analysis")) return "code-review";
+  if (lower.includes("resume") || lower.includes("candidate")) return "resume-screen";
+  if (lower.includes("seo") || lower.includes("search engine")) return "seo-audit";
+  if (lower.includes("contract") || lower.includes("clause")) return "contract-analyze";
+  if (lower.includes("invoice") || lower.includes("line_items")) return "invoice-extract";
+  if (lower.includes("claim") && lower.includes("extract")) return "claim-extract";
+  if (lower.includes("claim") && lower.includes("verif")) return "claim-verify";
+  if (lower.includes("source") && lower.includes("compar")) return "source-compare";
+  if (lower.includes("newsroom") || lower.includes("research")) return "news-research";
+  if (lower.includes("chat")) return "chat-reply";
+  if (lower.includes("classify") || lower.includes("task")) return "classify-task";
+  return "ai-request";
+}
+var FAST_MODEL, ACCURATE_MODEL;
 var init_openrouter_client = __esm({
   "handlers/lib/openrouter-client.ts"() {
     "use strict";
-    init_puter_client();
-    FAST_MODEL2 = process.env.FAST_MODEL || "google/gemini-2.5-flash";
-    ACCURATE_MODEL2 = process.env.ACCURATE_MODEL || "meta-llama/llama-3.3-70b-instruct";
+    init_groq();
+    FAST_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+    ACCURATE_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
   }
 });
 
@@ -39657,7 +40121,7 @@ async function buildSemanticMap(category, extracted_text, filename = "document")
   if (extracted_text.trim().length > 0) {
     try {
       const content = await callOpenRouter({
-        model: FAST_MODEL2,
+        model: FAST_MODEL,
         messages: [
           { role: "system", content: promptSystem },
           { role: "user", content: `Document text:
@@ -57910,7 +58374,7 @@ var require_signature = __commonJS({
     var BN_35 = BigInt(35);
     var BN_N = BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
     var BN_N_2 = BN_N / BN_2;
-    var inspect2 = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
+    var inspect2 = Symbol.for("nodejs.util.inspect.custom");
     var _guard = {};
     function toUint256(value) {
       return (0, index_js_2.zeroPadValue)((0, index_js_2.toBeArray)(value), 32);
@@ -58713,7 +59177,7 @@ var require_typed = __commonJS({
     function b(value, size) {
       return new Typed(_gaurd, `bytes${size ? size : ""}`, value, { size });
     }
-    var _typedSymbol = /* @__PURE__ */ Symbol.for("_ethers_typed");
+    var _typedSymbol = Symbol.for("_ethers_typed");
     var Typed = class _Typed {
       /**
        *  The type, as a Solidity-compatible type.
@@ -60069,7 +60533,7 @@ var require_transaction = __commonJS({
     var BN_28 = BigInt(28);
     var BN_35 = BigInt(35);
     var BN_MAX_UINT = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    var inspect2 = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
+    var inspect2 = Symbol.for("nodejs.util.inspect.custom");
     var BLOB_SIZE = 4096 * 32;
     var CELL_COUNT = 128;
     function splitBlobCells(_proof, cellCount) {
@@ -63344,7 +63808,7 @@ var require_fragments = __commonJS({
       return type;
     }
     var _guard = {};
-    var internal = /* @__PURE__ */ Symbol.for("_ethers_internal");
+    var internal = Symbol.for("_ethers_internal");
     var ParamTypeInternal = "_ParamTypeInternal";
     var ErrorFragmentInternal = "_ErrorInternal";
     var EventFragmentInternal = "_EventInternal";
@@ -67402,7 +67866,7 @@ var require_contract = __commonJS({
       });
       return method;
     }
-    var internal = /* @__PURE__ */ Symbol.for("_ethersInternal_contract");
+    var internal = Symbol.for("_ethersInternal_contract");
     var internalValues = /* @__PURE__ */ new WeakMap();
     function setInternal(contract, values) {
       internalValues.set(contract[internal], values);
@@ -68970,7 +69434,7 @@ var require_plugins_network = __commonJS({
     var properties_js_1 = require_properties2();
     var index_js_1 = require_utils4();
     var EnsAddress = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
-    var inspect2 = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
+    var inspect2 = Symbol.for("nodejs.util.inspect.custom");
     var NetworkPlugin = class _NetworkPlugin {
       /**
        *  The name of the plugin.
@@ -69171,7 +69635,7 @@ var require_network = __commonJS({
     var index_js_1 = require_transaction2();
     var index_js_2 = require_utils4();
     var plugins_network_js_1 = require_plugins_network();
-    var inspect2 = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
+    var inspect2 = Symbol.for("nodejs.util.inspect.custom");
     var Networks = /* @__PURE__ */ new Map();
     var Network = class _Network {
       #name;
@@ -73323,10 +73787,10 @@ var require_constants2 = __commonJS({
       EMPTY_BUFFER: Buffer.alloc(0),
       GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
       hasBlob,
-      kForOnEventAttribute: /* @__PURE__ */ Symbol("kIsForOnEventAttribute"),
-      kListener: /* @__PURE__ */ Symbol("kListener"),
-      kStatusCode: /* @__PURE__ */ Symbol("status-code"),
-      kWebSocket: /* @__PURE__ */ Symbol("websocket"),
+      kForOnEventAttribute: Symbol("kIsForOnEventAttribute"),
+      kListener: Symbol("kListener"),
+      kStatusCode: Symbol("status-code"),
+      kWebSocket: Symbol("websocket"),
       NOOP: () => {
       }
     };
@@ -73412,8 +73876,8 @@ var require_buffer_util = __commonJS({
 var require_limiter = __commonJS({
   "node_modules/ethers/node_modules/ws/lib/limiter.js"(exports2, module2) {
     "use strict";
-    var kDone = /* @__PURE__ */ Symbol("kDone");
-    var kRun = /* @__PURE__ */ Symbol("kRun");
+    var kDone = Symbol("kDone");
+    var kRun = Symbol("kRun");
     var Limiter = class {
       /**
        * Creates a new `Limiter`.
@@ -73468,11 +73932,11 @@ var require_permessage_deflate = __commonJS({
     var { kStatusCode } = require_constants2();
     var FastBuffer = Buffer[Symbol.species];
     var TRAILER = Buffer.from([0, 0, 255, 255]);
-    var kPerMessageDeflate = /* @__PURE__ */ Symbol("permessage-deflate");
-    var kTotalLength = /* @__PURE__ */ Symbol("total-length");
-    var kCallback = /* @__PURE__ */ Symbol("callback");
-    var kBuffers = /* @__PURE__ */ Symbol("buffers");
-    var kError = /* @__PURE__ */ Symbol("error");
+    var kPerMessageDeflate = Symbol("permessage-deflate");
+    var kTotalLength = Symbol("total-length");
+    var kCallback = Symbol("callback");
+    var kBuffers = Symbol("buffers");
+    var kError = Symbol("error");
     var zlibLimiter;
     var PerMessageDeflate = class {
       /**
@@ -74687,7 +75151,7 @@ var require_sender = __commonJS({
     var { EMPTY_BUFFER, kWebSocket, NOOP } = require_constants2();
     var { isBlob, isValidStatusCode } = require_validation3();
     var { mask: applyMask, toBuffer } = require_buffer_util();
-    var kByteLength = /* @__PURE__ */ Symbol("kByteLength");
+    var kByteLength = Symbol("kByteLength");
     var maskBuffer = Buffer.alloc(4);
     var RANDOM_POOL_SIZE = 8 * 1024;
     var randomPool;
@@ -75172,14 +75636,14 @@ var require_event_target = __commonJS({
   "node_modules/ethers/node_modules/ws/lib/event-target.js"(exports2, module2) {
     "use strict";
     var { kForOnEventAttribute, kListener } = require_constants2();
-    var kCode = /* @__PURE__ */ Symbol("kCode");
-    var kData = /* @__PURE__ */ Symbol("kData");
-    var kError = /* @__PURE__ */ Symbol("kError");
-    var kMessage = /* @__PURE__ */ Symbol("kMessage");
-    var kReason = /* @__PURE__ */ Symbol("kReason");
-    var kTarget = /* @__PURE__ */ Symbol("kTarget");
-    var kType = /* @__PURE__ */ Symbol("kType");
-    var kWasClean = /* @__PURE__ */ Symbol("kWasClean");
+    var kCode = Symbol("kCode");
+    var kData = Symbol("kData");
+    var kError = Symbol("kError");
+    var kMessage = Symbol("kMessage");
+    var kReason = Symbol("kReason");
+    var kTarget = Symbol("kTarget");
+    var kType = Symbol("kType");
+    var kWasClean = Symbol("kWasClean");
     var Event2 = class {
       /**
        * Create a new `Event`.
@@ -75581,7 +76045,7 @@ var require_websocket = __commonJS({
     } = require_event_target();
     var { format, parse } = require_extension();
     var { toBuffer } = require_buffer_util();
-    var kAborted = /* @__PURE__ */ Symbol("kAborted");
+    var kAborted = Symbol("kAborted");
     var protocolVersions = [8, 13];
     var readyStates = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
     var subprotocolRegex = /^[!#$%&'*+\-.0-9A-Z^_`|a-z~]+$/;
@@ -84935,7 +85399,7 @@ INSTRUCTIONS:
 5. Keep your response concise, clear, and under 3-4 sentences.`;
   try {
     const content = await callOpenRouter({
-      model: FAST_MODEL2,
+      model: FAST_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: message }
@@ -85312,7 +85776,7 @@ Return ONLY a JSON object with this exact structure:
 }`;
     try {
       const rawContent = await callOpenRouter({
-        model: FAST_MODEL2,
+        model: FAST_MODEL,
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: `Task Type: ${input.taskType || "general_query"}
@@ -85333,7 +85797,7 @@ ${currentContext}` }
         );
         if (validation.isValid) {
           currentContext = candidateText;
-          modelUsed = `${FAST_MODEL2} + deterministic`;
+          modelUsed = `${FAST_MODEL} + deterministic`;
           if (Array.isArray(parsed.removedRedundancies)) {
             removedRedundancies.push(...parsed.removedRedundancies);
           }
@@ -87839,7 +88303,7 @@ var require_range = __commonJS({
 var require_comparator = __commonJS({
   "node_modules/semver/classes/comparator.js"(exports2, module2) {
     "use strict";
-    var ANY = /* @__PURE__ */ Symbol("SemVer ANY");
+    var ANY = Symbol("SemVer ANY");
     var Comparator = class _Comparator {
       static get ANY() {
         return ANY;
@@ -91629,7 +92093,7 @@ var newHeadersFromIncoming = (incoming) => {
   }
   return new Headers(headerRecord);
 };
-var wrapBodyStream = /* @__PURE__ */ Symbol("wrapBodyStream");
+var wrapBodyStream = Symbol("wrapBodyStream");
 var newRequestFromIncoming = (method, url, headers, incoming, abortController) => {
   const init = {
     method,
@@ -91663,20 +92127,20 @@ var newRequestFromIncoming = (method, url, headers, incoming, abortController) =
   } else init.body = import_node_stream.Readable.toWeb(incoming);
   return new Request$1(url, init);
 };
-var getRequestCache = /* @__PURE__ */ Symbol("getRequestCache");
-var requestCache = /* @__PURE__ */ Symbol("requestCache");
-var incomingKey = /* @__PURE__ */ Symbol("incomingKey");
-var urlKey = /* @__PURE__ */ Symbol("urlKey");
-var methodKey = /* @__PURE__ */ Symbol("methodKey");
-var headersKey = /* @__PURE__ */ Symbol("headersKey");
-var abortControllerKey = /* @__PURE__ */ Symbol("abortControllerKey");
-var getAbortController = /* @__PURE__ */ Symbol("getAbortController");
-var abortRequest = /* @__PURE__ */ Symbol("abortRequest");
-var bodyBufferKey = /* @__PURE__ */ Symbol("bodyBuffer");
-var bodyReadPromiseKey = /* @__PURE__ */ Symbol("bodyReadPromise");
-var bodyConsumedDirectlyKey = /* @__PURE__ */ Symbol("bodyConsumedDirectly");
-var bodyLockReaderKey = /* @__PURE__ */ Symbol("bodyLockReader");
-var abortReasonKey = /* @__PURE__ */ Symbol("abortReason");
+var getRequestCache = Symbol("getRequestCache");
+var requestCache = Symbol("requestCache");
+var incomingKey = Symbol("incomingKey");
+var urlKey = Symbol("urlKey");
+var methodKey = Symbol("methodKey");
+var headersKey = Symbol("headersKey");
+var abortControllerKey = Symbol("abortControllerKey");
+var getAbortController = Symbol("getAbortController");
+var abortRequest = Symbol("abortRequest");
+var bodyBufferKey = Symbol("bodyBuffer");
+var bodyReadPromiseKey = Symbol("bodyReadPromise");
+var bodyConsumedDirectlyKey = Symbol("bodyConsumedDirectly");
+var bodyLockReaderKey = Symbol("bodyLockReader");
+var abortReasonKey = Symbol("abortReason");
 var newBodyUnusableError = () => {
   return /* @__PURE__ */ new TypeError("Body is unusable");
 };
@@ -91920,7 +92384,7 @@ Object.defineProperty(requestPrototype, "json", { value: function() {
   if (this[bodyConsumedDirectlyKey]) return rejectBodyUnusable();
   return this.text().then(JSON.parse);
 } });
-Object.defineProperty(requestPrototype, /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom"), { value: function(depth, options, inspectFn) {
+Object.defineProperty(requestPrototype, Symbol.for("nodejs.util.inspect.custom"), { value: function(depth, options, inspectFn) {
   return `Request (lightweight) ${inspectFn({
     method: this.method,
     url: this.url,
@@ -91962,9 +92426,9 @@ var newRequest = (incoming, defaultHostname) => {
   return req;
 };
 var defaultContentType = "text/plain; charset=UTF-8";
-var responseCache = /* @__PURE__ */ Symbol("responseCache");
-var getResponseCache = /* @__PURE__ */ Symbol("getResponseCache");
-var cacheKey = /* @__PURE__ */ Symbol("cache");
+var responseCache = Symbol("responseCache");
+var getResponseCache = Symbol("getResponseCache");
+var cacheKey = Symbol("cache");
 var GlobalResponse = global.Response;
 var Response$1 = class Response$12 {
   #body;
@@ -92034,7 +92498,7 @@ var Response$1 = class Response$12 {
     return this[getResponseCache]()[k]();
   } });
 });
-Object.defineProperty(Response$1.prototype, /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom"), { value: function(depth, options, inspectFn) {
+Object.defineProperty(Response$1.prototype, Symbol.for("nodejs.util.inspect.custom"), { value: function(depth, options, inspectFn) {
   return `Response (lightweight) ${inspectFn({
     status: this.status,
     headers: this.headers,
@@ -92138,8 +92602,8 @@ var buildOutgoingHttpHeaders = (headers, defaultContentType2) => {
   if (defaultContentType2) res["content-type"] ??= defaultContentType2;
   return res;
 };
-var outgoingEnded = /* @__PURE__ */ Symbol("outgoingEnded");
-var incomingDraining = /* @__PURE__ */ Symbol("incomingDraining");
+var outgoingEnded = Symbol("outgoingEnded");
+var incomingDraining = Symbol("incomingDraining");
 var DRAIN_TIMEOUT_MS = 500;
 var MAX_DRAIN_BYTES = 64 * 1024 * 1024;
 var drainIncoming = (incoming) => {
@@ -92394,9 +92858,9 @@ var CloseEvent = globalThis.CloseEvent ?? class extends Event {
     return this.#eventInitDict.reason ?? "";
   }
 };
-var generateConnectionSymbol = () => /* @__PURE__ */ Symbol("connection");
-var CONNECTION_SYMBOL_KEY = /* @__PURE__ */ Symbol("CONNECTION_SYMBOL_KEY");
-var WAIT_FOR_WEBSOCKET_SYMBOL = /* @__PURE__ */ Symbol("WAIT_FOR_WEBSOCKET_SYMBOL");
+var generateConnectionSymbol = () => Symbol("connection");
+var CONNECTION_SYMBOL_KEY = Symbol("CONNECTION_SYMBOL_KEY");
+var WAIT_FOR_WEBSOCKET_SYMBOL = Symbol("WAIT_FOR_WEBSOCKET_SYMBOL");
 var responseHeadersToSkip = /* @__PURE__ */ new Set([
   "connection",
   "content-length",
@@ -95462,7 +95926,7 @@ async function handleResumeScreenFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL2,
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -95549,7 +96013,7 @@ async function handleResumeScreenAccurateRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "meta-llama/llama-3.3-70b-instruct",
+          model: ACCURATE_MODEL,
           messages: [
             {
               role: "system",
@@ -95634,7 +96098,7 @@ async function handleContractAnalyzeFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL2,
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -95743,7 +96207,7 @@ async function handleContractAnalyzeAccurateRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "meta-llama/llama-3.3-70b-instruct",
+          model: ACCURATE_MODEL,
           messages: [
             {
               role: "system",
@@ -95853,7 +96317,7 @@ async function handleInvoiceExtractFastRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: FAST_MODEL2,
+          model: FAST_MODEL,
           messages: [
             {
               role: "system",
@@ -95963,7 +96427,7 @@ async function handleInvoiceExtractAccurateRequest(c) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: "meta-llama/llama-3.3-70b-instruct",
+          model: ACCURATE_MODEL,
           messages: [
             {
               role: "system",
@@ -96189,7 +96653,7 @@ async function handleCodeReviewFastRequest(c) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: FAST_MODEL2,
+        model: FAST_MODEL,
         messages: [
           {
             role: "system",
@@ -96387,7 +96851,7 @@ async function handleCodeReviewAccurateRequest(c) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: "meta-llama/llama-3.3-70b-instruct",
+        model: ACCURATE_MODEL,
         messages: [
           {
             role: "system",
@@ -96432,6 +96896,7 @@ ${codeContent.slice(0, 15e3)}`
 }
 
 // handlers/seo-audit-fast.ts
+init_openrouter_client();
 async function analyzeHtmlSeoRules(html, pageUrl) {
   const issues = [];
   let scoreDeductions = 0;
@@ -96597,13 +97062,53 @@ async function handleSeoAuditFastRequest(c) {
       return c.json({ error: `Failed to fetch page from ${targetUrl}: ${pageRes.statusText}` }, 400);
     }
     const html = await pageRes.text();
-    const { issues, seo_score } = await analyzeHtmlSeoRules(html, targetUrl);
+    const { issues: ruleIssues, seo_score: ruleScore } = await analyzeHtmlSeoRules(html, targetUrl);
+    const cleanText = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 3e3).trim();
+    let llmIssues = [];
+    let llmScore = ruleScore;
+    let usedLlm = false;
+    try {
+      const content = await callOpenRouter({
+        model: FAST_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: 'You are an SEO specialist. Analyze the provided webpage text content for readability, content engagement, keyword relevance, and content depth. Return ONLY valid JSON: { "llm_issues": [{ "category": "content"|"metadata"|"heading"|"images"|"links", "severity": "low"|"medium"|"high", "description": string, "suggestion": string }], "seo_score": number }. seo_score must be a float between 0.0 and 1.0.'
+          },
+          {
+            role: "user",
+            content: `Page URL: ${targetUrl}
+
+Webpage Extract:
+${cleanText}`
+          }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      });
+      let cleaned = content.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.llm_issues)) {
+          llmIssues = parsed.llm_issues;
+        }
+        if (typeof parsed.seo_score === "number") {
+          llmScore = Math.max(0, Math.min(1, parsed.seo_score));
+        }
+        usedLlm = true;
+      }
+    } catch (err2) {
+      console.warn(`[seo-audit-fast] LLM content analysis unavailable \u2014 using rule-based analysis only:`, err2);
+    }
+    const combinedIssues = [...ruleIssues, ...llmIssues];
+    const finalScore = usedLlm ? parseFloat((ruleScore * 0.5 + llmScore * 0.5).toFixed(2)) : ruleScore;
     const latency_ms = Date.now() - startTime;
     return c.json({
       page_url: targetUrl,
-      issues,
-      seo_score,
-      confidence: 0.78,
+      issues: combinedIssues,
+      seo_score: finalScore,
+      confidence: usedLlm ? 0.85 : 0.78,
       latency_ms,
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     });
@@ -96640,7 +97145,7 @@ async function handleSeoAuditAccurateRequest(c) {
     const llmStart = Date.now();
     try {
       const content = await callOpenRouter({
-        model: "meta-llama/llama-3.3-70b-instruct",
+        model: ACCURATE_MODEL,
         messages: [
           {
             role: "system",
@@ -96723,7 +97228,7 @@ Return ONLY valid JSON with this exact structure:
     }
   ]
 }`;
-async function processClaimExtraction(rawText, providedDocType, model16 = FAST_MODEL2) {
+async function processClaimExtraction(rawText, providedDocType, model16 = FAST_MODEL) {
   const text = (rawText || "").trim();
   if (!text) {
     return {
@@ -96938,7 +97443,7 @@ async function handleClaimExtractFastRequest(c) {
       return c.json({ error: "No valid document text provided for claim extraction." }, 400);
     }
     const llmStart = Date.now();
-    const result = await processClaimExtraction(inputText, documentType, FAST_MODEL2);
+    const result = await processClaimExtraction(inputText, documentType, FAST_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -96987,7 +97492,7 @@ async function handleClaimExtractAccurateRequest(c) {
       return c.json({ error: "No valid document text provided for claim extraction." }, 400);
     }
     const llmStart = Date.now();
-    const result = await processClaimExtraction(inputText, documentType, ACCURATE_MODEL2);
+    const result = await processClaimExtraction(inputText, documentType, ACCURATE_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -97062,7 +97567,7 @@ Return ONLY valid JSON matching this structure:
     "List of unverified qualifiers or missing elements"
   ]
 }`;
-async function processClaimVerification(claimInput, evidenceInput, model16 = FAST_MODEL2) {
+async function processClaimVerification(claimInput, evidenceInput, model16 = FAST_MODEL) {
   const claimText = (typeof claimInput === "string" ? claimInput : claimInput.text || claimInput.claim || "").trim();
   const claimId = typeof claimInput === "object" && claimInput.id ? claimInput.id : "claim_001";
   let sources = [];
@@ -97308,7 +97813,7 @@ async function handleClaimVerifyFastRequest(c) {
     const claimInput = claim || text || taskDescription || "";
     const evidenceInput = evidence || (await resolveFiles(body)).files || [];
     const llmStart = Date.now();
-    const result = await processClaimVerification(claimInput, evidenceInput, FAST_MODEL2);
+    const result = await processClaimVerification(claimInput, evidenceInput, FAST_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -97332,7 +97837,7 @@ async function handleClaimVerifyAccurateRequest(c) {
     const claimInput = claim || text || taskDescription || "";
     const evidenceInput = evidence || (await resolveFiles(body)).files || [];
     const llmStart = Date.now();
-    const result = await processClaimVerification(claimInput, evidenceInput, ACCURATE_MODEL2);
+    const result = await processClaimVerification(claimInput, evidenceInput, ACCURATE_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -97427,7 +97932,7 @@ Return ONLY valid JSON matching this exact structure:
     }
   ]
 }`;
-async function processSourceComparison(sourcesInput, providedTopic, model16 = FAST_MODEL2) {
+async function processSourceComparison(sourcesInput, providedTopic, model16 = FAST_MODEL) {
   let sources = [];
   if (Array.isArray(sourcesInput)) {
     sources = sourcesInput;
@@ -97858,7 +98363,7 @@ async function handleSourceCompareFastRequest(c) {
       }
     }
     const llmStart = Date.now();
-    const result = await processSourceComparison(sourcesInput, topic || taskDescription, FAST_MODEL2);
+    const result = await processSourceComparison(sourcesInput, topic || taskDescription, FAST_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -97891,7 +98396,7 @@ async function handleSourceCompareAccurateRequest(c) {
       }
     }
     const llmStart = Date.now();
-    const result = await processSourceComparison(sourcesInput, topic || taskDescription, ACCURATE_MODEL2);
+    const result = await processSourceComparison(sourcesInput, topic || taskDescription, ACCURATE_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -98907,7 +99412,7 @@ Return ONLY valid JSON matching this exact structure:
   ],
   "researchBrief": "Full narrative research brief suitable for journalists as a starting point for reporting, detailing agreements, conflicts, gaps, and verification status."
 }`;
-async function processNewsResearch(sourcesInput, providedTopic, model16 = FAST_MODEL2) {
+async function processNewsResearch(sourcesInput, providedTopic, model16 = FAST_MODEL) {
   let rawSources = [];
   if (Array.isArray(sourcesInput)) {
     rawSources = sourcesInput;
@@ -99177,7 +99682,7 @@ async function handleNewsResearchFastRequest(c) {
       }
     }
     const llmStart = Date.now();
-    const result = await processNewsResearch(sourcesInput, topic || taskDescription, FAST_MODEL2);
+    const result = await processNewsResearch(sourcesInput, topic || taskDescription, FAST_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -99211,7 +99716,7 @@ async function handleNewsResearchAccurateRequest(c) {
       }
     }
     const llmStart = Date.now();
-    const result = await processNewsResearch(sourcesInput, topic || taskDescription, ACCURATE_MODEL2);
+    const result = await processNewsResearch(sourcesInput, topic || taskDescription, ACCURATE_MODEL);
     const latency_ms = Date.now() - llmStart;
     return c.json({
       ...result,
@@ -99268,7 +99773,7 @@ async function handleClassifyTaskRequest(c) {
     let category = "unsupported";
     try {
       const openRouterContent = await callOpenRouter({
-        model: FAST_MODEL2,
+        model: FAST_MODEL,
         messages: [
           {
             role: "system",
@@ -101595,6 +102100,9 @@ function validateAuthBody(type) {
     }
   };
 }
+
+// index.ts
+init_groq();
 
 // middleware/auth.ts
 var import_jsonwebtoken = __toESM(require_jsonwebtoken());
@@ -106333,7 +106841,7 @@ app.notFound((c) => {
     404
   );
 });
-serve({ fetch: app.fetch, port }, () => {
+serve({ fetch: app.fetch, port }, async () => {
   console.log("\n\u2705 x402 Resource Server is running!\n");
   console.log("\u2550".repeat(60));
   console.log("Endpoints:");
@@ -106341,6 +106849,13 @@ serve({ fetch: app.fetch, port }, () => {
   console.log(`  Health:  http://localhost:${port}/health`);
   console.log(`  Info:    http://localhost:${port}/info`);
   console.log("\u2550".repeat(60));
+  try {
+    await initializeGroqService();
+    console.log("\u2705 Groq AI Service initialized");
+  } catch (err2) {
+    console.warn("\u26A0 Groq AI Service initialization warning:", err2);
+    console.warn("   AI endpoints will use fallback behavior");
+  }
   console.log("\n\u{1F4DA} QUICK COMMANDS:\n");
   console.log("Test health endpoint (no payment):");
   console.log(`  curl http://localhost:${port}/health

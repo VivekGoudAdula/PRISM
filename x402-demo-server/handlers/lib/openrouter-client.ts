@@ -1,7 +1,22 @@
-import { callPuterAI, FAST_MODEL as PUTER_FAST, ACCURATE_MODEL as PUTER_ACCURATE } from './puter-client';
+/**
+ * PRISM AI Router — Groq-Powered.
+ *
+ * This module is the centralized AI call point for ALL PRISM handlers.
+ * Previously routed to OpenRouter; now routes to Groq with multi-key
+ * management, rate limiting, and intelligent failover.
+ *
+ * The exported interface (callOpenRouter, FAST_MODEL, ACCURATE_MODEL, etc.)
+ * remains unchanged so that all existing handler imports continue to work
+ * without modification.
+ */
 
-export const FAST_MODEL = process.env.FAST_MODEL || 'google/gemini-2.5-flash';
-export const ACCURATE_MODEL = process.env.ACCURATE_MODEL || 'meta-llama/llama-3.3-70b-instruct';
+import { generateAIResponse } from '../../services/groq';
+
+/** Default fast model — uses Groq model from env or the specified default */
+export const FAST_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+
+/** Default accurate model — uses Groq model from env or the specified default */
+export const ACCURATE_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -17,69 +32,85 @@ export interface OpenRouterOptions {
 }
 
 /**
- * Returns keys from environment variables.
+ * Returns configured Groq API key availability status.
+ * Returns non-empty array if any keys are configured (maintains API compat).
  */
 export function getOpenRouterKeys(): string[] {
   const keys: string[] = [];
-  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
-    keys.push(process.env.OPENROUTER_API_KEY.trim());
+  if (process.env.GROQ_API_KEY_1?.trim()) keys.push('groq_key_1');
+  if (process.env.GROQ_API_KEY_2?.trim()) keys.push('groq_key_2');
+  if (process.env.GROQ_API_KEY_3?.trim()) keys.push('groq_key_3');
+  // Backward compat: also check legacy OpenRouter key
+  if (keys.length === 0 && process.env.OPENROUTER_API_KEY?.trim()) {
+    keys.push('openrouter_legacy');
   }
   return keys;
 }
 
 /**
- * Primary AI Chat Router.
- * Performs completion via OpenRouter when API key is set; delegates to Puter AI or local engine cleanly.
+ * Primary AI Chat Router — Groq-powered.
+ *
+ * Converts the existing OpenRouter-style call interface into a Groq
+ * generateAIResponse() call. All existing handlers call this function
+ * via `import { callOpenRouter } from './lib/openrouter-client'`.
+ *
+ * The function preserves the original interface:
+ * - Accepts messages array with system/user/assistant roles
+ * - Returns the raw text content string
+ * - Throws on failure (handlers catch and use fallbacks)
+ *
+ * @param options - Chat completion options (model, messages, temperature, etc.)
+ * @returns The AI-generated text content
+ * @throws Error if all Groq keys fail
  */
 export async function callOpenRouter(options: OpenRouterOptions): Promise<string> {
-  const keys = getOpenRouterKeys();
-  const requestedModel = options.model || process.env.OPENROUTER_MODEL || ACCURATE_MODEL;
+  const requestedModel = options.model || FAST_MODEL;
 
-  if (keys.length > 0) {
-    const apiKey = keys[0];
-    try {
-      console.log(`[AI Router] Sending request to model: ${requestedModel}`);
-      const bodyPayload: Record<string, any> = {
-        model: requestedModel,
-        messages: options.messages,
-        temperature: options.temperature ?? 0.2,
-        max_tokens: options.max_tokens ?? 2500,
-      };
+  // Extract system and user messages from the messages array
+  const systemMessages = options.messages.filter((m) => m.role === 'system');
+  const userMessages = options.messages.filter((m) => m.role === 'user');
 
-      if (options.response_format) {
-        bodyPayload.response_format = options.response_format;
-      }
+  const systemPrompt = systemMessages.map((m) => m.content).join('\n\n') || 'You are a helpful AI assistant.';
+  const userPrompt = userMessages.map((m) => m.content).join('\n\n') || '';
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://prism.ai',
-          'X-OpenRouter-Title': 'PRISM AI Router',
-        },
-        body: JSON.stringify(bodyPayload),
-      });
+  // Derive endpoint name from system prompt for logging
+  const endpointName = deriveEndpointName(systemPrompt);
 
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content && content.trim()) {
-          return content.trim();
-        }
-      } else {
-        const errText = await response.text();
-        console.warn(`[AI Router] OpenRouter HTTP ${response.status}: ${errText}`);
-      }
-    } catch (err) {
-      console.warn(`[AI Router] OpenRouter attempt failed:`, err);
-    }
-  }
+  console.log(`[AI Router] Routing request to Groq model: ${requestedModel}`);
 
-  // Delegate to Puter AI (suppressing verbose trace logs for headless Node environment)
-  try {
-    return await callPuterAI(options);
-  } catch (err) {
-    throw new Error('AI Provider unavailable in backend mode. PRISM Static Engine engaged.');
-  }
+  const result = await generateAIResponse({
+    systemPrompt,
+    userPrompt,
+    model: requestedModel,
+    temperature: options.temperature ?? 0.2,
+    maxTokens: options.max_tokens ?? 2500,
+    responseFormat: options.response_format,
+    endpointName,
+  });
+
+  return result.content;
+}
+
+/**
+ * Derives a human-readable endpoint name from the system prompt for logging.
+ *
+ * @param systemPrompt - The system prompt text
+ * @returns A short endpoint descriptor
+ */
+function deriveEndpointName(systemPrompt: string): string {
+  const lower = systemPrompt.toLowerCase();
+
+  if (lower.includes('code review') || lower.includes('code analysis')) return 'code-review';
+  if (lower.includes('resume') || lower.includes('candidate')) return 'resume-screen';
+  if (lower.includes('seo') || lower.includes('search engine')) return 'seo-audit';
+  if (lower.includes('contract') || lower.includes('clause')) return 'contract-analyze';
+  if (lower.includes('invoice') || lower.includes('line_items')) return 'invoice-extract';
+  if (lower.includes('claim') && lower.includes('extract')) return 'claim-extract';
+  if (lower.includes('claim') && lower.includes('verif')) return 'claim-verify';
+  if (lower.includes('source') && lower.includes('compar')) return 'source-compare';
+  if (lower.includes('newsroom') || lower.includes('research')) return 'news-research';
+  if (lower.includes('chat')) return 'chat-reply';
+  if (lower.includes('classify') || lower.includes('task')) return 'classify-task';
+
+  return 'ai-request';
 }

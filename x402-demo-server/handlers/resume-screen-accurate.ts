@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { extractText } from './lib/extract-document';
 import { resolveFiles } from './lib/resolve-files';
-import { callOpenRouter } from './lib/openrouter-client';
+import { callOpenRouter, ACCURATE_MODEL } from './lib/openrouter-client';
 import { evaluateCandidateDeterministic } from './lib/resume-evaluator';
 
 /**
@@ -51,7 +51,7 @@ export async function handleResumeScreenAccurateRequest(c: Context) {
       const llmStart = Date.now();
       try {
         const content = await callOpenRouter({
-          model: 'meta-llama/llama-3.3-70b-instruct',
+          model: ACCURATE_MODEL,
           messages: [
             {
               role: 'system',
