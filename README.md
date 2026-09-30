@@ -1,238 +1,863 @@
-# Prism
+# PRISM — AI Orchestration Platform
 
-**The Verified Bidding Market for AI Agents, Built on x402**
+<p align="center">
 
-Prism is an AI operations router for small and mid-sized businesses. A business asks for a task in plain language — screen these resumes, analyze this contract, extract these invoices — and Prism routes the request to the right AI capability, pays for it instantly on Algorand via the x402 protocol, verifies the result, and returns one clean answer with one bill.
+**One Platform. Every AI Task.**
 
-Built on Algorand TestNet, settled via [x402](https://x402.org), verified through the [GoPlausible](https://goplausible.com) facilitator.
+Understand → Optimize → Route → Execute
 
-> Submitted for the **Algorand Global x402 Challenge**.
+[![Built for Algorand](https://img.shields.io/badge/Built%20for-Algorand-000000?style=for-the-badge&logo=algorand)](https://algorand.co/)
+[![x402](https://img.shields.io/badge/Payments-x402-6C4CF1?style=for-the-badge)](https://dev.algorand.co/resources/x402-on-algorand/)
+[![TypeScript](https://img.shields.io/badge/Backend-TypeScript-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
+[![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
 
----
+</p>
 
-## Table of contents
-
-- [The problem](#the-problem)
-- [The solution](#the-solution)
-- [How it works](#how-it-works)
-- [Architecture](#architecture)
-- [Tech stack](#tech-stack)
-- [Repository structure](#repository-structure)
-- [Getting started](#getting-started)
-- [API reference](#api-reference)
-- [Demo walkthrough](#demo-walkthrough)
-- [Business model](#business-model)
-- [Competitive landscape](#competitive-landscape)
-- [Roadmap](#roadmap)
-- [Acknowledgments](#acknowledgments)
+<p align="center">
+  <b>AI orchestration with pay-per-use execution.</b><br/>
+  PRISM understands the task, optimizes the context, routes it to the right AI capability, executes it, and handles payment through x402 with settlement on Algorand.
+</p>
 
 ---
 
-## The problem
+## What is PRISM?
 
-Small and mid-sized businesses need many narrow AI capabilities — resume screening, contract review, invoice processing — but today's market forces a bad choice:
+AI applications today often depend on multiple specialized AI services.
 
-- **Buy five to ten separate subscriptions**, most of which sit idle most of the month and don't talk to each other.
-- **Or stitch together disconnected point solutions manually**, losing hours per task to copy-paste work between tools.
+One task may require:
 
-Meanwhile, developers building excellent narrow AI agents have no direct route to paying customers without building their own billing, onboarding, and distribution — as much work as building the model itself.
+* a code analysis service
+* a document extraction model
+* a resume screening system
+* an SEO analyzer
+* a research or verification service
+* different AI models for different quality requirements
 
-## The solution
+The problem is not a lack of AI capabilities.
 
-Prism is the router, not the marketplace. A business describes a task once. Behind the scenes:
+The problem is **connecting the right capability to the right task, at the right cost, with a simple execution and payment layer.**
 
-1. Prism classifies the task into a category.
-2. Every qualified endpoint in that category **bids** — price, confidence, and on-chain reputation.
-3. Prism selects the best overall bid (not just the cheapest) and pays it instantly via x402.
-4. The result is automatically **verified** before the business sees it.
-5. The verified outcome updates that endpoint's reputation, which feeds the next bid.
+**PRISM is an AI orchestration platform built to solve that problem.**
 
-All endpoints at launch are built and owned by Prism — this is what makes every transaction attributable to Prism on the official challenge leaderboard, and what makes genuine bidding possible from day one (a fast/lower-cost version and a slower/higher-accuracy version compete in every category). Third-party endpoints are a planned Phase 2 expansion, not part of the MVP.
+Instead of making users discover, configure, and manage individual AI services, PRISM provides a single interface that:
 
-## How it works
-
-```
- 1. Task intake        →  Business submits a request in plain language
- 2. Intent parsing      →  LLM classifies the task into a category
- 3. Discovery & bidding →  Qualified endpoints bid: price, confidence, reputation
- 4. Scoring & selection →  Best overall bid wins (not just cheapest)
- 5. Payment & execution →  x402 settles instantly, endpoint runs the task
- 6. Verification        →  Output checked; reputation updates on pass/fail
- 7. Synthesis & output   →  One clean answer, one bill, delivered to the business
-```
-
-Only steps 2, 6, and 7 require a language model at all — the rest (discovery, scoring, payment-protocol handling) is deterministic backend engineering. This is what makes the system explainable and buildable within a short build window rather than a multi-year research project.
-
-## Architecture
-
-```
-┌─────────────────────┐        ┌──────────────────────────────────────┐
-│   Frontend (React)   │        │        Backend (Hono + Node)         │
-│                       │        │                                      │
-│  Wallet connect       │◄──────►│  POST /run-task   (x402-protected)   │
-│  Task input + files   │  x402  │    → /classify-task   (internal)     │
-│  Result display       │  fetch │    → /select-endpoint (internal)     │
-└─────────────────────┘        │    → winning category endpoint       │
-                                 │      (x402-protected, 2 per category)│
-                                 │    → verify-output + reputation-store│
-                                 └──────────────────────────────────────┘
-                                              │
-                                              ▼
-                                  GoPlausible facilitator
-                                  Algorand TestNet · USDC ASA
+```text
+Understand
+    ↓
+Optimize
+    ↓
+Route
+    ↓
+Execute
+    ↓
+Settle
+    ↓
+Return Result
 ```
 
-Six category endpoints exist at launch — a fast and an accurate version each for resume screening, contract analysis, and invoice extraction — so the bidding step always has real competing options.
+PRISM exposes specialized AI capabilities as **pay-per-use services protected by x402**, with payment settlement on **Algorand**.
 
-## Tech stack
+---
 
-| Layer | Choice | Why |
-|---|---|---|
-| Blockchain / settlement | Algorand TestNet (Mainnet at launch) | Low fees, instant finality, native stablecoin support |
-| Payment protocol | x402 | HTTP-native, agent-to-agent settlement, no checkout UI |
-| Payment facilitator | GoPlausible | Verifies and settles x402 payments |
-| Backend | Hono + TypeScript (Node) | Lightweight, fast to iterate on the starter kit's route pattern |
-| Frontend | React + Vite + TailwindCSS | Fast dev loop, wallet integration via `@txnlab/use-wallet-react` |
-| Wallets | Pera / Defly / Lute | Algorand TestNet wallet support |
-| Document extraction | `pdf-parse` + `tesseract.js` (OCR fallback) | Handles both text-layer PDFs and scanned documents |
-| LLM orchestration | Provider-agnostic (Groq / Anthropic / OpenAI, whichever key is configured) | Intent classification and result structuring |
-| Reputation store | Local JSON store (`data/reputation.json`) at MVP stage | Simple, inspectable, upgradeable to a real database post-hackathon |
+## Problem
 
-## Repository structure
+AI services are increasingly specialized, but using them together remains fragmented.
 
-```
-x402-demo-server/            Backend (Hono)
-├── index.ts                  Server entry point, route registration
-├── endpoints.config.ts       Price/network config per x402-protected route
-├── handlers/
-│   ├── classify-task.ts       Public — LLM task classification
-│   ├── select-endpoint.ts     Public — bidding + scoring logic
-│   ├── run-task.ts            x402-protected — main customer-facing endpoint
-│   ├── resume-screen-fast.ts
-│   ├── resume-screen-accurate.ts
-│   ├── contract-analyze-fast.ts
-│   ├── contract-analyze-accurate.ts
-│   ├── invoice-extract-fast.ts
-│   ├── invoice-extract-accurate.ts
-│   └── lib/
-│       ├── extract-document.ts   Shared PDF/OCR text extraction
-│       ├── verify-output.ts      Schema-based output verification
-│       └── reputation-store.ts   Read/update endpoint reputation
-└── data/
-    └── reputation.json
+A typical workflow looks like:
 
-X402-Usecase/projects/X402-Usecase/    Frontend (React + Vite)
-├── src/
-│   ├── components/
-│   │   ├── ConnectWallet.tsx
-│   │   └── landing/                   Landing page sections
-│   ├── utils/
-│   │   ├── weatherApi.ts (→ taskApi.ts)  x402 client wrapper
-│   │   └── network/getAlgoClientConfigs.ts
-│   └── Home.tsx
-└── .env.local
+```text
+Find an AI service
+        ↓
+Understand its API
+        ↓
+Check pricing
+        ↓
+Prepare the input
+        ↓
+Choose a model
+        ↓
+Manage credentials
+        ↓
+Make the request
+        ↓
+Handle payment
+        ↓
+Process the result
 ```
 
-## Getting started
+This becomes difficult when applications need multiple capabilities.
+
+### The core problems
+
+* **Fragmented AI services** — different APIs for different tasks.
+* **Model selection complexity** — choosing the appropriate quality/cost tier.
+* **Repeated context preparation** — the same task context often needs to be structured repeatedly.
+* **Disconnected workflows** — AI capabilities operate independently instead of composing naturally.
+* **Payment friction** — pay-per-use AI services need a standardized payment mechanism.
+* **Cost inefficiency** — unnecessary tokens and repeated work increase execution costs.
+
+PRISM brings these concerns into one orchestration layer.
+
+---
+
+## Solution
+
+PRISM provides a single AI execution layer between the application and specialized AI capabilities.
+
+```text
+┌──────────────────────┐
+│   User / Application │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│        PRISM         │
+│  AI Orchestration    │
+└──────────┬───────────┘
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+ Understand    Context
+     │           │
+     └─────┬─────┘
+           ▼
+      Optimization
+           │
+           ▼
+        AI Router
+           │
+     ┌─────┼─────────────┐
+     ▼     ▼      ▼      ▼
+   Code  Resume   SEO   Documents
+  Review Screening Audit  Analysis
+     │     │      │      │
+     └─────┴──────┴──────┘
+              │
+              ▼
+       x402 Payment
+              │
+              ▼
+      Algorand Settlement
+              │
+              ▼
+       Structured Result
+```
+
+The application does not need to manage every specialized capability independently.
+
+PRISM handles the orchestration.
+
+---
+
+## Core Features
+
+| Feature | Description |
+| --- | --- |
+| **Task Understanding** | Identifies what the user is actually trying to accomplish. |
+| **Prompt Tutor** | Evaluates task prompts and identifies missing context or structure. |
+| **Data Map** | Structures task inputs and context for downstream execution. |
+| **Semantic Cache** | Reuses compatible prior results where applicable. |
+| **Prompt Optimizer** | Converts raw instructions into optimized execution context. |
+| **AI Router** | Selects the appropriate capability and model tier. |
+| **Code Review** | Analyze repositories and source code for quality and issues. |
+| **Resume Screening** | Evaluate candidate resumes against role requirements. |
+| **SEO Auditing** | Analyze webpages for SEO-related issues. |
+| **Invoice Extraction** | Extract structured information from invoices. |
+| **Contract Analysis** | Analyze contracts and extract relevant information. |
+| **Media Intelligence** | Extract, verify, compare, and research information from sources. |
+| **x402 Payments** | Pay-per-use access to protected AI capabilities. |
+| **Algorand Settlement** | Payments settle through Algorand. |
+
+---
+
+## Intelligence Layer
+
+PRISM is more than a collection of AI endpoints.
+
+An orchestration layer sits between the user's request and the final capability.
+
+### Prompt Tutor
+
+Evaluates the quality and completeness of an incoming task.
+
+It can identify:
+
+* unclear instructions
+* missing context
+* missing output structure
+* insufficient task specification
+
+and suggest improvements before execution.
+
+### Data Map
+
+Transforms incoming task information into structured context that can be used by downstream capabilities.
+
+This allows PRISM to reason about:
+
+* task inputs
+* entities
+* relationships
+* requirements
+* execution context
+
+### Semantic Cache
+
+Checks whether compatible prior work can be reused before executing another expensive AI operation.
+
+### Prompt Optimizer
+
+Optimizes the task context before model execution.
+
+### AI Router
+
+Selects the appropriate execution path based on the task and configured capability/model tiers.
+
+```text
+Raw Task
+   │
+   ▼
+Prompt Tutor
+   │
+   ▼
+Data Map
+   │
+   ▼
+Prompt Optimizer
+   │
+   ▼
+Semantic Cache
+   │
+   ▼
+AI Router
+   │
+   ▼
+Specialized Capability
+```
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TB
+
+    USER["User / Application"]
+
+    subgraph PRISM["PRISM AI ORCHESTRATION PLATFORM"]
+
+        INPUT["Task Input"]
+
+        subgraph INT["Intelligence Layer"]
+            PT["Prompt Tutor"]
+            DM["Data Map"]
+            PO["Prompt Optimizer"]
+            SC["Semantic Cache"]
+            AR["AI Router"]
+        end
+
+        subgraph CAP["AI CAPABILITY LAYER"]
+            CR["Code Review"]
+            RS["Resume Screening"]
+            SEO["SEO Auditing"]
+            INV["Invoice Extraction"]
+            CON["Contract Analysis"]
+            MI["Media Intelligence"]
+            TASK["AI Task Execution"]
+        end
+
+        INPUT --> PT
+        PT --> DM
+        DM --> PO
+        PO --> SC
+        SC --> AR
+
+        AR --> CR
+        AR --> RS
+        AR --> SEO
+        AR --> INV
+        AR --> CON
+        AR --> MI
+        AR --> TASK
+    end
+
+    USER --> INPUT
+
+    CR --> PAYMENT["x402 Payment / Access"]
+    RS --> PAYMENT
+    SEO --> PAYMENT
+    INV --> PAYMENT
+    CON --> PAYMENT
+    MI --> PAYMENT
+    TASK --> PAYMENT
+
+    PAYMENT --> FAC["GoPlausible Facilitator"]
+    FAC --> ALG["Algorand Settlement"]
+    ALG --> RESULT["Verified / Settled Execution"]
+    RESULT --> OUT["Structured Result"]
+```
+
+PRISM uses x402 as the payment/access mechanism around its paid capabilities.
+
+On Algorand, x402 follows the model where a client requests a resource, the server can return `402 Payment Required`, and a facilitator verifies and settles the payment before the protected resource is returned.
+
+---
+
+## x402 Payment Flow
+
+Every paid PRISM capability is designed around a clear unit of execution.
+
+Examples include:
+
+* one code-review operation
+* one resume-screening operation
+* one invoice extraction
+* one contract analysis
+* one claim verification
+* one source comparison
+* one research operation
+
+The conceptual flow is:
+
+```text
+Application
+     │
+     │ Request AI capability
+     ▼
+PRISM Endpoint
+     │
+     │ 402 Payment Required
+     ▼
+Payment Requirements
+     │
+     │ USDC
+     ▼
+GoPlausible Facilitator
+     │
+     ▼
+Algorand
+     │
+     │ Payment verified / settled
+     ▼
+PRISM Execution
+     │
+     ▼
+AI Capability
+     │
+     ▼
+Structured Result
+```
+
+PRISM uses the x402 implementation for its protected endpoints, with the GoPlausible facilitator handling payment verification and settlement.
+
+The Global x402 Challenge specifically requires participating projects to deploy paid x402 endpoints on Algorand Mainnet and use the GoPlausible facilitator.
+
+---
+
+## Why Algorand?
+
+PRISM uses Algorand as the settlement layer for its x402 payment flow.
+
+This gives the payment layer:
+
+* on-chain settlement
+* verifiable transactions
+* predictable transaction costs
+* fast finality
+* USDC-based payment support
+
+The important separation is:
+
+```text
+PRISM
+  │
+  │ Orchestration
+  ▼
+AI Capabilities
+  │
+  │ Payment Access
+  ▼
+x402
+  │
+  │ Verification / Settlement
+  ▼
+Algorand
+```
+
+PRISM focuses on the **orchestration and AI execution layer**, while Algorand provides the underlying settlement rail.
+
+---
+
+## AI Capabilities
+
+### Engineering
+
+#### Code Review
+
+Analyze source repositories and identify:
+
+* code quality issues
+* security concerns
+* architectural problems
+* maintainability issues
+* prioritized findings
+
+---
+
+### Human Resources
+
+#### Resume Screening
+
+Evaluate resumes against role requirements and return structured candidate analysis.
+
+---
+
+### Marketing
+
+#### SEO Auditing
+
+Analyze webpages and identify SEO-related issues and recommendations.
+
+---
+
+### Finance
+
+#### Invoice Extraction
+
+Extract structured information from invoices.
+
+---
+
+### Legal
+
+#### Contract Analysis
+
+Analyze contracts and extract relevant information.
+
+---
+
+### Media Intelligence
+
+PRISM includes multiple media-oriented capabilities:
+
+```text
+Claim Extraction
+       ↓
+Claim Verification
+       ↓
+Source Comparison
+       ↓
+News Research
+```
+
+These capabilities can be used independently or as part of larger workflows.
+
+---
+
+## How PRISM Works
+
+### 1. Submit a Task
+
+The user provides a natural-language request.
+
+Example:
+
+```text
+Review this GitHub repository for security and
+code quality issues.
+```
+
+### 2. Understand
+
+PRISM analyzes the task and determines what needs to be executed.
+
+### 3. Optimize
+
+The Intelligence Layer structures the task, maps its context, and optimizes execution.
+
+### 4. Route
+
+The AI Router determines the appropriate capability and execution tier.
+
+### 5. Pay
+
+The protected capability is accessed through x402.
+
+### 6. Execute
+
+The specialized AI capability processes the request.
+
+### 7. Settle
+
+The payment is verified and settled through the configured Algorand payment flow.
+
+### 8. Return
+
+PRISM returns a structured result to the user/application.
+
+---
+
+## Product Screens
+
+> Screenshots below should be added from the actual PRISM application. Do not use mock or stock images.
+
+### Landing Page
+
+The PRISM entry point explains the orchestration model and available capabilities.
+
+![PRISM Landing Page](docs/assets/screenshots/landing.png)
+
+### PRISM Console
+
+The main task execution interface.
+
+![PRISM Console](docs/assets/screenshots/dashboard.png)
+
+### Prompt Tutor
+
+Shows how PRISM evaluates and improves an incoming task.
+
+![Prompt Tutor](docs/assets/screenshots/prompt-tutor.png)
+
+### Data Map
+
+Shows the structured context generated by PRISM.
+
+![Data Map](docs/assets/screenshots/data-map.png)
+
+### Execution Summary
+
+Shows capability selection, workload information, optimization and execution details.
+
+![Execution Summary](docs/assets/screenshots/execution-summary.png)
+
+### x402 Payment
+
+Shows the payment and settlement stage.
+
+![x402 Payment](docs/assets/screenshots/payment.png)
+
+### Code Review
+
+Shows the final structured code-review result.
+
+![Code Review](docs/assets/screenshots/code-review-result.png)
+
+### Resume Screening
+
+Shows structured candidate screening.
+
+![Resume Screening](docs/assets/screenshots/resume-screening.png)
+
+---
+
+## Execution Model
+
+PRISM follows a pay-per-use model.
+
+There are no mandatory seat-based subscriptions for individual capability execution.
+
+The basic model is:
+
+```text
+Task
+  ↓
+Capability
+  ↓
+Execution
+  ↓
+x402 Payment
+  ↓
+Result
+```
+
+Pricing is capability-specific and defined by the backend endpoint configuration.
+
+See:
+
+[`docs/api-catalogue.md`](docs/api-catalogue.md)
+
+for the current endpoint catalogue and pricing.
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React + TypeScript + Vite |
+| Styling | Tailwind CSS |
+| Backend | Node.js + TypeScript |
+| API Framework | Hono |
+| AI | Groq / configured LLM providers |
+| Database | MongoDB |
+| Payments | x402 |
+| Facilitator | GoPlausible |
+| Settlement | Algorand |
+| Discovery | x402 Bazaar integration |
+| Deployment | Vercel + Render |
+
+The exact endpoint/model configuration is maintained in the backend source and documentation.
+
+---
+
+## Project Structure
+
+```text
+PRISM/
+│
+├── README.md
+├── ARCHITECTURE.md
+├── X402_IMPLEMENTATION_GUIDE.md
+├── render.yaml
+├── vercel.json
+│
+├── docs/
+│   ├── api-catalogue.md
+│   ├── development.md
+│   ├── intelligence-layer.md
+│   ├── x402-protocol.md
+│   └── assets/
+│       ├── architecture/
+│       └── screenshots/
+│
+├── X402-Usecase/
+│   └── projects/
+│       └── X402-Usecase/
+│           ├── src/
+│           ├── public/
+│           ├── tests/
+│           └── package.json
+│
+└── x402-demo-server/
+    ├── handlers/
+    ├── middleware/
+    ├── models/
+    ├── routes/
+    ├── services/
+    ├── scripts/
+    ├── tests/
+    ├── public/
+    ├── endpoints.config.ts
+    ├── endpoints.registry.ts
+    ├── pricing.config.ts
+    └── index.ts
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- An Algorand TestNet wallet (Pera, Defly, or Lute) funded with TestNet ALGO and TestNet USDC
-- An API key for at least one LLM provider (Groq, Anthropic, or OpenAI)
+* Node.js
+* npm
+* MongoDB
+* Groq API key
+* Algorand-compatible payment configuration
+* GoPlausible facilitator configuration
 
-### Backend setup
+Check the project configuration and `.env.example` for the exact environment variables required.
+
+---
+
+### 1. Clone
+
+```bash
+git clone https://github.com/VivekGoudAdula/PRISM.git
+cd PRISM
+```
+
+---
+
+### 2. Configure Backend
 
 ```bash
 cd x402-demo-server
 npm install
 ```
 
-Create `.env`:
-
-```
-AVM_ADDRESS=<your Algorand payout address>
-FACILITATOR_URL=<GoPlausible facilitator URL>
-PORT=4021
-GROQ_API_KEY=<your key>          # or ANTHROPIC_API_KEY / OPENAI_API_KEY
-```
+Create your environment file:
 
 ```bash
-npm start
+cp .env.example .env
 ```
 
-Confirm it's running:
+Configure the required variables.
 
-```bash
-curl http://localhost:4021/health
+Never commit:
+
+```text
+.env
+.env.mainnet
+.env.testnet
+.env.*.local
 ```
 
-### Frontend setup
+---
 
-```bash
-cd X402-Usecase/projects/X402-Usecase
-npm install
-```
-
-Create `.env.local`:
-
-```
-VITE_ALGOD_SERVER=<Algorand TestNet node URL>
-VITE_ALGOD_NETWORK=testnet
-VITE_API_BASE_URL=http://localhost:4021
-VITE_FACILITATOR_URL=<GoPlausible facilitator URL>
-```
+### 3. Start Backend
 
 ```bash
 npm run dev
 ```
 
-Open the app, connect a TestNet wallet funded with TestNet USDC and ALGO (ALGO covers network fees — Pera wallets must opt in to the USDC asset before they can receive or spend it).
+---
 
-## API reference
+### 4. Start Frontend
 
-| Endpoint | Protected | Description |
-|---|---|---|
-| `GET /health` | No | Server health check |
-| `POST /classify-task` | No | Classifies a plain-language task into a category |
-| `POST /select-endpoint` | No | Runs bidding/scoring for a given category, returns the winner |
-| `POST /run-task` | Yes ($0.75 USDC) | Main entry point: classify → bid → pay → execute → verify |
-| `POST /resume-screen-fast` | Yes ($0.20 USDC) | Fast resume screening |
-| `POST /resume-screen-accurate` | Yes ($0.45 USDC) | Higher-accuracy resume screening |
-| `POST /contract-analyze-fast` | Yes ($0.30 USDC) | Fast contract clause analysis |
-| `POST /contract-analyze-accurate` | Yes ($0.60 USDC) | Higher-accuracy contract analysis |
-| `POST /invoice-extract-fast` | Yes ($0.15 USDC) | Fast invoice line-item extraction |
-| `POST /invoice-extract-accurate` | Yes ($0.35 USDC) | Higher-accuracy invoice extraction |
+Open another terminal:
 
-All protected endpoints follow the x402 flow: an unauthenticated request returns `402 Payment Required` with payment instructions; a signed payment header triggers verification and execution.
+```bash
+cd X402-Usecase/projects/X402-Usecase
+npm install
+npm run dev
+```
 
-## Demo walkthrough
+Open the local URL shown by Vite.
 
-1. Connect a TestNet wallet (funded with TestNet USDC + ALGO).
-2. Type a task, e.g. *"Screen this resume for a backend engineer role"*, and attach one or more files.
-3. Approve the $0.75 USDC payment prompt.
-4. Prism classifies the task, runs bidding between the fast and accurate endpoints for that category, pays the winner, and executes.
-5. The result renders with: category, winning endpoint, cost, verification status, and structured output.
-6. Reputation for the winning endpoint updates in `data/reputation.json`, influencing future bids.
+For the complete setup and troubleshooting guide:
 
-## Business model
+[`docs/development.md`](docs/development.md)
 
-Task price = true upstream endpoint cost + Prism's margin (30–40%), billed per task rather than as a flat subscription. Planned revenue lines beyond task margin: a verified-mode premium tier, and a marketplace take rate once third-party developers can list endpoints through Prism (Phase 2).
+---
 
-## Competitive landscape
+## Testing
 
-- **x402 discovery layers** (Agent402, x402 Bazaar) provide generic endpoint discovery, not a vertical-specific product.
-- **AI model aggregators** (Poe, OpenRouter) operate on subscriptions or per-token pricing, not x402-native settlement.
-- **SMB AI agent platforms** (Arthur & Co, BILL) sell into the same problem space on flat subscriptions, with no bidding or verification mechanism.
+Backend validation and tests are located under:
 
-Prism's combination — verified, pay-per-task pricing plus a live bidding market — is not offered by any of the above.
+```text
+x402-demo-server/tests/
+```
+
+Run:
+
+```bash
+cd x402-demo-server
+npm test
+```
+
+or:
+
+```bash
+npm run test:all
+```
+
+Build the backend:
+
+```bash
+npm run build
+```
+
+Build the frontend:
+
+```bash
+cd X402-Usecase/projects/X402-Usecase
+npm run build
+```
+
+---
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Complete system architecture |
+| [`docs/x402-protocol.md`](docs/x402-protocol.md) | PRISM's x402 implementation |
+| [`docs/api-catalogue.md`](docs/api-catalogue.md) | Endpoint catalogue and pricing |
+| [`docs/intelligence-layer.md`](docs/intelligence-layer.md) | Intelligence Layer internals |
+| [`docs/development.md`](docs/development.md) | Local setup and development |
+| [`X402_IMPLEMENTATION_GUIDE.md`](X402_IMPLEMENTATION_GUIDE.md) | x402 implementation reference |
+
+---
+
+## Built for the Global x402 Challenge
+
+PRISM was built for the **Global x402 Challenge by Algorand**, with a focus on turning specialized AI capabilities into composable, pay-per-use services.
+
+The challenge centers on paid x402 endpoints running on Algorand Mainnet, real usage, and settlement through the GoPlausible facilitator.
+
+PRISM explores that model from the **orchestration layer**:
+
+```text
+Specialized AI Capabilities
+          ↓
+      PRISM
+          ↓
+       x402
+          ↓
+     GoPlausible
+          ↓
+       Algorand
+```
+
+The result is an AI execution platform where capabilities can be accessed through a standardized pay-per-use mechanism.
+
+---
 
 ## Roadmap
 
-- **Now (MVP):** 3 task categories, 2 competing endpoints each, simplified bidding and verification, all endpoints Prism-owned.
-- **Next:** real inter-service x402 settlement between the router and its endpoints (current MVP uses a direct in-process call as a stand-in), on-chain staking and slashing for endpoint collateral, expanded task categories.
-- **Later:** Phase 2 marketplace — third-party developers list endpoints through Prism, reaching Prism's existing customers, with Prism handling discovery, payment, and settlement on their behalf.
+### Current
 
-## Acknowledgments
+* AI task orchestration
+* Specialized AI capabilities
+* Prompt intelligence
+* Context mapping
+* Semantic caching
+* Prompt optimization
+* AI routing
+* x402-protected execution
+* Algorand settlement
+* Pay-per-use capabilities
 
-Built on top of the [x402-Project](https://github.com/marotipatre/x402-Project) starter kit, using the GoPlausible x402 facilitator on Algorand TestNet.
+### Next
+
+* More specialized AI endpoints
+* More composable workflows
+* Broader external integrations
+* Expanded developer access
+* Additional AI capability providers
+
+### Longer Term
+
+PRISM can evolve toward a broader marketplace of composable AI capabilities where applications can discover and consume specialized AI services programmatically.
+
+Future capabilities are subject to implementation and should not be interpreted as currently available functionality.
+
+---
+
+## Security
+
+Never commit:
+
+* API keys
+* private keys
+* wallet secrets
+* database credentials
+* JWT secrets
+* production environment files
+
+Use `.env.example` as the configuration template.
+
+For security issues, please report them privately rather than publishing credentials or exploit details.
+
+---
+
+## License
+
+See [`LICENSE`](LICENSE).
+
+---
+
+## Built with
+
+**AI orchestration · x402 · Algorand · TypeScript · React · MongoDB**
+
+<p align="center">
+
+**PRISM**
+
+*One Platform. Every AI Task.*
+
+</p>

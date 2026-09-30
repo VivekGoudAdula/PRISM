@@ -1,5 +1,24 @@
+# Environment variables — NEVER commit these
 .env
 .env.*
-node_modules 
+!.env.example
 
+# Dependencies
+node_modules/
 
+# Build output
+dist/
+
+# Logs
+*.log
+logs/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Vite generated artifacts
+vite.config.ts.timestamp-*.mjs
+
+# OS files
+.DS_Store
+Thumbs.db

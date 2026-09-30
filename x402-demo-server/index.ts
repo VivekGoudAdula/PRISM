@@ -489,8 +489,8 @@ serve({ fetch: app.fetch, port }, async () => {
   console.log('Test health endpoint (no payment):');
   console.log(`  curl http://localhost:${port}/health\n`);
   console.log('Test payment endpoint (will request payment):');
-  console.log(`  curl http://localhost:${port}/weather\n`);
-  console.log('See handlers/ directory for examples');
-  console.log('See endpoints.config.ts to add new endpoints');
+  console.log(`  curl http://localhost:${port}/seo-audit-fast\n`);
+  console.log('See handlers/ directory for capability implementations');
+  console.log('See endpoints.config.ts for pricing configuration');
   console.log('\n' + '═'.repeat(60) + '\n');
 });
