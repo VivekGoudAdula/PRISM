@@ -250,7 +250,62 @@ Specialized Capability
 
 ## System Architecture
 
-![PRISM System Architecture](docs/assets/screenshots/architecture.png)
+```mermaid
+flowchart TB
+    classDef topBottom fill:#FDE8D0,stroke:#E59849,stroke-width:1.5px,color:#2D1800;
+    classDef purpleBox fill:#DCDCF5,stroke:#8B8BE5,stroke-width:1.5px,color:#1A1A4A;
+    classDef cyanBox fill:#BCEBEF,stroke:#46B2BC,stroke-width:1.5px,color:#0A3438;
+    classDef greyBlueBox fill:#C4D1DF,stroke:#6B829B,stroke-width:1.5px,color:#142230;
+    classDef pinkBox fill:#F9D6D6,stroke:#E07A7A,stroke-width:1.5px,color:#401010;
+    classDef capBox fill:#B4E5F5,stroke:#49ADC9,stroke-width:1.5px,color:#0B3542;
+
+    START["<b>USER QUERY ON PRISM / AGENT</b><br/>Text • Code • Resume • PDF • URL • Documents • Task"]:::topBottom
+    ORCH["<b>PRISM</b><br/>AI ORCHESTRATION LAYER"]:::purpleBox
+
+    UND["<b>PROMPT / TASK UNDERSTANDING</b><br/><br/>• Prompt Tutor<br/>• Intent Detection<br/>• Task Analysis"]:::cyanBox
+    CTX["<b>CONTEXT & DATA INTELLIGENCE</b><br/><br/>• Data Map<br/>• Context Mapping<br/>• Document Context"]:::cyanBox
+
+    OPT["<b>OPTIMIZATION LAYER</b><br/><br/>• Semantic Cache<br/>• Prompt Optimizer<br/>• Token Optimization<br/>• Savings Measurement"]:::greyBlueBox
+
+    ROUT["<b>AI ROUTER</b><br/>Selects the appropriate PRISM endpoint"]:::pinkBox
+
+    CR["<b>CODE REVIEW</b>"]:::capBox
+    RS["<b>RESUME SCREENING</b>"]:::capBox
+    SEO["<b>SEO AUDIT</b>"]:::capBox
+    MI["<b>MEDIA INTELLIGENCE</b>"]:::capBox
+    INV["<b>INVOICE EXTRACTION</b>"]:::capBox
+    CON["<b>CONTRACT ANALYSIS</b>"]:::capBox
+
+    RESP["<b>ENDPOINT RESPONSE</b><br/><br/>• Analysis<br/>• Structured Data<br/>• Insights<br/>• Claims / Evidence<br/>• Task-Specific Results"]:::pinkBox
+
+    PAY["<b>x402 PAYMENT</b><br/><br/>• Payment Required<br/>• Payment Verification<br/>• Pay-Per-Use Access"]:::cyanBox
+
+    SETTLE["<b>ALGORAND SETTLEMENT</b><br/><br/>• On-Chain Settlement<br/>• Transaction Record<br/>• Payment Finality"]:::purpleBox
+
+    END_RES["<b>USER / APPLICATION<br/>FINAL RESULT</b>"]:::topBottom
+
+    START --> ORCH
+    ORCH --> UND
+    ORCH --> CTX
+    UND --> OPT
+    CTX --> OPT
+    OPT --> ROUT
+    ROUT --> CR
+    ROUT --> RS
+    ROUT --> SEO
+    ROUT --> MI
+    ROUT --> INV
+    ROUT --> CON
+    CR --> RESP
+    RS --> RESP
+    SEO --> RESP
+    MI --> RESP
+    INV --> RESP
+    CON --> RESP
+    RESP --> PAY
+    PAY --> SETTLE
+    SETTLE --> END_RES
+```
 
 PRISM uses x402 as the payment/access mechanism around its paid capabilities.
 
