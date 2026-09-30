@@ -105,43 +105,53 @@ PRISM brings these concerns into one orchestration layer.
 
 PRISM provides a single AI execution layer between the application and specialized AI capabilities.
 
-```text
-┌──────────────────────┐
-│   User / Application │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│        PRISM         │
-│  AI Orchestration    │
-└──────────┬───────────┘
-           │
-     ┌─────┴─────┐
-     ▼           ▼
- Understand    Context
-     │           │
-     └─────┬─────┘
-           ▼
-      Optimization
-           │
-           ▼
-        AI Router
-           │
-     ┌─────┼─────────────┐
-     ▼     ▼      ▼      ▼
-   Code  Resume   SEO   Documents
-  Review Screening Audit  Analysis
-     │     │      │      │
-     └─────┴──────┴──────┘
-              │
-              ▼
-       x402 Payment
-              │
-              ▼
-      Algorand Settlement
-              │
-              ▼
-       Structured Result
+```mermaid
+flowchart TB
+    classDef client fill:#0F172A,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC
+    classDef platform fill:#1E1B4B,stroke:#6366F1,stroke-width:2px,color:#F8FAFC
+    classDef intel fill:#3B0764,stroke:#A855F7,stroke-width:2px,color:#F8FAFC
+    classDef cap fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#F8FAFC
+    classDef pay fill:#831843,stroke:#F43F5E,stroke-width:2px,color:#F8FAFC
+    classDef algo fill:#18181B,stroke:#00D2FF,stroke-width:2px,color:#F8FAFC
+    classDef output fill:#022C22,stroke:#22C55E,stroke-width:2px,color:#F8FAFC
+
+    USER["User / Application"]:::client
+    PRISM["PRISM AI Orchestration Platform"]:::platform
+
+    subgraph INT["Intelligence Layer"]
+        UND["Understand"]:::intel
+        CTX["Context"]:::intel
+        OPT["Optimization"]:::intel
+        ROUT["AI Router"]:::intel
+    end
+
+    subgraph CAP["Specialized AI Capabilities"]
+        CR["Code Review"]:::cap
+        RS["Resume Screening"]:::cap
+        SEO["SEO Audit"]:::cap
+        DOC["Documents Analysis"]:::cap
+    end
+
+    PAY["x402 Payment Protocol"]:::pay
+    SETTLE["Algorand Settlement Rail"]:::algo
+    OUT["Structured Result"]:::output
+
+    USER --> PRISM
+    PRISM --> UND
+    PRISM --> CTX
+    UND --> OPT
+    CTX --> OPT
+    OPT --> ROUT
+    ROUT --> CR
+    ROUT --> RS
+    ROUT --> SEO
+    ROUT --> DOC
+    CR --> PAY
+    RS --> PAY
+    SEO --> PAY
+    DOC --> PAY
+    PAY --> SETTLE
+    SETTLE --> OUT
 ```
 
 The application does not need to manage every specialized capability independently.
@@ -240,63 +250,7 @@ Specialized Capability
 
 ## System Architecture
 
-```mermaid
-flowchart TB
-
-    USER["User / Application"]
-
-    subgraph PRISM["PRISM AI ORCHESTRATION PLATFORM"]
-
-        INPUT["Task Input"]
-
-        subgraph INT["Intelligence Layer"]
-            PT["Prompt Tutor"]
-            DM["Data Map"]
-            PO["Prompt Optimizer"]
-            SC["Semantic Cache"]
-            AR["AI Router"]
-        end
-
-        subgraph CAP["AI CAPABILITY LAYER"]
-            CR["Code Review"]
-            RS["Resume Screening"]
-            SEO["SEO Auditing"]
-            INV["Invoice Extraction"]
-            CON["Contract Analysis"]
-            MI["Media Intelligence"]
-            TASK["AI Task Execution"]
-        end
-
-        INPUT --> PT
-        PT --> DM
-        DM --> PO
-        PO --> SC
-        SC --> AR
-
-        AR --> CR
-        AR --> RS
-        AR --> SEO
-        AR --> INV
-        AR --> CON
-        AR --> MI
-        AR --> TASK
-    end
-
-    USER --> INPUT
-
-    CR --> PAYMENT["x402 Payment / Access"]
-    RS --> PAYMENT
-    SEO --> PAYMENT
-    INV --> PAYMENT
-    CON --> PAYMENT
-    MI --> PAYMENT
-    TASK --> PAYMENT
-
-    PAYMENT --> FAC["GoPlausible Facilitator"]
-    FAC --> ALG["Algorand Settlement"]
-    ALG --> RESULT["Verified / Settled Execution"]
-    RESULT --> OUT["Structured Result"]
-```
+![PRISM System Architecture](docs/assets/screenshots/architecture.png)
 
 PRISM uses x402 as the payment/access mechanism around its paid capabilities.
 
