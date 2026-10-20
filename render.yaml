@@ -3,7 +3,7 @@ services:
     name: prism-backend
     env: node
     rootDir: x402-demo-server
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
