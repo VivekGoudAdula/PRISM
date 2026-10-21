@@ -14,7 +14,12 @@ export interface IAuditLog {
     | 'Task Failed'
     | 'Endpoint Selected'
     | 'Payment Completed'
-    | 'Verification Failed';
+    | 'Verification Failed'
+    | 'Legal Consent Renewed'
+    | 'Account Deletion Requested'
+    | 'Consent Withdrawn'
+    | 'Data Export Requested'
+    | 'Verified Account Erasure Executed';
   details?: any;
   ipAddress?: string;
   timestamp: Date;
@@ -37,6 +42,11 @@ const AuditLogSchema = new Schema<IAuditLog>({
       'Endpoint Selected',
       'Payment Completed',
       'Verification Failed',
+      'Legal Consent Renewed',
+      'Account Deletion Requested',
+      'Consent Withdrawn',
+      'Data Export Requested',
+      'Verified Account Erasure Executed',
     ],
     required: true,
     index: true,

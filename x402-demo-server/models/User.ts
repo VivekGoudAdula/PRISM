@@ -16,6 +16,9 @@ export interface IUser {
   totalSpent: number;
   totalSaved: number;
   totalEndpointsUsed: number;
+  termsAcceptedVersion?: string;
+  privacyAcceptedVersion?: string;
+  legalConsentAcceptedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +39,9 @@ const UserSchema = new Schema<IUser>({
   totalSpent: { type: Number, default: 0 },
   totalSaved: { type: Number, default: 0 },
   totalEndpointsUsed: { type: Number, default: 0 },
+  termsAcceptedVersion: { type: String },
+  privacyAcceptedVersion: { type: String },
+  legalConsentAcceptedAt: { type: Date },
 }, {
   timestamps: true
 });

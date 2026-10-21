@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono';
+import { CURRENT_LEGAL_VERSIONS } from '../legal.config';
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -52,6 +53,7 @@ export async function requestLogger(c: Context, next: Next) {
 
 /**
  * Validation Middleware for Signup/Login
+ * Enforces server-side field checks and mandatory legal consent on signup.
  */
 export function validateAuthBody(type: 'signup' | 'login') {
   return async (c: Context, next: Next) => {
@@ -70,9 +72,43 @@ export function validateAuthBody(type: 'signup' | 'login') {
         if (!body.fullName || typeof body.fullName !== 'string' || body.fullName.trim().length === 0) {
           return c.json({ error: 'Full name is required.' }, 400);
         }
+
+        // Enforce Terms of Service acceptance
+        if (body.agreedToTerms !== true) {
+          return c.json({
+            error: 'You must agree to the PRISM Terms of Service to create an account.',
+            field: 'agreedToTerms'
+          }, 400);
+        }
+
+        // Enforce Privacy Policy acknowledgment
+        if (body.acknowledgedPrivacyPolicy !== true) {
+          return c.json({
+            error: 'You must acknowledge that you have read the PRISM Privacy Policy to create an account.',
+            field: 'acknowledgedPrivacyPolicy'
+          }, 400);
+        }
+
+        // Enforce valid Terms version
+        if (!body.termsVersion || body.termsVersion !== CURRENT_LEGAL_VERSIONS.termsVersion) {
+          return c.json({
+            error: `Unsupported or outdated Terms of Service version (${body.termsVersion || 'none'}). Expected version ${CURRENT_LEGAL_VERSIONS.termsVersion}.`,
+            field: 'termsVersion',
+            expectedVersion: CURRENT_LEGAL_VERSIONS.termsVersion
+          }, 400);
+        }
+
+        // Enforce valid Privacy Policy version
+        if (!body.privacyVersion || body.privacyVersion !== CURRENT_LEGAL_VERSIONS.privacyVersion) {
+          return c.json({
+            error: `Unsupported or outdated Privacy Policy version (${body.privacyVersion || 'none'}). Expected version ${CURRENT_LEGAL_VERSIONS.privacyVersion}.`,
+            field: 'privacyVersion',
+            expectedVersion: CURRENT_LEGAL_VERSIONS.privacyVersion
+          }, 400);
+        }
       }
 
-      // Re-inject body since we already read c.req.json() (hono req.json caching works, but this is safe)
+      // Re-inject validated body into context
       c.set('parsedBody', body);
       await next();
     } catch (err: any) {

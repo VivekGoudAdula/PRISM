@@ -10,7 +10,9 @@ import Prism from './components/Prism'
 import AdminDashboard from './components/AdminDashboard'
 // import WaitlistModal from './components/WaitlistModal'
 import { api, setAccessToken } from './utils/api'
-// import { fetchWaitlistCount } from './utils/waitlistApi'
+import { Link } from 'react-router-dom'
+import { LegalDocumentModal } from './components/LegalDocumentModal'
+import { CURRENT_LEGAL_VERSIONS, TERMS_OF_SERVICE, PRIVACY_POLICY } from './data/legalDocuments'
 
 interface HomeProps { }
 
@@ -492,6 +494,41 @@ const Home: React.FC<HomeProps> = () => {
   const [authError, setAuthError] = useState('')
   const [authSubmitting, setAuthSubmitting] = useState(false)
 
+  // Legal Consent & Compliance States (Phase 4)
+  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false)
+  const [acknowledgedPrivacyPolicy, setAcknowledgedPrivacyPolicy] = useState<boolean>(false)
+  const [consentValidationErrors, setConsentValidationErrors] = useState<{ terms?: string; privacy?: string }>({})
+  const [previewLegalDoc, setPreviewLegalDoc] = useState<'terms' | 'privacy' | null>(null)
+
+  // Wallet Registration Consent Modal (Phase 5)
+  const [walletConsentPending, setWalletConsentPending] = useState<boolean>(false)
+  const [walletConsentAgreedTerms, setWalletConsentAgreedTerms] = useState<boolean>(false)
+  const [walletConsentAckPrivacy, setWalletConsentAckPrivacy] = useState<boolean>(false)
+  const [walletConsentSubmitting, setWalletConsentSubmitting] = useState<boolean>(false)
+  const [walletConsentError, setWalletConsentError] = useState<string>('')
+
+  // User Legal Settings & Data Access (Phase 7)
+  const [userConsentInfo, setUserConsentInfo] = useState<{
+    termsVersion?: string | null;
+    privacyVersion?: string | null;
+    acceptedAt?: string | null;
+  } | null>(null)
+  const [showLegalSettingsModal, setShowLegalSettingsModal] = useState<boolean>(false)
+  const [dataRequestLoading, setDataRequestLoading] = useState<boolean>(false)
+  const [dataRequestSuccessMessage, setDataRequestSuccessMessage] = useState<string>('')
+  const [dataRequestErrorMessage, setDataRequestErrorMessage] = useState<string>('')
+  const [exportedDataJson, setExportedDataJson] = useState<any | null>(null)
+
+  // Reset checkboxes on fresh signup page entry
+  useEffect(() => {
+    if (pathname === '/signup' || pathname === '/login') {
+      setAgreedToTerms(false)
+      setAcknowledgedPrivacyPolicy(false)
+      setConsentValidationErrors({})
+      setAuthError('')
+    }
+  }, [pathname])
+
   // Check login on load — redirect to /app if already signed in
   useEffect(() => {
     const savedUser = localStorage.getItem('prism_logged_in_user')
@@ -504,13 +541,30 @@ const Home: React.FC<HomeProps> = () => {
       const savedEmail = localStorage.getItem('prism_user_email') || ''
       const savedCredits = Number(localStorage.getItem('prism_user_credits') || '0')
       const savedPlan = localStorage.getItem('prism_user_plan') || 'free'
+      const savedTermsVersion = localStorage.getItem('prism_user_terms_version') || null
+      const savedPrivacyVersion = localStorage.getItem('prism_user_privacy_version') || null
+      const savedConsentDate = localStorage.getItem('prism_user_consent_date') || null
+
       setProfileData({ email: savedEmail, credits: savedCredits, plan: savedPlan })
+      setUserConsentInfo({
+        termsVersion: savedTermsVersion,
+        privacyVersion: savedPrivacyVersion,
+        acceptedAt: savedConsentDate,
+      })
       fetchTasks()
 
       // Check session validity with me endpoint
       api.get('/api/auth/me')
         .then(() => {
           if (pathname !== '/app') navigate('/app', { replace: true })
+          // Refresh user consent records from server
+          api.get('/api/auth/consent-status')
+            .then(({ data }) => {
+              if (data?.userAccepted) {
+                setUserConsentInfo(data.userAccepted);
+              }
+            })
+            .catch(() => {});
         })
         .catch(() => {
           // Token expired or invalid
@@ -543,6 +597,9 @@ const Home: React.FC<HomeProps> = () => {
             if (data.user?.email) localStorage.setItem('prism_user_email', data.user.email);
             if (data.user?.credits !== undefined) localStorage.setItem('prism_user_credits', data.user.credits.toString());
             if (data.user?.subscriptionPlan) localStorage.setItem('prism_user_plan', data.user.subscriptionPlan);
+            if (data.user?.termsAcceptedVersion) localStorage.setItem('prism_user_terms_version', data.user.termsAcceptedVersion);
+            if (data.user?.privacyAcceptedVersion) localStorage.setItem('prism_user_privacy_version', data.user.privacyAcceptedVersion);
+            if (data.user?.legalConsentAcceptedAt) localStorage.setItem('prism_user_consent_date', data.user.legalConsentAcceptedAt);
 
             setCurrentUser(data.user?.fullName || 'Wallet User');
             setUserRole(data.user?.role || 'user');
@@ -551,22 +608,99 @@ const Home: React.FC<HomeProps> = () => {
               credits: data.user?.credits ?? 100,
               plan: data.user?.subscriptionPlan || 'free',
             });
+            setUserConsentInfo({
+              termsVersion: data.user?.termsAcceptedVersion,
+              privacyVersion: data.user?.privacyAcceptedVersion,
+              acceptedAt: data.user?.legalConsentAcceptedAt,
+            });
+            setWalletConsentPending(false);
             fetchTasks();
           }
         })
-        .catch(err => console.error('Failed to sync wallet address', err));
+        .catch(err => {
+          if (err.response?.status === 403 && err.response?.data?.requiresConsent) {
+            // New wallet registration requires legal consent acceptance
+            setWalletConsentPending(true);
+            setWalletConsentAgreedTerms(false);
+            setWalletConsentAckPrivacy(false);
+            setWalletConsentError('');
+          } else {
+            console.error('Failed to sync wallet address', err);
+          }
+        });
     }
   }, [activeAddress])
+
+  // Complete wallet registration with legal consent
+  const handleConfirmWalletConsent = async () => {
+    if (!walletConsentAgreedTerms || !walletConsentAckPrivacy) {
+      setWalletConsentError('You must affirmatively agree to both the Terms of Service and Privacy Policy.');
+      return;
+    }
+    setWalletConsentSubmitting(true);
+    setWalletConsentError('');
+
+    try {
+      const { data } = await api.post('/api/auth/connect-wallet', {
+        walletAddress: activeAddress,
+        agreedToTerms: true,
+        acknowledgedPrivacyPolicy: true,
+        termsVersion: CURRENT_LEGAL_VERSIONS.termsVersion,
+        privacyVersion: CURRENT_LEGAL_VERSIONS.privacyVersion,
+      });
+
+      if (data?.accessToken) {
+        setAccessToken(data.accessToken);
+        if (data.refreshToken) localStorage.setItem('prism_refresh_token', data.refreshToken);
+        if (data.user?.fullName) localStorage.setItem('prism_logged_in_user', data.user.fullName);
+        if (data.user?.role) localStorage.setItem('prism_user_role', data.user.role);
+        if (data.user?.email) localStorage.setItem('prism_user_email', data.user.email);
+        if (data.user?.credits !== undefined) localStorage.setItem('prism_user_credits', data.user.credits.toString());
+        if (data.user?.subscriptionPlan) localStorage.setItem('prism_user_plan', data.user.subscriptionPlan);
+        if (data.user?.termsAcceptedVersion) localStorage.setItem('prism_user_terms_version', data.user.termsAcceptedVersion);
+        if (data.user?.privacyAcceptedVersion) localStorage.setItem('prism_user_privacy_version', data.user.privacyAcceptedVersion);
+        if (data.user?.legalConsentAcceptedAt) localStorage.setItem('prism_user_consent_date', data.user.legalConsentAcceptedAt);
+
+        setCurrentUser(data.user?.fullName || 'Wallet User');
+        setUserRole(data.user?.role || 'user');
+        setProfileData({
+          email: data.user?.email || '',
+          credits: data.user?.credits ?? 100,
+          plan: data.user?.subscriptionPlan || 'free',
+        });
+        setUserConsentInfo({
+          termsVersion: data.user?.termsAcceptedVersion,
+          privacyVersion: data.user?.privacyAcceptedVersion,
+          acceptedAt: data.user?.legalConsentAcceptedAt,
+        });
+        setWalletConsentPending(false);
+        fetchTasks();
+      }
+    } catch (err: any) {
+      setWalletConsentError(err.response?.data?.error || 'Failed to complete wallet registration.');
+    } finally {
+      setWalletConsentSubmitting(false);
+    }
+  };
 
   const toggleWalletModal = () => {
     setOpenWalletModal(!openWalletModal)
   }
 
-  // Handle Signup
+  // Handle Signup (Phase 4)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (authSubmitting) return;
     setAuthError('')
+
+    const errors: { terms?: string; privacy?: string } = {}
+    if (!agreedToTerms) {
+      errors.terms = 'You must agree to the PRISM Terms of Service to create an account.'
+    }
+    if (!acknowledgedPrivacyPolicy) {
+      errors.privacy = 'You must acknowledge that you have read the PRISM Privacy Policy.'
+    }
+    setConsentValidationErrors(errors)
 
     if (!name || !email || !password || !confirmPassword) {
       setAuthError('All fields are required.')
@@ -578,12 +712,21 @@ const Home: React.FC<HomeProps> = () => {
       return
     }
 
+    if (!agreedToTerms || !acknowledgedPrivacyPolicy) {
+      setAuthError('Please review and accept the required legal agreements to continue.')
+      return
+    }
+
     setAuthSubmitting(true);
     try {
       const { data } = await api.post('/api/auth/signup', {
         fullName: name,
         email,
         password,
+        agreedToTerms,
+        acknowledgedPrivacyPolicy,
+        termsVersion: CURRENT_LEGAL_VERSIONS.termsVersion,
+        privacyVersion: CURRENT_LEGAL_VERSIONS.privacyVersion,
       });
 
       setAccessToken(data.accessToken);
@@ -593,6 +736,9 @@ const Home: React.FC<HomeProps> = () => {
       localStorage.setItem('prism_user_email', data.user.email);
       localStorage.setItem('prism_user_credits', data.user.credits?.toString() || '0');
       localStorage.setItem('prism_user_plan', data.user.subscriptionPlan || 'free');
+      if (data.user.termsAcceptedVersion) localStorage.setItem('prism_user_terms_version', data.user.termsAcceptedVersion);
+      if (data.user.privacyAcceptedVersion) localStorage.setItem('prism_user_privacy_version', data.user.privacyAcceptedVersion);
+      if (data.user.legalConsentAcceptedAt) localStorage.setItem('prism_user_consent_date', data.user.legalConsentAcceptedAt);
 
       setCurrentUser(data.user.fullName);
       setUserRole(data.user.role);
@@ -601,6 +747,11 @@ const Home: React.FC<HomeProps> = () => {
         credits: data.user.credits || 0,
         plan: data.user.subscriptionPlan || 'free'
       });
+      setUserConsentInfo({
+        termsVersion: data.user.termsAcceptedVersion,
+        privacyVersion: data.user.privacyAcceptedVersion,
+        acceptedAt: data.user.legalConsentAcceptedAt,
+      });
       navigate('/app');
 
       // Reset inputs
@@ -608,12 +759,62 @@ const Home: React.FC<HomeProps> = () => {
       setEmail('')
       setPassword('')
       setConfirmPassword('')
+      setAgreedToTerms(false)
+      setAcknowledgedPrivacyPolicy(false)
+      setConsentValidationErrors({})
     } catch (err: any) {
       setAuthError(err.response?.data?.error || 'Signup failed.');
     } finally {
       setAuthSubmitting(false);
     }
   }
+
+  // Handle GDPR / DPDP Act 2023 Data Requests (Phase 7)
+  const handleDataRequest = async (requestType: 'export' | 'delete' | 'withdraw_consent') => {
+    setDataRequestLoading(true);
+    setDataRequestSuccessMessage('');
+    setDataRequestErrorMessage('');
+    try {
+      let payload: any = { requestType };
+
+      if (requestType === 'delete') {
+        const confirmed = window.confirm(
+          'Permanent Account Erasure:\n\nDo you want to immediately and permanently purge your uploaded documents, extracted text, chat histories, and semantic cache?\n\nClick OK to purge data immediately. Click Cancel to register a ticket pending review.'
+        );
+        payload.confirmed = confirmed;
+      } else if (requestType === 'withdraw_consent') {
+        const confirmed = window.confirm(
+          'Withdraw Legal Consent:\n\nAre you sure you want to withdraw your legal consent? Your active sessions will be terminated and platform capabilities disabled.\n\nYour account profile will remain intact, and you may log in to re-affirm consent at any time.'
+        );
+        if (!confirmed) {
+          setDataRequestLoading(false);
+          return;
+        }
+      }
+
+      const { data } = await api.post('/api/auth/data-request', payload);
+      if (requestType === 'export') {
+        setExportedDataJson(data.data);
+        setDataRequestSuccessMessage('Account data export generated successfully. See details below.');
+      } else if (requestType === 'delete') {
+        setDataRequestSuccessMessage(
+          data.status === 'verified_deletion_completed'
+            ? `Verified Erasure Completed (Ref: ${data.referenceId}). Uploaded documents and personal records purged.`
+            : (data.message || 'Account erasure request registered.')
+        );
+        if (data.status === 'verified_deletion_completed') {
+          setTimeout(() => handleLogout(), 4000);
+        }
+      } else if (requestType === 'withdraw_consent') {
+        setDataRequestSuccessMessage(data.message || 'Consent withdrawn. Logging out...');
+        setTimeout(() => handleLogout(), 2500);
+      }
+    } catch (err: any) {
+      setDataRequestErrorMessage(err.response?.data?.error || 'Failed to process data request.');
+    } finally {
+      setDataRequestLoading(false);
+    }
+  };
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -908,12 +1109,12 @@ const Home: React.FC<HomeProps> = () => {
                 </button>
 
                 {showProfileDropdown && (
-                  <div className="absolute right-0 mt-3 w-72 bg-slate-900/95 backdrop-blur-lg border border-slate-800/90 rounded-2xl p-5 shadow-2xl z-50 flex flex-col gap-4 animate-fade-in text-left">
+                  <div className="absolute right-0 mt-3 w-80 bg-slate-900/95 backdrop-blur-lg border border-slate-800/90 rounded-2xl p-5 shadow-2xl z-50 flex flex-col gap-4 animate-fade-in text-left">
                     <div className="border-b border-slate-800/60 pb-3">
                       <p className="text-sm font-bold text-white leading-tight">{currentUser}</p>
                       <p className="text-xs text-slate-400 mt-1">{profileData?.email || 'No email'}</p>
                     </div>
-                    <div className="flex flex-col gap-2.5 text-xs text-slate-300">
+                    <div className="flex flex-col gap-2 text-xs text-slate-300">
                       <div className="flex justify-between">
                         <span className="text-slate-500 font-medium">Subscription:</span>
                         <span className="badge badge-outline badge-primary badge-sm font-bold uppercase text-[9px]">{profileData?.plan || 'free'}</span>
@@ -927,8 +1128,59 @@ const Home: React.FC<HomeProps> = () => {
                         <span className="font-bold text-slate-400 capitalize">{userRole}</span>
                       </div>
                     </div>
+
+                    {/* Legal & Privacy Section (Phase 7) */}
+                    <div className="border-t border-slate-800/80 pt-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 font-semibold flex items-center gap-1">
+                          <FiShield className="text-indigo-400 text-xs" />
+                          <span>Legal & Privacy</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                          v{userConsentInfo?.termsVersion || CURRENT_LEGAL_VERSIONS.termsVersion}
+                        </span>
+                      </div>
+
+                      {userConsentInfo?.acceptedAt && (
+                        <div className="text-[10px] text-slate-400">
+                          Accepted on {new Date(userConsentInfo.acceptedAt).toLocaleDateString()}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1 text-[11px]">
+                        <Link
+                          to="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-300 hover:text-indigo-300 underline"
+                        >
+                          Terms
+                        </Link>
+                        <span className="text-slate-600">•</span>
+                        <Link
+                          to="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-300 hover:text-indigo-300 underline"
+                        >
+                          Privacy
+                        </Link>
+                        <span className="text-slate-600">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowProfileDropdown(false);
+                            setShowLegalSettingsModal(true);
+                          }}
+                          className="text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline"
+                        >
+                          Data Rights
+                        </button>
+                      </div>
+                    </div>
+
                     <button
-                      className="btn btn-error btn-sm w-full rounded-xl text-xs font-bold text-white mt-2"
+                      className="btn btn-error btn-sm w-full rounded-xl text-xs font-bold text-white mt-1"
                       onClick={handleLogout}
                     >
                       Log Out
@@ -1774,9 +2026,113 @@ const Home: React.FC<HomeProps> = () => {
                   </div>
                 )}
 
+                {isSignUp && (
+                  <div className="flex flex-col gap-3 pt-2.5 pb-1 border-t border-slate-800/80">
+                    {/* Required Checkbox 1: Terms of Service */}
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="agree-terms-checkbox"
+                        className="flex items-start gap-2.5 text-xs text-slate-300 cursor-pointer select-none"
+                      >
+                        <input
+                          id="agree-terms-checkbox"
+                          type="checkbox"
+                          aria-required="true"
+                          checked={agreedToTerms}
+                          onChange={(e) => {
+                            setAgreedToTerms(e.target.checked);
+                            if (e.target.checked) {
+                              setConsentValidationErrors((prev) => ({ ...prev, terms: undefined }));
+                            }
+                          }}
+                          className="checkbox checkbox-primary checkbox-xs mt-0.5 rounded border-slate-700 bg-slate-950 focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <span className="leading-normal">
+                          I agree to the{' '}
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setPreviewLegalDoc('terms');
+                            }}
+                            className="text-indigo-400 font-semibold hover:underline inline"
+                          >
+                            PRISM Terms of Service
+                          </button>
+                          {' '}(
+                          <Link
+                            to="/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-400 hover:text-indigo-300 underline text-[11px]"
+                          >
+                            dedicated page
+                          </Link>
+                          ).
+                        </span>
+                      </label>
+                      {consentValidationErrors.terms && (
+                        <span className="text-[11px] text-rose-400 pl-6 font-medium">
+                          {consentValidationErrors.terms}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Required Checkbox 2: Privacy Policy */}
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="ack-privacy-checkbox"
+                        className="flex items-start gap-2.5 text-xs text-slate-300 cursor-pointer select-none"
+                      >
+                        <input
+                          id="ack-privacy-checkbox"
+                          type="checkbox"
+                          aria-required="true"
+                          checked={acknowledgedPrivacyPolicy}
+                          onChange={(e) => {
+                            setAcknowledgedPrivacyPolicy(e.target.checked);
+                            if (e.target.checked) {
+                              setConsentValidationErrors((prev) => ({ ...prev, privacy: undefined }));
+                            }
+                          }}
+                          className="checkbox checkbox-primary checkbox-xs mt-0.5 rounded border-slate-700 bg-slate-950 focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <span className="leading-normal">
+                          I acknowledge that I have read the{' '}
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              setPreviewLegalDoc('privacy');
+                            }}
+                            className="text-indigo-400 font-semibold hover:underline inline"
+                          >
+                            PRISM Privacy Policy
+                          </button>
+                          {' '}(
+                          <Link
+                            to="/privacy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-400 hover:text-indigo-300 underline text-[11px]"
+                          >
+                            dedicated page
+                          </Link>
+                          ).
+                        </span>
+                      </label>
+                      {consentValidationErrors.privacy && (
+                        <span className="text-[11px] text-rose-400 pl-6 font-medium">
+                          {consentValidationErrors.privacy}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={authSubmitting}
+                  disabled={authSubmitting || (isSignUp && (!agreedToTerms || !acknowledgedPrivacyPolicy))}
                   className="btn btn-primary w-full rounded-lg font-bold text-sm mt-2 shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
                 >
                   {authSubmitting ? (
@@ -1828,6 +2184,17 @@ const Home: React.FC<HomeProps> = () => {
           <div className="w-full max-w-6xl mx-auto px-4 md:px-8 relative z-20">
             <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 border-t-white/20 rounded-2xl sm:rounded-full px-6 md:px-8 py-3.5 shadow-2xl shadow-black/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-300 font-light tracking-wide">
               <span className="font-light text-slate-300/90">© {new Date().getFullYear()} PRISM. All rights reserved.</span>
+
+              {/* Public Legal Documents */}
+              <div className="flex items-center gap-3 text-slate-400 text-xs font-normal">
+                <Link to="/terms" className="hover:text-white transition-colors">
+                  Terms of Service
+                </Link>
+                <span className="text-slate-600">•</span>
+                <Link to="/privacy" className="hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
+              </div>
 
               {/* Social Icons (X & Instagram only) */}
               <div className="flex items-center gap-2.5">
@@ -2066,6 +2433,255 @@ const Home: React.FC<HomeProps> = () => {
             >
               Close Breakdown
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Legal Document Inspection Modal (Phase 4) */}
+      {previewLegalDoc && (
+        <LegalDocumentModal
+          isOpen={Boolean(previewLegalDoc)}
+          onClose={() => setPreviewLegalDoc(null)}
+          document={previewLegalDoc === 'terms' ? TERMS_OF_SERVICE : PRIVACY_POLICY}
+          onOpenDedicatedPage={(path) => {
+            setPreviewLegalDoc(null);
+            navigate(path);
+          }}
+        />
+      )}
+
+      {/* Wallet Registration Consent Modal (Phase 5) */}
+      {walletConsentPending && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col gap-5 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xl">
+                <FiShield />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Legal Consent Required</h3>
+                <p className="text-xs text-slate-400">Complete Registration for Connected Wallet</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              You are registering an account with Algorand wallet address <strong className="text-indigo-400 font-mono">{activeAddress ? `${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}` : 'Connected Wallet'}</strong>. Before accessing PRISM capabilities, please review and accept our required legal terms:
+            </p>
+
+            {walletConsentError && (
+              <div className="bg-rose-950/40 border border-rose-900/50 text-rose-350 text-xs p-3 rounded-lg">
+                {walletConsentError}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 py-2 border-y border-slate-800">
+              <label className="flex items-start gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={walletConsentAgreedTerms}
+                  onChange={(e) => setWalletConsentAgreedTerms(e.target.checked)}
+                  className="checkbox checkbox-primary checkbox-xs mt-0.5 rounded border-slate-700 bg-slate-950"
+                />
+                <span className="leading-normal">
+                  I agree to the{' '}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewLegalDoc('terms')}
+                    className="text-indigo-400 underline font-semibold"
+                  >
+                    PRISM Terms of Service
+                  </button>{' '}
+                  (<Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-indigo-300 underline text-[11px]">dedicated page</Link>).
+                </span>
+              </label>
+
+              <label className="flex items-start gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={walletConsentAckPrivacy}
+                  onChange={(e) => setWalletConsentAckPrivacy(e.target.checked)}
+                  className="checkbox checkbox-primary checkbox-xs mt-0.5 rounded border-slate-700 bg-slate-950"
+                />
+                <span className="leading-normal">
+                  I acknowledge that I have read the{' '}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewLegalDoc('privacy')}
+                    className="text-indigo-400 underline font-semibold"
+                  >
+                    PRISM Privacy Policy
+                  </button>{' '}
+                  (<Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-indigo-300 underline text-[11px]">dedicated page</Link>).
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setWalletConsentPending(false)}
+                className="btn btn-ghost btn-sm text-xs text-slate-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={walletConsentSubmitting || !walletConsentAgreedTerms || !walletConsentAckPrivacy}
+                onClick={handleConfirmWalletConsent}
+                className="btn btn-primary btn-sm text-xs font-bold px-5"
+              >
+                {walletConsentSubmitting ? 'Registering...' : 'Accept & Complete Registration'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account Legal & Data Rights Modal (Phase 7) */}
+      {showLegalSettingsModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+        >
+          <div className="w-full max-w-2xl bg-slate-900 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col gap-6 animate-scale-up max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xl">
+                  <FiShield />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Account Legal & Privacy Rights</h3>
+                  <p className="text-xs text-slate-400">Review consent records and exercise GDPR / DPDP Act 2023 rights</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLegalSettingsModal(false);
+                  setDataRequestSuccessMessage('');
+                  setDataRequestErrorMessage('');
+                  setExportedDataJson(null);
+                }}
+                className="btn btn-circle btn-ghost btn-sm text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Current Policy Records */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Terms of Service</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white">Current Version:</span>
+                  <span className="font-mono text-indigo-400 text-xs font-bold">v{CURRENT_LEGAL_VERSIONS.termsVersion}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Your Acceptance:</span>
+                  <span className="text-emerald-400 font-semibold">{userConsentInfo?.termsVersion ? `v${userConsentInfo.termsVersion}` : 'Active'}</span>
+                </div>
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline mt-1 inline-flex items-center gap-1">
+                  Read Full Terms <FiArrowRight className="text-[10px]" />
+                </Link>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Privacy Policy</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white">Current Version:</span>
+                  <span className="font-mono text-indigo-400 text-xs font-bold">v{CURRENT_LEGAL_VERSIONS.privacyVersion}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Your Acceptance:</span>
+                  <span className="text-emerald-400 font-semibold">{userConsentInfo?.privacyVersion ? `v${userConsentInfo.privacyVersion}` : 'Active'}</span>
+                </div>
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline mt-1 inline-flex items-center gap-1">
+                  Read Privacy Policy <FiArrowRight className="text-[10px]" />
+                </Link>
+              </div>
+            </div>
+
+            {userConsentInfo?.acceptedAt && (
+              <p className="text-xs text-slate-400">
+                Recorded Acceptance Timestamp: <strong className="text-slate-200">{new Date(userConsentInfo.acceptedAt).toLocaleString()}</strong>
+              </p>
+            )}
+
+            {/* Status Feedback Banners */}
+            {dataRequestSuccessMessage && (
+              <div className="bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-xs p-3.5 rounded-xl">
+                {dataRequestSuccessMessage}
+              </div>
+            )}
+            {dataRequestErrorMessage && (
+              <div className="bg-rose-950/40 border border-rose-900/50 text-rose-350 text-xs p-3.5 rounded-xl">
+                {dataRequestErrorMessage}
+              </div>
+            )}
+
+            {/* Exported JSON viewer */}
+            {exportedDataJson && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-300">Machine-Readable Account Export (JSON)</span>
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(exportedDataJson, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `prism-account-export-${Date.now()}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn btn-xs btn-outline text-[10px] text-indigo-300"
+                  >
+                    Download File
+                  </button>
+                </div>
+                <pre className="text-[10px] font-mono text-emerald-300 max-h-48 overflow-y-auto bg-slate-900 p-2.5 rounded border border-slate-800">
+                  {JSON.stringify(exportedDataJson, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* Available Statutory Data Controls */}
+            <div className="flex flex-col gap-3 border-t border-slate-800 pt-4">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Statutory Data Rights & Actions</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  disabled={dataRequestLoading}
+                  onClick={() => handleDataRequest('export')}
+                  className="btn btn-outline btn-sm text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>Export My Data</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={dataRequestLoading}
+                  onClick={() => handleDataRequest('delete')}
+                  className="btn btn-outline btn-warning btn-sm text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>Request Erasure</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={dataRequestLoading}
+                  onClick={() => handleDataRequest('withdraw_consent')}
+                  className="btn btn-outline btn-error btn-sm text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>Withdraw Consent</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-normal">
+                Note: Immutable on-chain Algorand settlement transaction hashes and security audit logs are retained under statutory financial compliance and anti-fraud exemptions.
+              </p>
+            </div>
           </div>
         </div>
       )}

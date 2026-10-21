@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch index.ts",
     "test": "tsx tests/test-routing.ts",
+    "test:legal": "tsx tests/test-legal-consent.ts",
     "test:all": "tsx tests/test-routing.ts && tsx tests/test-prompt-optimizer.ts && tsx tests/test-generic-datamap.ts"
   },
   "keywords": [],
