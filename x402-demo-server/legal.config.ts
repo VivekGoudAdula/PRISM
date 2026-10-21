@@ -130,7 +130,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       id: 'contact',
       title: '16. Contact Information',
       content:
-        'For legal inquiries, dispute notices, or general questions regarding these Terms, contact us at: Email: legal@prism.ai (or support@prism.ai). Physical address: [REGISTERED_BUSINESS_ADDRESS_PLACEHOLDER].',
+        'For legal inquiries, dispute notices, or general questions regarding these Terms, contact us at: Email: adulavivekgoud@gmail.com. Physical address: [REGISTERED_BUSINESS_ADDRESS_PLACEHOLDER].',
     },
     {
       id: 'modifications',
@@ -153,7 +153,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: 'operator',
       title: '1. Who Operates PRISM & Contact Information',
       content:
-        'PRISM is operated by PRISM Labs. For questions regarding data protection, privacy practices, or to exercise your statutory privacy rights, contact our Privacy and Grievance Desk at: Email: privacy@prism.ai (or support@prism.ai). Address: [REGISTERED_BUSINESS_ADDRESS_PLACEHOLDER]. Under the Indian Digital Personal Data Protection Act, 2023 ("DPDP Act"), our designated Grievance Officer can be contacted at: grievance@prism.ai.',
+        'PRISM is operated by PRISM Labs. For questions regarding data protection, privacy practices, or to exercise your statutory privacy rights, contact our Privacy and Support Desk at: Email: adulavivekgoud@gmail.com. Address: [REGISTERED_BUSINESS_ADDRESS_PLACEHOLDER]. Note: Statutory appointment and designation of a formal Grievance Officer under the Indian Digital Personal Data Protection Act, 2023 ("DPDP Act") is pending legal review and business registration.',
     },
     {
       id: 'account-information',
@@ -219,7 +219,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: 'user-rights',
       title: '12. Your Data Rights: Access, Correction & Erasure',
       content:
-        'You have the right to: (a) Access: Request a copy of the personal data PRISM holds about you; (b) Correction: Update inaccurate or incomplete account information; (c) Erasure: Request deletion of your personal account data, uploaded files, and task records, subject to statutory retention exemptions for financial settlement and audit records; and (d) Portability: Request an export of your account data in structured machine-readable format. Requests can be submitted via the Account Settings panel or by emailing privacy@prism.ai.',
+        'You have the right to: (a) Access: Request a copy of the personal data PRISM holds about you; (b) Correction: Update inaccurate or incomplete account information; (c) Erasure: Request deletion of your personal account data, uploaded files, and task records, subject to statutory retention exemptions for financial settlement and audit records; and (d) Portability: Request an export of your account data in structured machine-readable format. Requests can be submitted via the Account Settings panel or by emailing adulavivekgoud@gmail.com.',
     },
     {
       id: 'consent-withdrawal',
@@ -237,7 +237,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: 'incident-grievance',
       title: '15. Security Incidents & Grievance Procedures',
       content:
-        'In the event of a confirmed personal data breach affecting your information, PRISM will notify affected individuals and regulatory authorities in accordance with applicable laws. If you have a privacy complaint or concern, please contact our Grievance Officer at grievance@prism.ai. We strive to acknowledge grievances within 48 hours and resolve them within statutory timeframes.',
+        'In the event of a confirmed personal data breach affecting your information, PRISM will notify affected individuals and regulatory authorities in accordance with applicable laws. If you have a privacy complaint, data inquiry, or security concern, contact: adulavivekgoud@gmail.com. We strive to acknowledge inquiries within 48 hours and address them within statutory timeframes. Note: A formal Grievance Officer designation under the Indian DPDP Act, 2023 will be published following qualified legal counsel review.',
     },
     {
       id: 'version-effective',

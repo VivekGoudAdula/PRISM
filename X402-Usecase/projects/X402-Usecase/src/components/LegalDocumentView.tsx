@@ -247,8 +247,8 @@ export const LegalDocumentView: React.FC<LegalDocumentViewProps> = ({
           <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <div>
               <span>Need clarification? Contact our legal desk at </span>
-              <a href="mailto:legal@prism.ai" className="text-indigo-400 hover:underline">
-                legal@prism.ai
+              <a href="mailto:adulavivekgoud@gmail.com" className="text-indigo-400 hover:underline">
+                adulavivekgoud@gmail.com
               </a>
             </div>
             <button
