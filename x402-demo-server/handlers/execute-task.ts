@@ -380,7 +380,8 @@ export async function handleExecuteTaskRequest(c: Context) {
         planId,
         status,
         error,
-        body
+        resultCount: Array.isArray(results) ? results.length : 0,
+        txCount: Array.isArray(transactionIds) ? transactionIds.length : 0
       });
       taskRecord.status = 'failed';
       await AuditLog.create({

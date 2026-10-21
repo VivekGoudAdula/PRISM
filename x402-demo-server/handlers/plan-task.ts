@@ -95,8 +95,8 @@ export async function handlePlanTaskRequest(c: Context) {
     // ── Pre-Classification Branch 2: Unsupported Task ────────────────────────
     if (!classifyResult || classifyResult.error || category === 'unsupported') {
       console.log('🔍 [DIAGNOSTIC /plan-task 400]', {
-        task_description,
-        classifyResult,
+        taskDescriptionLength: task_description ? task_description.length : 0,
+        category,
         reason: 'Task type is unsupported or classification failed'
       });
       return c.json({

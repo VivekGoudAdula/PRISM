@@ -72,6 +72,7 @@ import { analyticsRouter, adminRouter } from './routes/analytics';
 import promptTutorRouter from './routes/promptTutor';
 import dataMapRouter from './routes/dataMap';
 import promptOptimizerRouter from './routes/promptOptimizer';
+import legalRouter from './routes/legal';
 
 // Load environment variables
 config();
@@ -346,6 +347,7 @@ app.route('/api/prompt-tutor', promptTutorRouter);
 app.route('/api/data-map', dataMapRouter);
 app.route('/api/semantic-cache', semanticCacheRouter);
 app.route('/api/prompt-optimizer', promptOptimizerRouter);
+app.route('/api/legal', legalRouter);
 
 /**
  * X402 Payment Middleware

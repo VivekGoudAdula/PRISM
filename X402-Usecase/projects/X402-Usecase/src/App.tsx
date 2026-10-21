@@ -4,6 +4,9 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './Home'
 import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
 
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
+
 export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
   const isMainnet = (import.meta.env.VITE_ALGOD_NETWORK || 'mainnet').toLowerCase() === 'mainnet'
@@ -74,6 +77,9 @@ export default function App() {
           <Route path="/signup" element={<Home />} />
           {/* Dashboard */}
           <Route path="/app" element={<Home />} />
+          {/* Public Legal Pages */}
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           {/* Hidden demo route (disabled locally — was used during waitlist mode)
           <Route path="/demo" element={<Home />} />
           */}
