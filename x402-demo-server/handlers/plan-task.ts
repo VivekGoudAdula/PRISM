@@ -9,6 +9,7 @@ import { User } from '../models/User';
 import { AuditLog } from '../models/AuditLog';
 import { estimateTokens } from '../services/tokenAnalytics';
 import { calculateDynamicPrice } from '../services/pricing';
+import { encryptDocument } from '../services/encryption';
 
 config();
 
@@ -490,7 +491,10 @@ export async function handlePlanTaskRequest(c: Context) {
           cacheTokensSaved: cacheTokensAvoided,
         },
         ...(repoFilesData ? {
-          files: repoFilesData.files,
+          files: repoFilesData.files.map((f: any) => ({
+            ...f,
+            content: f.content ? encryptDocument(f.content) : '',
+          })),
           skipped: repoFilesData.skipped,
           capped: repoFilesData.capped,
           total_files_found: repoFilesData.total_files_found,
@@ -500,9 +504,14 @@ export async function handlePlanTaskRequest(c: Context) {
           pages: sitePagesData.pages,
           skipped: sitePagesData.skipped,
         } : {}),
-        // Store uploaded file content for resume/contract/invoice so per-file x402 calls
-        // can use lightweight references instead of re-sending large base64 payloads.
-        ...(uploadedFiles.length > 0 ? { files: uploadedFiles } : {}),
+        // Store uploaded file content encrypted at rest (AES-256-GCM) for sensitive documents
+        ...(uploadedFiles.length > 0 ? {
+          files: uploadedFiles.map((f) => ({
+            ...f,
+            content_base64: f.content_base64 ? encryptDocument(f.content_base64) : '',
+            extracted_text: f.extracted_text ? encryptDocument(f.extracted_text) : '',
+          })),
+        } : {}),
       },
       providerName,
       unitPrice,

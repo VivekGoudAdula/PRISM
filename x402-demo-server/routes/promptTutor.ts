@@ -115,11 +115,17 @@ promptTutorRouter.post('/analyze', async (c) => {
 
 /**
  * GET /api/prompt-tutor/task/:taskId
- * Retrieves saved PromptAnalysis record by taskId.
+ * Retrieves saved PromptAnalysis record by taskId with strict ownership verification.
  */
 promptTutorRouter.get('/task/:taskId', async (c) => {
   try {
     const { taskId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
+    if (!tokenUser?.userId) {
+      return c.json({ error: 'Authentication required to view prompt analysis' }, 401);
+    }
+
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       return c.json({ error: 'Invalid taskId format' }, 400);
     }
@@ -127,6 +133,11 @@ promptTutorRouter.get('/task/:taskId', async (c) => {
     const analysis = await PromptAnalysis.findOne({ taskId: new mongoose.Types.ObjectId(taskId) });
     if (!analysis) {
       return c.json({ error: 'Prompt analysis not found for this task' }, 404);
+    }
+
+    // Access control: verify ownership
+    if (analysis.userId && analysis.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+      return c.json({ error: 'Forbidden: You do not have permission to view this prompt analysis' }, 403);
     }
 
     return c.json(analysis);

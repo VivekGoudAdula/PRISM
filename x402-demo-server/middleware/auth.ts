@@ -1,7 +1,13 @@
 import type { Context, Next } from 'hono';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'prism_default_secret_key_12345';
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!secret || secret === 'prism_default_secret_key_12345')) {
+    throw new Error('[SECURITY CRITICAL] Insecure or missing JWT_SECRET in production');
+  }
+  return secret || 'prism_default_secret_key_12345';
+}
 
 export interface DecodedToken {
   userId: string;
@@ -35,7 +41,7 @@ export async function optionalAuth(c: Context, next: Next) {
     }
 
     if (token) {
-      const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+      const decoded = jwt.verify(token, getJwtSecret()) as DecodedToken;
       c.set('user', decoded);
     }
   } catch (error: any) {
@@ -75,7 +81,7 @@ export async function requireAuth(c: Context, next: Next) {
       return c.json({ error: 'Access token required. Please authenticate.' }, 401);
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    const decoded = jwt.verify(token, getJwtSecret()) as DecodedToken;
     c.set('user', decoded);
     await next();
   } catch (error: any) {

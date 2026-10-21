@@ -10,6 +10,9 @@ import { TokenUsage } from '../models/TokenUsage';
 import { Organization } from '../models/Organization';
 import { StressTestRecord } from '../models/StressTestRecord';
 import { PromptOptimization } from '../models/PromptOptimization';
+import { DataMap } from '../models/DataMap';
+import { SemanticCache } from '../models/SemanticCache';
+import { PromptAnalysis } from '../models/PromptAnalysis';
 import createPaymentConfig from '../endpoints.config';
 import mongoose from 'mongoose';
 
@@ -139,6 +142,77 @@ analyticsRouter.get('/tasks', async (c) => {
   } catch (error) {
     console.error('Get user tasks error:', error);
     return c.json({ error: 'Failed to fetch tasks history' }, 500);
+  }
+});
+
+/**
+ * DELETE /api/analytics/tasks/:taskId
+ * Securely deletes or scrubs a user's document task, uploaded files, extracted text,
+ * AI outputs, and associated DataMaps, semantic cache entries, and optimization records.
+ */
+analyticsRouter.delete('/tasks/:taskId', async (c) => {
+  try {
+    const userPayload = (c as any).get('user');
+    const taskId = c.req.param('taskId');
+
+    if (!mongoose.Types.ObjectId.isValid(taskId)) {
+      return c.json({ error: 'Invalid taskId format' }, 400);
+    }
+
+    const taskObjId = new mongoose.Types.ObjectId(taskId);
+    const task = await Task.findOne({ _id: taskObjId, userId: userPayload.userId });
+
+    if (!task) {
+      return c.json({ error: 'Task not found or unauthorized' }, 404);
+    }
+
+    // 1. Invalidate and delete associated DataMaps
+    const deletedMaps = await DataMap.deleteMany({ taskId: taskObjId });
+
+    // 2. Invalidate and delete associated PromptAnalysis & PromptOptimization
+    await PromptAnalysis.deleteMany({ taskId: taskObjId });
+    await PromptOptimization.deleteMany({ taskId: taskObjId });
+
+    // 3. Purge associated SemanticCache entries
+    await SemanticCache.deleteMany({
+      userId: new mongoose.Types.ObjectId(userPayload.userId),
+      taskType: task.category,
+    });
+
+    // 4. Scrub sensitive content from the task (preserving on-chain audit metadata)
+    const hadFiles = Boolean(task.plannerOutput?.files?.length);
+    task.plannerOutput = {
+      ...(task.plannerOutput || {}),
+      files: [],
+      extractedFiles: [],
+    };
+    task.output = { message: 'Document analysis output purged by user request' };
+    task.prompt = '[DELETED_DOCUMENT_TASK]';
+    task.status = 'failed';
+    await task.save();
+
+    // 5. Audit Log the deletion action
+    await AuditLog.create({
+      userId: new mongoose.Types.ObjectId(userPayload.userId),
+      action: 'Document Task Deleted',
+      details: {
+        taskId: task._id,
+        category: task.category,
+        filesScrubbed: hadFiles,
+        dataMapsDeleted: deletedMaps.deletedCount,
+      },
+      ipAddress: c.req.header('x-forwarded-for') || '127.0.0.1',
+    });
+
+    return c.json({
+      success: true,
+      message: 'Sensitive document data, outputs, DataMaps, and cache entries purged successfully',
+      taskId: task._id.toString(),
+      dataMapsDeleted: deletedMaps.deletedCount,
+    });
+  } catch (error: any) {
+    console.error('Delete Task Error:', error);
+    return c.json({ error: 'Failed to delete document task', message: error.message }, 500);
   }
 });
 
@@ -1659,6 +1733,51 @@ adminRouter.get('/analytics/tasks/:taskId', async (c) => {
     console.error('Task Detail Error:', error);
     return c.json({ error: 'Failed to fetch task detail view' }, 500);
   }
+});
+
+/**
+ * GET /api/admin/retention/config
+ * Retrieves currently active data retention policies.
+ */
+adminRouter.get('/retention/config', async (c) => {
+  const { getRetentionConfig } = await import('../services/retention');
+  return c.json({
+    status: 'active',
+    policy: getRetentionConfig(),
+    description: 'Automated lifecycle retention rules compliant with DPDP Act and GDPR data minimization principles',
+  });
+});
+
+/**
+ * POST /api/admin/retention/prune
+ * Manually triggers a data retention pruning pass across tasks, caches, and sessions.
+ */
+adminRouter.post('/retention/prune', async (c) => {
+  try {
+    const { pruneExpiredData } = await import('../services/retention');
+    const result = await pruneExpiredData();
+    return c.json({
+      success: true,
+      message: 'Retention pruning pass completed successfully',
+      result,
+    });
+  } catch (error: any) {
+    console.error('Retention Prune Error:', error);
+    return c.json({ error: 'Failed to execute retention pruning', message: error.message }, 500);
+  }
+});
+
+/**
+ * GET /api/admin/retention/status
+ * Retrieves real-time status and telemetry of the automated recurring retention scheduler.
+ */
+adminRouter.get('/retention/status', async (c) => {
+  const { getRetentionSchedulerStatus, getRetentionConfig } = await import('../services/retention');
+  return c.json({
+    status: 'ok',
+    scheduler: getRetentionSchedulerStatus(),
+    config: getRetentionConfig(),
+  });
 });
 
 

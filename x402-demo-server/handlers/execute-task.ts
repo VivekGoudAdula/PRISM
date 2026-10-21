@@ -351,8 +351,14 @@ export async function handleExecuteTaskRequest(c: Context) {
       }, 409);
     }
 
-    // ── Step 2: Resolve user ────────────────────────────────────────────────
+    // ── Step 2: Resolve user & enforce authorization ───────────────────────
     const tokenUser = c.get('user' as any);
+    if (tokenUser?.userId && taskRecord.userId) {
+      if (taskRecord.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+        return c.json({ error: 'Forbidden: You are not authorized to execute this plan.' }, 403);
+      }
+    }
+
     if (tokenUser?.userId) {
       user = await User.findById(tokenUser.userId);
     }

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { SemanticCache, ISemanticCache } from '../models/SemanticCache';
 import { estimateTokens } from './tokenAnalytics';
+import { isEncrypted, decryptDocument } from './encryption';
 
 /**
  * Normalizes query string for semantic matching.
@@ -17,15 +18,18 @@ export function normalizeQuery(query: string): string {
 
 /**
  * Creates a unique fingerprint of the source inputs (prompt + source file contents).
+ * Transparently decrypts encrypted file contents to ensure canonical, deterministic hashing
+ * across plans and execution steps regardless of random encryption IVs.
  */
 export function createContextFingerprint(prompt: string, files: any[] = []): string {
   const normPrompt = normalizeQuery(prompt);
   const fileDigest = (files || [])
     .map((f) => {
       const name = f.filename || f.path || f.file_path || f.name || '';
-      const text = f.text || f.extracted_text || f.content_base64 || f.raw_url || f.content || '';
-      // Include deterministic hash of the actual file text content
-      const contentHash = crypto.createHash('md5').update(text).digest('hex');
+      const rawText = f.text || f.extracted_text || f.content_base64 || f.raw_url || f.content || '';
+      // Canonicalize: if the text is AES-256-GCM encrypted, decrypt to original content for deterministic digest
+      const text = isEncrypted(rawText) ? decryptDocument(rawText) : rawText;
+      const contentHash = crypto.createHash('sha256').update(text).digest('hex');
       return `${name}:${contentHash}`;
     })
     .sort()
@@ -108,24 +112,47 @@ export interface CacheCheckResult {
 
 /**
  * Checks for a semantic cache hit strictly within the authenticated user's workspace/context.
+ * Guarantees zero cross-user cache leakage.
  */
 export async function findSimilarContext(options: CheckCacheOptions): Promise<CacheCheckResult> {
   const threshold = options.threshold || parseFloat(process.env.SEMANTIC_CACHE_THRESHOLD || '0.85');
+
+  // Strict tenant & user isolation: require a valid MongoDB ObjectId
+  if (!options.userId || !mongoose.Types.ObjectId.isValid(options.userId.toString())) {
+    return {
+      hit: false,
+      similarity: 0,
+      cachedContextTokens: 0,
+      sourceFingerprint: '',
+    };
+  }
+
   const userId = new mongoose.Types.ObjectId(options.userId);
-  const normQuery = normalizeQuery(options.prompt);
   const sourceFingerprint = createContextFingerprint(options.prompt, options.files);
 
-  // Require exact sourceFingerprint & prompt match to avoid returning cached full-site context on partial item runs
-  const exactMatch = await SemanticCache.findOne({
+  const queryFilter: any = {
     userId,
     taskType: options.taskType,
     sourceFingerprint,
-  }).select('+embedding');
+  };
+
+  // Optional workspace-level tenancy isolation
+  if (options.workspaceId) {
+    queryFilter.workspaceId = options.workspaceId;
+  }
+
+  // Require exact sourceFingerprint & prompt match to avoid returning cached context on changed documents
+  const query = SemanticCache.findOne(queryFilter);
+  const exactMatch = query && typeof query.select === 'function'
+    ? await query.select('+embedding')
+    : await query;
 
   if (exactMatch) {
     exactMatch.hitCount += 1;
     exactMatch.lastUsedAt = new Date();
-    await exactMatch.save().catch(() => {});
+    if (typeof exactMatch.save === 'function') {
+      await exactMatch.save().catch(() => {});
+    }
 
     return {
       hit: true,
@@ -160,9 +187,15 @@ export interface SaveCacheOptions {
 
 /**
  * Saves a new semantic context representation to MongoDB (non-blocking safe).
+ * Strictly bound to requesting user.
  */
 export async function saveContext(options: SaveCacheOptions): Promise<any> {
   try {
+    if (!options.userId || !mongoose.Types.ObjectId.isValid(options.userId.toString())) {
+      console.warn('[SEMANTIC CACHE] Rejected saveContext: missing or invalid userId');
+      return null;
+    }
+
     const userId = new mongoose.Types.ObjectId(options.userId);
     const normQuery = normalizeQuery(options.prompt);
     const sourceFingerprint = createContextFingerprint(options.prompt, options.files);
@@ -200,4 +233,43 @@ export async function saveContext(options: SaveCacheOptions): Promise<any> {
     console.error('Error saving Semantic Cache context (non-blocking):', err?.message || err);
     return null;
   }
+}
+
+/**
+ * Invalidates a specific cached context when source documents or prompts are modified.
+ */
+export async function invalidateContext(
+  userId: string | mongoose.Types.ObjectId,
+  taskType: string,
+  sourceFingerprint: string
+): Promise<boolean> {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId.toString())) return false;
+  const result = await SemanticCache.deleteOne({
+    userId: new mongoose.Types.ObjectId(userId),
+    taskType,
+    sourceFingerprint,
+  });
+  return (result.deletedCount || 0) > 0;
+}
+
+/**
+ * Invalidates all semantic cache entries for a specific user (e.g. on account reset or request).
+ */
+export async function invalidateUserCache(userId: string | mongoose.Types.ObjectId): Promise<number> {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId.toString())) return 0;
+  const result = await SemanticCache.deleteMany({
+    userId: new mongoose.Types.ObjectId(userId),
+  });
+  return result.deletedCount || 0;
+}
+
+/**
+ * Invalidates all semantic cache entries linked to a specific source DataMap.
+ */
+export async function invalidateMapCache(sourceMapId: string | mongoose.Types.ObjectId): Promise<number> {
+  if (!sourceMapId || !mongoose.Types.ObjectId.isValid(sourceMapId.toString())) return 0;
+  const result = await SemanticCache.deleteMany({
+    sourceMapId: new mongoose.Types.ObjectId(sourceMapId),
+  });
+  return result.deletedCount || 0;
 }

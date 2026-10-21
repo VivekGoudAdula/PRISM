@@ -242,18 +242,12 @@ dataMapRouter.post('/generate', async (c) => {
  */
 dataMapRouter.get('/user', async (c) => {
   try {
-    let userId: any = null;
     const tokenUser = (c as any).get('user');
-    if (tokenUser?.userId) {
-      const user = await User.findById(tokenUser.userId);
-      if (user) userId = user._id;
-    }
-    if (!userId) {
-      const guestUser = await User.findOne({ email: 'guest@prism.ai' });
-      if (guestUser) userId = guestUser._id;
+    if (!tokenUser?.userId) {
+      return c.json({ error: 'Authentication required to list Data Maps' }, 401);
     }
 
-    const maps = await DataMap.find({ userId }).sort({ updatedAt: -1 }).limit(50);
+    const maps = await DataMap.find({ userId: tokenUser.userId }).sort({ updatedAt: -1 }).limit(50);
     return c.json(maps);
   } catch (error: any) {
     console.error('Error in GET /api/data-map/user:', error);
@@ -263,15 +257,27 @@ dataMapRouter.get('/user', async (c) => {
 
 /**
  * GET /api/data-map/chat/:chatId
- * Retrieves saved DataMap by chatId.
+ * Retrieves saved DataMap by chatId with ownership verification.
  */
 dataMapRouter.get('/chat/:chatId', async (c) => {
   try {
     const { chatId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
     const dataMap = await DataMap.findOne({ chatId });
     if (!dataMap) {
       return c.json({ error: 'Data Map not found for this chat' }, 404);
     }
+
+    // Access control: verify ownership
+    if (tokenUser?.userId) {
+      if (dataMap.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+        return c.json({ error: 'Forbidden: You do not have permission to view this Data Map' }, 403);
+      }
+    } else {
+      return c.json({ error: 'Authentication required to view this Data Map' }, 401);
+    }
+
     return c.json(dataMap);
   } catch (error: any) {
     console.error('Error in GET /api/data-map/chat/:chatId:', error);
@@ -281,21 +287,39 @@ dataMapRouter.get('/chat/:chatId', async (c) => {
 
 /**
  * PATCH /api/data-map/:mapId/title
- * Allows updating/renaming a Data Map title.
+ * Allows updating/renaming a Data Map title with strict ownership verification.
  */
 dataMapRouter.patch('/:mapId/title', async (c) => {
   try {
     const { mapId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
+    if (!tokenUser?.userId) {
+      return c.json({ error: 'Authentication required to modify Data Map' }, 401);
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(mapId)) {
+      return c.json({ error: 'Invalid mapId format' }, 400);
+    }
+
+    const existingMap = await DataMap.findById(mapId);
+    if (!existingMap) {
+      return c.json({ error: 'Data Map not found' }, 404);
+    }
+
+    if (existingMap.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+      return c.json({ error: 'Forbidden: You do not have permission to modify this Data Map' }, 403);
+    }
+
     const { title } = await c.req.json();
     if (!title || !title.trim()) {
       return c.json({ error: 'Title is required' }, 400);
     }
 
-    const updated = await DataMap.findByIdAndUpdate(mapId, { title: title.trim() }, { returnDocument: 'after' });
-    if (!updated) {
-      return c.json({ error: 'Data Map not found' }, 404);
-    }
-    return c.json(updated);
+    existingMap.title = title.trim();
+    await existingMap.save();
+
+    return c.json(existingMap);
   } catch (error: any) {
     console.error('Error in PATCH /api/data-map/:mapId/title:', error);
     return c.json({ error: 'Failed to rename Data Map' }, 500);
@@ -304,11 +328,13 @@ dataMapRouter.patch('/:mapId/title', async (c) => {
 
 /**
  * GET /api/data-map/task/:taskId
- * Retrieves saved DataMap by taskId.
+ * Retrieves saved DataMap by taskId with ownership verification.
  */
 dataMapRouter.get('/task/:taskId', async (c) => {
   try {
     const { taskId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       return c.json({ error: 'Invalid taskId format' }, 400);
     }
@@ -316,6 +342,15 @@ dataMapRouter.get('/task/:taskId', async (c) => {
     const dataMap = await DataMap.findOne({ taskId: new mongoose.Types.ObjectId(taskId) });
     if (!dataMap) {
       return c.json({ error: 'Data Map not found for this task' }, 404);
+    }
+
+    // Access control: verify ownership
+    if (tokenUser?.userId) {
+      if (dataMap.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+        return c.json({ error: 'Forbidden: You do not have permission to view this Data Map' }, 403);
+      }
+    } else {
+      return c.json({ error: 'Authentication required to view this Data Map' }, 401);
     }
 
     return c.json(dataMap);
@@ -327,11 +362,13 @@ dataMapRouter.get('/task/:taskId', async (c) => {
 
 /**
  * GET /api/data-map/:mapId
- * Retrieves saved DataMap by mapId.
+ * Retrieves saved DataMap by mapId with ownership verification.
  */
 dataMapRouter.get('/:mapId', async (c) => {
   try {
     const { mapId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
     if (!mongoose.Types.ObjectId.isValid(mapId)) {
       return c.json({ error: 'Invalid mapId format' }, 400);
     }
@@ -341,10 +378,58 @@ dataMapRouter.get('/:mapId', async (c) => {
       return c.json({ error: 'Data Map not found' }, 404);
     }
 
+    // Access control: verify ownership
+    if (tokenUser?.userId) {
+      if (dataMap.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+        return c.json({ error: 'Forbidden: You do not have permission to view this Data Map' }, 403);
+      }
+    } else {
+      return c.json({ error: 'Authentication required to view this Data Map' }, 401);
+    }
+
     return c.json(dataMap);
   } catch (error: any) {
     console.error('Error in GET /api/data-map/:mapId:', error);
     return c.json({ error: 'Failed to fetch Data Map' }, 500);
+  }
+});
+
+/**
+ * DELETE /api/data-map/:mapId
+ * Securely deletes a saved Data Map owned by the user.
+ */
+dataMapRouter.delete('/:mapId', async (c) => {
+  try {
+    const { mapId } = c.req.param();
+    const tokenUser = (c as any).get('user');
+
+    if (!tokenUser?.userId) {
+      return c.json({ error: 'Authentication required to delete Data Map' }, 401);
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(mapId)) {
+      return c.json({ error: 'Invalid mapId format' }, 400);
+    }
+
+    const dataMap = await DataMap.findById(mapId);
+    if (!dataMap) {
+      return c.json({ error: 'Data Map not found' }, 404);
+    }
+
+    if (dataMap.userId.toString() !== tokenUser.userId && tokenUser.role !== 'admin') {
+      return c.json({ error: 'Forbidden: You do not have permission to delete this Data Map' }, 403);
+    }
+
+    await DataMap.findByIdAndDelete(mapId);
+
+    // Also clean up associated semantic cache entries referencing this DataMap
+    const { SemanticCache } = await import('../models/SemanticCache');
+    await SemanticCache.deleteMany({ sourceMapId: dataMap._id }).catch(() => {});
+
+    return c.json({ success: true, message: 'Data Map and derived cache entries deleted', mapId });
+  } catch (error: any) {
+    console.error('Error in DELETE /api/data-map/:mapId:', error);
+    return c.json({ error: 'Failed to delete Data Map' }, 500);
   }
 });
 

@@ -62,6 +62,7 @@ import { getCanonicalResourceUrl } from './endpoints.registry';
 
 // Import Middlewares and Routers
 import { requestLogger, rateLimiter, errorMiddleware } from './middleware/common';
+import { securityHeaders, validateProductionSecrets, safeErrorHandler } from './middleware/security';
 import { initializeGroqService } from './services/groq';
 import { requireAuth, optionalAuth } from './middleware/auth';
 import authRouter from './routes/auth';
@@ -76,6 +77,9 @@ import legalRouter from './routes/legal';
 
 // Load environment variables
 config();
+
+// Enforce production security hygiene (reject default/missing secrets)
+validateProductionSecrets();
 
 import bcrypt from 'bcryptjs';
 import { User } from './models/User';
@@ -296,7 +300,8 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Load standard middlewares
+// Load standard security & observability middlewares
+app.use('*', securityHeaders);
 app.use('*', requestLogger);
 app.use('*', rateLimiter);
 // Serve public brand icons/logos for x402 Challenge Leaderboard and Bazaar discovery
@@ -406,7 +411,7 @@ app.on(['GET', 'POST'], '/api/news-research', (c) => handleNewsResearchFastReque
 
 app.on(['GET', 'POST'], '/run-task', requireAuth, (c) => handleRunTaskRequest(c));
 app.get('/savings-summary', optionalAuth, (c) => handleSavingsSummaryRequest(c));
-app.post('/chat-reply', (c) => handleChatReplyRequest(c));
+app.post('/chat-reply', optionalAuth, (c) => handleChatReplyRequest(c));
 
 app.post('/execute-task', optionalAuth, (c) => handleExecuteTaskRequest(c));
 
@@ -449,6 +454,8 @@ app.get('/info', (c) => {
 // ERROR HANDLING
 // ════════════════════════════════════════════════════════════════════
 
+app.onError(safeErrorHandler);
+
 /**
  * 404 Handler
  *
@@ -485,6 +492,15 @@ serve({ fetch: app.fetch, port }, async () => {
   } catch (err) {
     console.warn('⚠ Groq AI Service initialization warning:', err);
     console.warn('   AI endpoints will use fallback behavior');
+  }
+
+  // Initialize Automated Data Retention & Lifecycle Scheduler
+  try {
+    const { startRetentionScheduler } = await import('./services/retention');
+    startRetentionScheduler(24);
+    console.log('✅ Automated Data Retention Scheduler started');
+  } catch (retentionErr: any) {
+    console.warn('⚠ Data Retention Scheduler initialization warning:', retentionErr?.message || retentionErr);
   }
 
   console.log('\n📚 QUICK COMMANDS:\n');

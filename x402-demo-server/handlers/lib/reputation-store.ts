@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Reputation } from '../../models/AnalyticsData';
 
 export interface ReputationEntry {
@@ -36,6 +37,9 @@ const DEFAULT_ENDPOINTS = [
  */
 export async function readReputationAsync(): Promise<ReputationStore> {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return readReputation();
+    }
     const docs = await Reputation.find({});
     const store: ReputationStore = {};
 
@@ -78,6 +82,9 @@ export function readReputation(): ReputationStore {
  */
 export async function updateReputation(endpoint_path: string, passed: boolean): Promise<void> {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return;
+    }
     let rep = await Reputation.findOne({ endpointPath: endpoint_path });
     if (!rep) {
       rep = new Reputation({

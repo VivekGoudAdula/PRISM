@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import mongoose from 'mongoose';
 import { Task } from '../models/Task';
 import { callOpenRouter, FAST_MODEL } from './lib/openrouter-client';
 
@@ -15,7 +16,11 @@ export async function handleChatReplyRequest(c: Context) {
       return c.json({ reply: "Hello! I'm Prism, your decentralized AI routing assistant. How can I help you today?" });
     }
 
-    const reply = await generateChatReply(message);
+    // Access control: extract authenticated user if present
+    const tokenUser = (c as any).get('user');
+    const userId = tokenUser?.userId;
+
+    const reply = await generateChatReply(message, userId);
     return c.json({
       category: 'conversational',
       reply,
@@ -33,29 +38,35 @@ export async function handleChatReplyRequest(c: Context) {
 
 /**
  * Helper to generate direct OpenRouter LLM response for conversational prompts,
- * grounded in recent task execution context from MongoDB.
+ * grounded strictly in the requesting user's own prior task execution context from MongoDB.
+ * Never accesses another user's task executions.
  */
-export async function generateChatReply(message: string): Promise<string> {
-  // 1. Fetch recent task execution context from MongoDB
+export async function generateChatReply(message: string, userId?: string): Promise<string> {
+  // 1. Fetch recent task execution context from MongoDB ONLY for this authenticated user
   let recentTaskContext = '';
   try {
-    const recentTasks = await Task.find({ status: 'completed' })
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .lean();
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const recentTasks = await Task.find({
+        userId: new mongoose.Types.ObjectId(userId),
+        status: 'completed',
+      })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .lean();
 
-    if (recentTasks && recentTasks.length > 0) {
-      recentTaskContext = JSON.stringify(
-        recentTasks.map((t) => ({
-          prompt: t.prompt,
-          category: t.category,
-          output: t.output,
-          totalCost: t.totalCost,
-          providerName: t.providerName,
-        })),
-        null,
-        2
-      );
+      if (recentTasks && recentTasks.length > 0) {
+        recentTaskContext = JSON.stringify(
+          recentTasks.map((t) => ({
+            prompt: t.prompt,
+            category: t.category,
+            output: t.output,
+            totalCost: t.totalCost,
+            providerName: t.providerName,
+          })),
+          null,
+          2
+        );
+      }
     }
   } catch (err) {
     console.error('Error fetching recent tasks for chat reply context:', err);

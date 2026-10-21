@@ -178,4 +178,35 @@ chatRouter.post('/messages', async (c) => {
   }
 });
 
+/**
+ * DELETE /conversations/:id
+ * Securely deletes a conversation and its messages owned by the authenticated user.
+ */
+chatRouter.delete('/conversations/:id', async (c) => {
+  try {
+    const user = (c as any).get('user');
+    const { id } = c.req.param();
+
+    if (!mongoose.isValidObjectId(id)) {
+      return c.json({ error: 'Invalid conversation ID format.' }, 400);
+    }
+
+    const conversation = await Conversation.findOneAndDelete({
+      _id: id,
+      userId: user.userId,
+    });
+
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found or unauthorized.' }, 404);
+    }
+
+    await Message.deleteMany({ conversationId: id });
+
+    return c.json({ success: true, message: 'Conversation and messages deleted successfully', id });
+  } catch (error: any) {
+    console.error('Delete Conversation Error:', error);
+    return c.json({ error: 'Failed to delete conversation.' }, 500);
+  }
+});
+
 export default chatRouter;

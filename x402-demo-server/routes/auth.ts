@@ -8,12 +8,21 @@ import { LegalConsent } from '../models/LegalConsent';
 import { Task } from '../models/Task';
 import { SemanticCache } from '../models/SemanticCache';
 import { Conversation, Message } from '../models/Chat';
+import { DataMap } from '../models/DataMap';
+import { PromptOptimization } from '../models/PromptOptimization';
+import { PromptAnalysis } from '../models/PromptAnalysis';
 import { CURRENT_LEGAL_VERSIONS } from '../legal.config';
 import { validateAuthBody } from '../middleware/common';
-import { requireAuth, optionalAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth, getJwtSecret } from '../middleware/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'prism_default_secret_key_12345';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'prism_default_refresh_secret_key_12345';
+export function getJwtRefreshSecret(): string {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (process.env.NODE_ENV === 'production' && (!secret || secret === 'prism_default_refresh_secret_key_12345')) {
+    throw new Error('[SECURITY CRITICAL] Insecure or missing JWT_REFRESH_SECRET in production');
+  }
+  return secret || 'prism_default_refresh_secret_key_12345';
+}
+
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
@@ -39,13 +48,13 @@ function extractSanitizedClientMetadata(c: any): { ipAddress: string; userAgent:
 function generateTokens(user: { _id: any; email: string; role: string }) {
   const accessToken = jwt.sign(
     { userId: user._id.toString(), email: user.email, role: user.role },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: ACCESS_TOKEN_EXPIRY }
   );
 
   const refreshToken = jwt.sign(
     { userId: user._id.toString(), jti: Math.random().toString(36).slice(2) + Date.now().toString(36) },
-    JWT_REFRESH_SECRET,
+    getJwtRefreshSecret(),
     { expiresIn: `${REFRESH_TOKEN_EXPIRY_DAYS}d` }
   );
 
@@ -241,7 +250,7 @@ authRouter.post('/refresh', async (c) => {
       return c.json({ error: 'Session expired or invalid refresh token.' }, 401);
     }
 
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId: string };
+    const decoded = jwt.verify(refreshToken, getJwtRefreshSecret()) as { userId: string };
     const user = await User.findById(decoded.userId);
     if (!user) {
       return c.json({ error: 'User account not found.' }, 401);
@@ -250,7 +259,7 @@ authRouter.post('/refresh', async (c) => {
     // Generate new Access Token
     const accessToken = jwt.sign(
       { userId: user._id.toString(), email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
 
@@ -649,6 +658,11 @@ authRouter.post('/data-request', requireAuth, async (c) => {
         // 2. Purge semantic cache entries for this user
         const cacheDeleteResult = await SemanticCache.deleteMany({ userId: user._id });
 
+        // 2b. Purge DataMaps, PromptOptimizations, and PromptAnalyses
+        const dataMapDeleteResult = await DataMap.deleteMany({ userId: user._id });
+        const promptOptDeleteResult = await PromptOptimization.deleteMany({ userId: user._id });
+        const promptAnalysisDeleteResult = await PromptAnalysis.deleteMany({ userId: user._id });
+
         // 3. Purge chat conversations and individual messages
         const userConvs = await Conversation.find({ userId: user._id }).select('_id');
         const convIds = userConvs.map((cv) => cv._id);
@@ -695,6 +709,9 @@ authRouter.post('/data-request', requireAuth, async (c) => {
             referenceId,
             tasksScrubbed: tasksWithFiles,
             semanticCachesDeleted: cacheDeleteResult.deletedCount,
+            dataMapsDeleted: dataMapDeleteResult.deletedCount,
+            promptOptimizationsDeleted: promptOptDeleteResult.deletedCount,
+            promptAnalysesDeleted: promptAnalysisDeleteResult.deletedCount,
             conversationsDeleted: convDeleteResult.deletedCount,
             sessionsTerminated: sessionDeleteResult.deletedCount,
           },
@@ -706,10 +723,13 @@ authRouter.post('/data-request', requireAuth, async (c) => {
           requestType: 'delete',
           status: 'verified_deletion_completed',
           referenceId,
-          message: 'Personal data, uploaded documents, extracted text, chat histories, and semantic cache entries have been permanently purged. Statutory financial records and Algorand on-chain settlement transaction hashes are retained under legal and regulatory compliance exemptions.',
+          message: 'Personal data, uploaded documents, extracted text, chat histories, DataMaps, and semantic cache entries have been permanently purged. Statutory financial records and Algorand on-chain settlement transaction hashes are retained under legal and regulatory compliance exemptions.',
           auditSummary: {
             tasksScrubbed: tasksWithFiles,
             semanticCachesDeleted: cacheDeleteResult.deletedCount,
+            dataMapsDeleted: dataMapDeleteResult.deletedCount,
+            promptOptimizationsDeleted: promptOptDeleteResult.deletedCount,
+            promptAnalysesDeleted: promptAnalysisDeleteResult.deletedCount,
             conversationsDeleted: convDeleteResult.deletedCount,
             sessionsTerminated: sessionDeleteResult.deletedCount,
             accountAnonymized: true,
