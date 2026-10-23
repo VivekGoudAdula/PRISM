@@ -19,6 +19,9 @@ export interface IUser {
   termsAcceptedVersion?: string;
   privacyAcceptedVersion?: string;
   legalConsentAcceptedAt?: Date;
+  referralCode?: string;
+  referredBy?: Types.ObjectId;
+  referralPointsBalance?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +45,9 @@ const UserSchema = new Schema<IUser>({
   termsAcceptedVersion: { type: String },
   privacyAcceptedVersion: { type: String },
   legalConsentAcceptedAt: { type: Date },
+  referralCode: { type: String, unique: true, sparse: true, uppercase: true, trim: true },
+  referredBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+  referralPointsBalance: { type: Number, default: 0 },
 }, {
   timestamps: true
 });

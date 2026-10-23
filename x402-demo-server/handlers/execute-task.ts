@@ -487,6 +487,13 @@ export async function handleExecuteTaskRequest(c: Context) {
       taskId: taskRecord._id,
     });
 
+    // ── Non-blocking Referral Qualification Check ────────────────────────────
+    if (taskRecord.status === 'completed' && taskRecord.verificationStatus !== 'failed' && !taskRecord.refundIssued) {
+      import('../services/referral')
+        .then(({ evaluateReferralQualification }) => evaluateReferralQualification(user._id, taskRecord._id))
+        .catch((refErr) => console.warn('Referral qualification evaluation warning:', refErr.message));
+    }
+
     // ── Step 10: Check Semantic Cache & Record Central Token Analytics ──────
     const { findSimilarContext, saveContext } = await import('../services/semanticCache');
     const cacheCheck = await findSimilarContext({

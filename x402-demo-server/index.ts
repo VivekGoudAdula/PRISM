@@ -74,6 +74,9 @@ import promptTutorRouter from './routes/promptTutor';
 import dataMapRouter from './routes/dataMap';
 import promptOptimizerRouter from './routes/promptOptimizer';
 import legalRouter from './routes/legal';
+import referralRouter from './routes/referrals';
+import adminReferralRouter from './routes/adminReferrals';
+import { getActiveCampaign, initReferralIndexes } from './services/referral';
 
 // Load environment variables
 config();
@@ -166,8 +169,12 @@ mongoose.connect(connectionString)
           await user.save();
         }
       }
+
+      // Seed / ensure default referral campaign and initialize indexes non-destructively
+      await getActiveCampaign().catch((campErr) => console.warn('Referral campaign seeding warning:', campErr?.message || campErr));
+      await initReferralIndexes().catch((idxErr) => console.warn('Referral index initialization warning:', idxErr?.message || idxErr));
     } catch (err) {
-      console.error('Error seeding admin/organizations:', err);
+      console.error('Error seeding admin/organizations/referrals:', err);
     }
   })
   .catch((err) => console.error('❌ MongoDB connection error:', err));
@@ -353,6 +360,8 @@ app.route('/api/data-map', dataMapRouter);
 app.route('/api/semantic-cache', semanticCacheRouter);
 app.route('/api/prompt-optimizer', promptOptimizerRouter);
 app.route('/api/legal', legalRouter);
+app.route('/api/referrals', referralRouter);
+app.route('/api/admin/referrals', adminReferralRouter);
 
 /**
  * X402 Payment Middleware

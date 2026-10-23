@@ -6,6 +6,7 @@ import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } fr
 
 import TermsPage from './pages/TermsPage'
 import PrivacyPage from './pages/PrivacyPage'
+import CampaignPage from './pages/CampaignPage'
 
 export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
@@ -80,6 +81,8 @@ export default function App() {
           {/* Public Legal Pages */}
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          {/* Public Referral Campaign Page */}
+          <Route path="/campaign" element={<CampaignPage />} />
           {/* Hidden demo route (disabled locally — was used during waitlist mode)
           <Route path="/demo" element={<Home />} />
           */}

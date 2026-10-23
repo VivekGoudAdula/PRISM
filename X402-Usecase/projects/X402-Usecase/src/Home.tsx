@@ -2,12 +2,13 @@
 import { useWallet } from '@txnlab/use-wallet-react'
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign, FiMap, FiPlus, FiCode, FiUserCheck, FiGlobe, FiTv, FiCpu, FiLayers, FiZap, FiArrowRight, FiMail, FiTwitter, FiInstagram, FiLinkedin, FiGithub, FiMessageSquare, FiSend } from 'react-icons/fi'
+import { FiLink, FiCheckCircle, FiShield, FiFileText, FiBarChart2, FiLock, FiUser, FiLogOut, FiDollarSign, FiMap, FiPlus, FiCode, FiUserCheck, FiGlobe, FiTv, FiCpu, FiLayers, FiZap, FiArrowRight, FiMail, FiTwitter, FiInstagram, FiLinkedin, FiGithub, FiMessageSquare, FiSend, FiGift } from 'react-icons/fi'
 import emailjs from '@emailjs/browser'
 import ConnectWallet from './components/ConnectWallet'
 import PrismConsole from './components/PrismConsole'
 import Prism from './components/Prism'
 import AdminDashboard from './components/AdminDashboard'
+import { ReferralModal } from './components/ReferralModal'
 // import WaitlistModal from './components/WaitlistModal'
 import { api, setAccessToken } from './utils/api'
 import { Link } from 'react-router-dom'
@@ -519,6 +520,26 @@ const Home: React.FC<HomeProps> = () => {
   const [dataRequestErrorMessage, setDataRequestErrorMessage] = useState<string>('')
   const [exportedDataJson, setExportedDataJson] = useState<any | null>(null)
 
+  // Referral Program State
+  const [showReferralModal, setShowReferralModal] = useState<boolean>(false)
+  const [referralCodeInput, setReferralCodeInput] = useState<string>('')
+
+  // Auto-detect referral code from URL parameter ?ref=CODE
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const refParam = params.get('ref')
+    if (refParam && refParam.trim().length > 0) {
+      const cleanRef = refParam.trim().toUpperCase()
+      localStorage.setItem('prism_ref_code', cleanRef)
+      setReferralCodeInput(cleanRef)
+    } else {
+      const storedRef = localStorage.getItem('prism_ref_code')
+      if (storedRef) {
+        setReferralCodeInput(storedRef)
+      }
+    }
+  }, [])
+
   // Reset checkboxes on fresh signup page entry
   useEffect(() => {
     if (pathname === '/signup' || pathname === '/login') {
@@ -641,15 +662,18 @@ const Home: React.FC<HomeProps> = () => {
     setWalletConsentError('');
 
     try {
+      const activeRefCode = referralCodeInput.trim() || localStorage.getItem('prism_ref_code') || undefined;
       const { data } = await api.post('/api/auth/connect-wallet', {
         walletAddress: activeAddress,
         agreedToTerms: true,
         acknowledgedPrivacyPolicy: true,
         termsVersion: CURRENT_LEGAL_VERSIONS.termsVersion,
         privacyVersion: CURRENT_LEGAL_VERSIONS.privacyVersion,
+        referralCode: activeRefCode,
       });
 
       if (data?.accessToken) {
+        localStorage.removeItem('prism_ref_code');
         setAccessToken(data.accessToken);
         if (data.refreshToken) localStorage.setItem('prism_refresh_token', data.refreshToken);
         if (data.user?.fullName) localStorage.setItem('prism_logged_in_user', data.user.fullName);
@@ -719,6 +743,7 @@ const Home: React.FC<HomeProps> = () => {
 
     setAuthSubmitting(true);
     try {
+      const activeRefCode = referralCodeInput.trim() || localStorage.getItem('prism_ref_code') || undefined;
       const { data } = await api.post('/api/auth/signup', {
         fullName: name,
         email,
@@ -727,8 +752,10 @@ const Home: React.FC<HomeProps> = () => {
         acknowledgedPrivacyPolicy,
         termsVersion: CURRENT_LEGAL_VERSIONS.termsVersion,
         privacyVersion: CURRENT_LEGAL_VERSIONS.privacyVersion,
+        referralCode: activeRefCode,
       });
 
+      localStorage.removeItem('prism_ref_code');
       setAccessToken(data.accessToken);
       localStorage.setItem('prism_refresh_token', data.refreshToken);
       localStorage.setItem('prism_logged_in_user', data.user.fullName);
@@ -1028,6 +1055,17 @@ const Home: React.FC<HomeProps> = () => {
               </button>
             )}
 
+            {/* 5. Refer & Earn button */}
+            {viewState === 'app' && currentUser && (
+              <button
+                className="btn h-10 min-h-[40px] rounded-full px-4 text-xs font-semibold flex items-center gap-1.5 transition-all duration-300 bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 border border-amber-500/40 text-amber-300 hover:border-amber-400 hover:bg-amber-500/25 hover:scale-105 shadow-sm shadow-amber-500/10"
+                onClick={() => setShowReferralModal(true)}
+                title="Refer friends & earn reward points"
+              >
+                <FiGift className="text-amber-400 text-sm" />
+                <span>Refer & Earn</span>
+              </button>
+            )}
 
             {/* 6. Wallet button — red if disconnected, green address if connected */}
             {viewState === 'app' && (
@@ -1128,6 +1166,24 @@ const Home: React.FC<HomeProps> = () => {
                         <span className="font-bold text-slate-400 capitalize">{userRole}</span>
                       </div>
                     </div>
+
+                    {/* Referral & Rewards Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileDropdown(false);
+                        setShowReferralModal(true);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 hover:from-amber-500/25 hover:to-amber-600/20 border border-amber-500/35 text-amber-300 transition-all text-xs font-bold"
+                    >
+                      <span className="flex items-center gap-2">
+                        <FiGift className="text-amber-400 text-sm" />
+                        <span>Referral Program & Points</span>
+                      </span>
+                      <span className="text-[10px] bg-amber-500/25 text-amber-200 px-2 py-0.5 rounded-full font-mono font-extrabold border border-amber-500/30">
+                        Rewards
+                      </span>
+                    </button>
 
                     {/* Legal & Privacy Section (Phase 7) */}
                     <div className="border-t border-slate-800/80 pt-3 flex flex-col gap-2">
@@ -2027,6 +2083,29 @@ const Home: React.FC<HomeProps> = () => {
                 )}
 
                 {isSignUp && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <FiGift className="text-amber-400 text-xs" />
+                        <span>Referral Code</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-medium">(Optional)</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. PRISM-7X29K"
+                      className="input input-bordered bg-slate-950/60 border-slate-800 text-sm focus:border-amber-500 focus:outline-none font-mono uppercase tracking-wider placeholder:normal-case placeholder:tracking-normal"
+                      value={referralCodeInput}
+                      onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                      maxLength={16}
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      Earn bonus platform reward points when you complete your first paid AI task.
+                    </p>
+                  </div>
+                )}
+
+                {isSignUp && (
                   <div className="flex flex-col gap-3 pt-2.5 pb-1 border-t border-slate-800/80">
                     {/* Required Checkbox 1: Terms of Service */}
                     <div className="flex flex-col gap-1">
@@ -2478,6 +2557,25 @@ const Home: React.FC<HomeProps> = () => {
               </div>
             )}
 
+            {/* Optional Referral Code for Wallet Signup */}
+            <div className="flex flex-col gap-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <FiGift className="text-amber-400 text-xs" />
+                  <span>Referral Code</span>
+                </label>
+                <span className="text-[10px] text-slate-500 font-medium">(Optional)</span>
+              </div>
+              <input
+                type="text"
+                placeholder="e.g. PRISM-7X29K"
+                className="input input-bordered input-sm bg-slate-950/60 border-slate-800 text-xs focus:border-amber-500 focus:outline-none font-mono uppercase tracking-wider placeholder:normal-case placeholder:tracking-normal"
+                value={referralCodeInput}
+                onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                maxLength={16}
+              />
+            </div>
+
             <div className="flex flex-col gap-3 py-2 border-y border-slate-800">
               <label className="flex items-start gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
                 <input
@@ -2685,6 +2783,12 @@ const Home: React.FC<HomeProps> = () => {
           </div>
         </div>
       )}
+
+      {/* Referral Program Modal */}
+      <ReferralModal
+        isOpen={showReferralModal}
+        onClose={() => setShowReferralModal(false)}
+      />
 
       <ConnectWallet openModal={openWalletModal} closeModal={toggleWalletModal} />
     </div>

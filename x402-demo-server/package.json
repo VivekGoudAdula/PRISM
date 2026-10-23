@@ -10,7 +10,9 @@
     "dev": "tsx watch index.ts",
     "test": "tsx tests/test-routing.ts",
     "test:legal": "tsx tests/test-legal-consent.ts",
-    "test:all": "tsx tests/test-routing.ts && tsx tests/test-prompt-optimizer.ts && tsx tests/test-generic-datamap.ts"
+    "test:referrals": "tsx tests/test-referral-system.ts",
+    "test:referral-security": "tsx tests/test-referral-security.ts",
+    "test:all": "tsx tests/test-routing.ts && tsx tests/test-prompt-optimizer.ts && tsx tests/test-generic-datamap.ts && tsx tests/test-referral-system.ts && tsx tests/test-referral-security.ts"
   },
   "keywords": [],
   "author": "",

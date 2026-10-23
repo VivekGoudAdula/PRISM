@@ -341,6 +341,13 @@ export async function handleRunTaskRequest(c: Context) {
     user.totalEndpointsUsed = userEndpoints.length;
     await user.save();
 
+    // Non-blocking referral qualification check
+    if (!refund && verification.passed) {
+      import('../services/referral')
+        .then(({ evaluateReferralQualification }) => evaluateReferralQualification(user._id, taskRecord._id))
+        .catch((refErr) => console.warn('Referral qualification evaluation warning:', refErr.message));
+    }
+
     // Compute savings_this_request from processedFiles
     let reqRawTokens = 0;
     let reqMapTokens = 0;

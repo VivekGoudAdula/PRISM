@@ -21,7 +21,9 @@ import {
   FiPlay,
   FiAward,
   FiInfo,
+  FiGift,
 } from 'react-icons/fi';
+import { AdminReferralsPanel } from './AdminReferralsPanel';
 import {
   AreaChart,
   Area,
@@ -57,7 +59,8 @@ type AdminTab =
   | 'optimization'
   | 'stress-tests'
   | 'organizations'
-  | 'users';
+  | 'users'
+  | 'referrals';
 
 interface DateFilter {
   from: string;
@@ -528,6 +531,7 @@ const AdminDashboard: React.FC = () => {
     { key: 'stress-tests', label: 'Stress Tests', icon: <FiCpu /> },
     { key: 'organizations', label: 'Organizations', icon: <FiBriefcase /> },
     { key: 'users', label: 'Users', icon: <FiUsers /> },
+    { key: 'referrals', label: 'Referrals & Rewards', icon: <FiGift /> },
   ];
 
   if (loading && !overview) {
@@ -1068,6 +1072,9 @@ const AdminDashboard: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Referrals & Campaigns Tab */}
+      {activeTab === 'referrals' && <AdminReferralsPanel />}
 
       {/* Task Execution Detail Modal Drawer */}
       <TaskDetailModal taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />

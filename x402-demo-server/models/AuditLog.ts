@@ -19,7 +19,11 @@ export interface IAuditLog {
     | 'Account Deletion Requested'
     | 'Consent Withdrawn'
     | 'Data Export Requested'
-    | 'Verified Account Erasure Executed';
+    | 'Verified Account Erasure Executed'
+    | 'Referral Applied'
+    | 'Referral Qualified'
+    | 'Referral Reviewed'
+    | 'Referral Points Awarded';
   details?: any;
   ipAddress?: string;
   timestamp: Date;
@@ -47,6 +51,10 @@ const AuditLogSchema = new Schema<IAuditLog>({
       'Consent Withdrawn',
       'Data Export Requested',
       'Verified Account Erasure Executed',
+      'Referral Applied',
+      'Referral Qualified',
+      'Referral Reviewed',
+      'Referral Points Awarded',
     ],
     required: true,
     index: true,

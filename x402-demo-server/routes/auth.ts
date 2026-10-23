@@ -14,6 +14,11 @@ import { PromptAnalysis } from '../models/PromptAnalysis';
 import { CURRENT_LEGAL_VERSIONS } from '../legal.config';
 import { validateAuthBody } from '../middleware/common';
 import { requireAuth, optionalAuth, getJwtSecret } from '../middleware/auth';
+import {
+  generateUniqueReferralCode,
+  attributeReferralOnSignup,
+  ensureUserReferralCode,
+} from '../services/referral';
 
 export function getJwtRefreshSecret(): string {
   const secret = process.env.JWT_REFRESH_SECRET;
@@ -147,6 +152,21 @@ authRouter.post('/signup', validateAuthBody('signup'), async (c) => {
       ipAddress,
     });
 
+    // Generate unique referral code for the new user
+    const userRefCode = await generateUniqueReferralCode();
+    newUser.referralCode = userRefCode;
+    await newUser.save();
+
+    // If a referral code was supplied, attribute it
+    if (body.referralCode && typeof body.referralCode === 'string' && body.referralCode.trim().length > 0) {
+      await attributeReferralOnSignup({
+        refereeId: newUser._id,
+        referralCode: body.referralCode,
+        clientIp: ipAddress,
+        userAgent,
+      }).catch((refErr) => console.warn('Referral attribution on signup warning:', refErr.message));
+    }
+
     return c.json({
       accessToken,
       refreshToken,
@@ -156,6 +176,8 @@ authRouter.post('/signup', validateAuthBody('signup'), async (c) => {
         email: newUser.email,
         role: newUser.role,
         credits: newUser.credits,
+        referralCode: newUser.referralCode,
+        referralPointsBalance: newUser.referralPointsBalance || 0,
         termsAcceptedVersion: newUser.termsAcceptedVersion,
         privacyAcceptedVersion: newUser.privacyAcceptedVersion,
         legalConsentAcceptedAt: newUser.legalConsentAcceptedAt,
@@ -310,6 +332,7 @@ authRouter.get('/me', requireAuth, async (c) => {
   if (!user) {
     return c.json({ error: 'User not found.' }, 404);
   }
+  await ensureUserReferralCode(user);
   return c.json({ user });
 });
 
@@ -401,12 +424,28 @@ authRouter.post('/connect-wallet', optionalAuth, async (c) => {
             console.error('Consent recording failed for wallet user:', consentErr);
             return c.json({ error: 'Failed to record legal consent for wallet user.' }, 500);
           }
+
+          // Generate referral code for new wallet user
+          const walletUserRefCode = await generateUniqueReferralCode();
+          user.referralCode = walletUserRefCode;
+          await user.save();
+
+          // If a referral code was supplied during wallet registration, attribute it
+          if (body.referralCode && typeof body.referralCode === 'string' && body.referralCode.trim().length > 0) {
+            await attributeReferralOnSignup({
+              refereeId: user._id,
+              referralCode: body.referralCode,
+              clientIp: walletIp,
+              userAgent: walletAgent,
+            }).catch((refErr) => console.warn('Referral attribution on wallet connect warning:', refErr.message));
+          }
         }
       }
     }
 
     user.walletAddress = cleanWallet;
     user.lastLogin = new Date();
+    await ensureUserReferralCode(user);
     await user.save();
 
     const { accessToken, refreshToken } = generateTokens(user);
@@ -438,6 +477,8 @@ authRouter.post('/connect-wallet', optionalAuth, async (c) => {
         role: user.role,
         credits: user.credits,
         walletAddress: user.walletAddress,
+        referralCode: user.referralCode,
+        referralPointsBalance: user.referralPointsBalance || 0,
         subscriptionPlan: user.subscriptionPlan,
         termsAcceptedVersion: user.termsAcceptedVersion,
         privacyAcceptedVersion: user.privacyAcceptedVersion,
